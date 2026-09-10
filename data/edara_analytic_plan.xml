@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- One shared analytic plan for all EDARA properties. One analytic account
+         per edara.property (not per branch/building/unit - see EDARA_PROJECT_STATE.md
+         "Analytic accounting" decision: properties scale ~2 orders of magnitude
+         better than units for this purpose). -->
+    <record id="analytic_plan_edara_property" model="account.analytic.plan">
+        <field name="name">EDARA Property Analytics</field>
+    </record>
+</odoo>

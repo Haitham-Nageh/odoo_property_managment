@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Per spec §47 - a professional management dashboard using native
+        Odoo view architecture only (no external frontend framework, no OWL
+        component). A TransientModel keeps this stateless: a fresh record is
+        created on every open and its KPI fields are computed live (same
+        non-stored "snapshot" pattern as edara.property._compute_financial_summary),
+        so the dashboard never goes stale and never needs a singleton row.
+    -->
+    <record id="view_edara_dashboard_form" model="ir.ui.view">
+        <field name="name">edara.dashboard.form</field>
+        <field name="model">edara.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="EDARA Dashboard" create="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>EDARA Management Dashboard</h1>
+                    </div>
+                    <field name="currency_id" invisible="1"/>
+                    <div class="row mt16">
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="total_properties"/></span>
+                            <span class="o_stat_text">Total Properties</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="total_buildings"/></span>
+                            <span class="o_stat_text">Total Buildings</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="total_units"/></span>
+                            <span class="o_stat_text">Total Units</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="occupied_units"/></span>
+                            <span class="o_stat_text">Occupied Units</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="available_units"/></span>
+                            <span class="o_stat_text">Available Units</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="under_maintenance_units"/></span>
+                            <span class="o_stat_text">Under Maintenance</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="monthly_revenue" widget="monetary"/></span>
+                            <span class="o_stat_text">Monthly Revenue</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="outstanding_receivables" widget="monetary"/></span>
+                            <span class="o_stat_text">Outstanding Receivables</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="upcoming_renewals_count"/></span>
+                            <span class="o_stat_text">Pending Renewals</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="open_maintenance_count"/></span>
+                            <span class="o_stat_text">Open Maintenance</span>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6 o_stat_info">
+                            <span class="o_stat_value"><field name="recent_payments_count"/></span>
+                            <span class="o_stat_text">Payments This Month</span>
+                        </div>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_dashboard" model="ir.actions.act_window">
+        <field name="name">Dashboard</field>
+        <field name="res_model">edara.dashboard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_edara_dashboard_form"/>
+        <field name="target">current</field>
+    </record>
+
+    <record id="action_edara_dashboard_open" model="ir.actions.server">
+        <field name="name">Open EDARA Dashboard</field>
+        <field name="model_id" ref="model_edara_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open()</field>
+    </record>
+</odoo>

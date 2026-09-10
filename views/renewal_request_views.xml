@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_renewal_request_list" model="ir.ui.view">
+        <field name="name">edara.renewal.request.list</field>
+        <field name="model">edara.renewal.request</field>
+        <field name="arch" type="xml">
+            <list string="Renewal Requests" decoration-info="state == 'submitted'"
+                  decoration-muted="state == 'rejected'" decoration-success="state == 'approved'">
+                <field name="contract_id"/>
+                <field name="tenant_id"/>
+                <field name="requested_start_date"/>
+                <field name="requested_end_date"/>
+                <field name="requested_rent_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_edara_renewal_request_kanban" model="ir.ui.view">
+        <field name="name">edara.renewal.request.kanban</field>
+        <field name="model">edara.renewal.request</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_small_column">
+                <templates>
+                    <t t-name="card">
+                        <field name="contract_id" class="fw-bold"/>
+                        <div class="text-muted"><field name="tenant_id"/></div>
+                        <div>
+                            <field name="requested_start_date"/> - <field name="requested_end_date"/>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_edara_renewal_request_form" model="ir.ui.view">
+        <field name="name">edara.renewal.request.form</field>
+        <field name="model">edara.renewal.request</field>
+        <field name="arch" type="xml">
+            <form string="Renewal Request">
+                <header>
+                    <button string="Approve" type="object" name="action_approve" class="btn-primary"
+                            invisible="state != 'submitted'"/>
+                    <button string="Reject" type="object" name="action_reject"
+                            invisible="state != 'submitted'" confirm="Reject this renewal request?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="submitted,approved,rejected"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="contract_id" readonly="state != 'submitted'"/>
+                            <field name="tenant_id" readonly="1"/>
+                            <field name="unit_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="requested_start_date" readonly="state != 'submitted'"/>
+                            <field name="requested_end_date" readonly="state != 'submitted'"/>
+                            <field name="requested_rent_amount" readonly="state != 'submitted'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="note" readonly="1"/>
+                        <field name="decision_note" invisible="state == 'submitted'"/>
+                        <field name="new_contract_id" readonly="1" invisible="not new_contract_id"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_renewal_request" model="ir.actions.act_window">
+        <field name="name">Renewal Requests</field>
+        <field name="res_model">edara.renewal.request</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">
+                No renewal requests yet
+            </p>
+            <p>
+                Renewal requests are created here when a tenant asks to extend their
+                lease, either from the portal or on their behalf.
+            </p>
+        </field>
+    </record>
+</odoo>

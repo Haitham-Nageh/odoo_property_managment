@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_lease_contract_list" model="ir.ui.view">
+        <field name="name">edara.lease.contract.list</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <list string="Lease Contracts" decoration-success="state == 'active'"
+                  decoration-muted="state in ('terminated', 'expired', 'renewed')">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="unit_id"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="rent_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_edara_lease_contract_form" model="ir.ui.view">
+        <field name="name">edara.lease.contract.form</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <form string="Lease Contract">
+                <header>
+                    <button string="Activate" type="object" name="action_activate" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button string="Renew" type="action" name="%(action_edara_lease_renewal_wizard)d"
+                            invisible="state != 'active'"/>
+                    <button string="Terminate" type="object" name="action_terminate"
+                            invisible="state != 'active'" confirm="Terminate this lease contract?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,terminated"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button type="object" name="action_view_schedule_lines" class="oe_stat_button" icon="fa-calendar">
+                            <field name="schedule_line_count" widget="statinfo" string="Schedule"/>
+                        </button>
+                        <button type="object" name="action_view_deposit" class="oe_stat_button" icon="fa-shield"
+                                invisible="not deposit_required">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Deposit</span>
+                            </div>
+                        </button>
+                        <button type="object" name="action_view_renewal_requests" class="oe_stat_button" icon="fa-refresh">
+                            <field name="renewal_request_count" widget="statinfo" string="Renewals"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="unit_id" readonly="state != 'draft'"/>
+                            <field name="tenant_id" readonly="state != 'draft'"/>
+                            <field name="branch_id" readonly="1" groups="base.group_no_one"/>
+                            <field name="property_id" readonly="1" groups="base.group_no_one"/>
+                            <field name="building_id" readonly="1" groups="base.group_no_one"/>
+                        </group>
+                        <group>
+                            <field name="start_date" readonly="state != 'draft'"/>
+                            <field name="end_date" readonly="state not in ('draft', 'active')"/>
+                            <field name="rent_amount"/>
+                            <field name="currency_id" groups="base.group_multi_currency"/>
+                            <field name="billing_frequency"/>
+                            <field name="payment_day"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Deposit">
+                            <field name="deposit_required"/>
+                            <field name="deposit_amount" invisible="not deposit_required"/>
+                        </group>
+                        <group string="Renewal / Termination" invisible="not predecessor_contract_id and not successor_contract_id and state != 'terminated'">
+                            <field name="predecessor_contract_id" readonly="1"/>
+                            <field name="successor_contract_id" readonly="1"/>
+                            <field name="termination_date" readonly="1"/>
+                            <field name="termination_reason" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes" name="notes">
+                            <field name="notes"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_lease_contract" model="ir.actions.act_window">
+        <field name="name">Lease Contracts</field>
+        <field name="res_model">edara.lease.contract</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">
+                Create your first lease contract
+            </p>
+        </field>
+    </record>
+</odoo>

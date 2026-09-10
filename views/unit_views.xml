@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_unit_list" model="ir.ui.view">
+        <field name="name">edara.unit.list</field>
+        <field name="model">edara.unit</field>
+        <field name="arch" type="xml">
+            <list string="Units" decoration-success="occupancy_status == 'available'"
+                  decoration-danger="occupancy_status == 'rented'"
+                  decoration-warning="occupancy_status == 'reserved'"
+                  decoration-muted="operational_status == 'under_maintenance'">
+                <field name="name"/>
+                <field name="building_id"/>
+                <field name="property_id" groups="base.group_no_one"/>
+                <field name="unit_type"/>
+                <field name="floor"/>
+                <field name="area"/>
+                <field name="rent_amount_default"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="occupancy_status"/>
+                <field name="operational_status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_edara_unit_kanban" model="ir.ui.view">
+        <field name="name">edara.unit.kanban</field>
+        <field name="model">edara.unit</field>
+        <field name="arch" type="xml">
+            <!--
+                Per spec §48 "Visual Property Management" - a floor/unit grid
+                visualization where status is obvious at a glance, built with
+                plain native kanban/QWeb (grouped by floor, one column per
+                floor exactly like the spec's ASCII mockup) and Bootstrap
+                utility classes for color - no OWL component, no CSS file,
+                no third-party dependency.
+            -->
+            <kanban default_group_by="floor" class="o_kanban_small_column">
+                <templates>
+                    <t t-name="card">
+                        <div t-attf-class="text-center rounded p-2 text-white #{record.operational_status.raw_value == 'under_maintenance' ? 'bg-warning' : (record.occupancy_status.raw_value == 'rented' ? 'bg-danger' : (record.occupancy_status.raw_value == 'available' ? 'bg-success' : 'bg-secondary'))}">
+                            <field name="operational_status" invisible="1"/>
+                            <div class="fw-bold"><field name="name"/></div>
+                            <div class="small"><field name="occupancy_status"/></div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_edara_unit_search" model="ir.ui.view">
+        <field name="name">edara.unit.search</field>
+        <field name="model">edara.unit</field>
+        <field name="arch" type="xml">
+            <search string="Units">
+                <field name="name"/>
+                <field name="building_id"/>
+                <field name="floor"/>
+                <filter string="Available" name="available" domain="[('occupancy_status', '=', 'available')]"/>
+                <filter string="Rented" name="rented" domain="[('occupancy_status', '=', 'rented')]"/>
+                <filter string="Under Maintenance" name="under_maintenance"
+                        domain="[('operational_status', '=', 'under_maintenance')]"/>
+                <group>
+                    <filter string="Building" name="group_by_building" context="{'group_by': 'building_id'}"/>
+                    <filter string="Floor" name="group_by_floor" context="{'group_by': 'floor'}"/>
+                    <filter string="Occupancy" name="group_by_occupancy" context="{'group_by': 'occupancy_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_edara_unit_form" model="ir.ui.view">
+        <field name="name">edara.unit.form</field>
+        <field name="model">edara.unit</field>
+        <field name="arch" type="xml">
+            <form string="Unit">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button type="object" name="action_view_contracts" class="oe_stat_button" icon="fa-file-text-o">
+                            <field name="contract_count" widget="statinfo" string="Contracts"/>
+                        </button>
+                        <button type="object" name="action_view_maintenance_requests" class="oe_stat_button" icon="fa-wrench">
+                            <field name="maintenance_request_count" widget="statinfo" string="Maintenance"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. A-101"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="building_id"/>
+                            <field name="property_id" readonly="1" groups="base.group_no_one"/>
+                            <field name="branch_id" readonly="1" groups="base.group_no_one"/>
+                            <field name="active" invisible="1"/>
+                            <field name="unit_type"/>
+                            <field name="floor"/>
+                            <field name="unit_number"/>
+                        </group>
+                        <group>
+                            <field name="area"/>
+                            <field name="bedrooms"/>
+                            <field name="bathrooms"/>
+                            <field name="rent_amount_default"/>
+                            <field name="currency_id" groups="base.group_multi_currency"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="occupancy_status"/>
+                        </group>
+                        <group>
+                            <field name="operational_status"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_unit" model="ir.actions.act_window">
+        <field name="name">Units</field>
+        <field name="res_model">edara.unit</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_edara_unit_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">
+                Create your first unit
+            </p>
+        </field>
+    </record>
+</odoo>

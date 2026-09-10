@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="seq_edara_lease_contract" model="ir.sequence">
+        <field name="name">EDARA Lease Contract</field>
+        <field name="code">edara.lease.contract</field>
+        <field name="prefix">LC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_edara_service_charge" model="ir.sequence">
+        <field name="name">EDARA Service Charge</field>
+        <field name="code">edara.service.charge</field>
+        <field name="prefix">SC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_edara_maintenance_request" model="ir.sequence">
+        <field name="name">EDARA Maintenance Request</field>
+        <field name="code">edara.maintenance.request</field>
+        <field name="prefix">MR/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

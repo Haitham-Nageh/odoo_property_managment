@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.edara</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="EDARA Property Management" string="EDARA Property Management"
+                     name="property_managment">
+                    <block title="Accounting" name="edara_accounting_setting_container">
+                        <setting id="edara_rental_income_account_setting"
+                                 help="Account credited when a rent invoice is posted.">
+                            <field name="edara_rental_income_account_id"/>
+                        </setting>
+                        <setting id="edara_late_fee_income_account_setting"
+                                 help="Account credited when a late fee invoice is posted.">
+                            <field name="edara_late_fee_income_account_id"/>
+                        </setting>
+                        <setting id="edara_late_fee_amount_setting"
+                                 help="Flat amount charged when staff manually charge a late fee on an overdue payment. Never applied automatically.">
+                            <field name="edara_late_fee_amount"/>
+                        </setting>
+                        <setting id="edara_service_charge_income_account_setting"
+                                 help="Account credited when a service charge invoice is posted.">
+                            <field name="edara_service_charge_income_account_id"/>
+                        </setting>
+                        <setting id="edara_deposit_liability_account_setting"
+                                 help="Liability account holding tenant security deposits.">
+                            <field name="edara_deposit_liability_account_id"/>
+                        </setting>
+                        <setting id="edara_deposit_deduction_income_account_setting"
+                                 help="Income account credited when a deposit deduction (e.g. damage recovery) is recorded.">
+                            <field name="edara_deposit_deduction_income_account_id"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_edara_config_settings" model="ir.actions.act_window">
+        <field name="name">EDARA Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module': 'property_managment'}</field>
+    </record>
+</odoo>

@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Pattern reused for every branch-scoped EDARA model added in later phases:
+        1) a global (no group) multi-company rule: company_id in user's allowed companies
+        2) a restrictive rule on group_edara_viewer (inherited by every other EDARA
+           role): only branches the user is assigned to (staff or manager)
+        3) a full-access rule on group_edara_company_manager: sees every branch of
+           the company. Since Company Manager/Administrator also carry
+           group_edara_viewer (via implied_ids), rule (2) and (3) are OR'd together
+           for them, so the company-wide rule wins.
+    -->
+    <record id="rule_edara_branch_company" model="ir.rule">
+        <field name="name">EDARA Branch: multi-company</field>
+        <field name="model_id" ref="model_edara_branch"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="rule_edara_branch_assigned_only" model="ir.rule">
+        <field name="name">EDARA Branch: assigned branches only</field>
+        <field name="model_id" ref="model_edara_branch"/>
+        <field name="domain_force">['|', ('user_ids', 'in', [user.id]), ('manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+
+    <record id="rule_edara_branch_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Branch: company manager sees all branches</field>
+        <field name="model_id" ref="model_edara_branch"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.property: branch_id is a direct field -->
+    <record id="rule_edara_property_company" model="ir.rule">
+        <field name="name">EDARA Property: multi-company</field>
+        <field name="model_id" ref="model_edara_property"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_property_assigned_only" model="ir.rule">
+        <field name="name">EDARA Property: assigned branches only</field>
+        <field name="model_id" ref="model_edara_property"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_property_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Property: company manager sees all</field>
+        <field name="model_id" ref="model_edara_property"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.building: branch_id is a stored related field -->
+    <record id="rule_edara_building_company" model="ir.rule">
+        <field name="name">EDARA Building: multi-company</field>
+        <field name="model_id" ref="model_edara_building"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_building_assigned_only" model="ir.rule">
+        <field name="name">EDARA Building: assigned branches only</field>
+        <field name="model_id" ref="model_edara_building"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_building_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Building: company manager sees all</field>
+        <field name="model_id" ref="model_edara_building"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.unit: branch_id is a stored related field -->
+    <record id="rule_edara_unit_company" model="ir.rule">
+        <field name="name">EDARA Unit: multi-company</field>
+        <field name="model_id" ref="model_edara_unit"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_unit_assigned_only" model="ir.rule">
+        <field name="name">EDARA Unit: assigned branches only</field>
+        <field name="model_id" ref="model_edara_unit"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_unit_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Unit: company manager sees all</field>
+        <field name="model_id" ref="model_edara_unit"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.ownership: branch_id is a stored related field -->
+    <record id="rule_edara_ownership_company" model="ir.rule">
+        <field name="name">EDARA Ownership: multi-company</field>
+        <field name="model_id" ref="model_edara_ownership"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_ownership_assigned_only" model="ir.rule">
+        <field name="name">EDARA Ownership: assigned branches only</field>
+        <field name="model_id" ref="model_edara_ownership"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_ownership_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Ownership: company manager sees all</field>
+        <field name="model_id" ref="model_edara_ownership"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.lease.contract: branch_id is a stored related field -->
+    <record id="rule_edara_lease_contract_company" model="ir.rule">
+        <field name="name">EDARA Lease Contract: multi-company</field>
+        <field name="model_id" ref="model_edara_lease_contract"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_lease_contract_assigned_only" model="ir.rule">
+        <field name="name">EDARA Lease Contract: assigned branches only</field>
+        <field name="model_id" ref="model_edara_lease_contract"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_lease_contract_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Lease Contract: company manager sees all</field>
+        <field name="model_id" ref="model_edara_lease_contract"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.payment.schedule.line: branch_id is a stored related field -->
+    <record id="rule_edara_schedule_line_company" model="ir.rule">
+        <field name="name">EDARA Payment Schedule Line: multi-company</field>
+        <field name="model_id" ref="model_edara_payment_schedule_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_schedule_line_assigned_only" model="ir.rule">
+        <field name="name">EDARA Payment Schedule Line: assigned branches only</field>
+        <field name="model_id" ref="model_edara_payment_schedule_line"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_schedule_line_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Payment Schedule Line: company manager sees all</field>
+        <field name="model_id" ref="model_edara_payment_schedule_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.deposit: branch_id is a stored related field -->
+    <record id="rule_edara_deposit_company" model="ir.rule">
+        <field name="name">EDARA Deposit: multi-company</field>
+        <field name="model_id" ref="model_edara_deposit"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_deposit_assigned_only" model="ir.rule">
+        <field name="name">EDARA Deposit: assigned branches only</field>
+        <field name="model_id" ref="model_edara_deposit"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_deposit_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Deposit: company manager sees all</field>
+        <field name="model_id" ref="model_edara_deposit"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.deposit.transaction: branch_id is a stored related field -->
+    <record id="rule_edara_deposit_transaction_company" model="ir.rule">
+        <field name="name">EDARA Deposit Transaction: multi-company</field>
+        <field name="model_id" ref="model_edara_deposit_transaction"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_deposit_transaction_assigned_only" model="ir.rule">
+        <field name="name">EDARA Deposit Transaction: assigned branches only</field>
+        <field name="model_id" ref="model_edara_deposit_transaction"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_deposit_transaction_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Deposit Transaction: company manager sees all</field>
+        <field name="model_id" ref="model_edara_deposit_transaction"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.service.charge: branch_id is a stored related field -->
+    <record id="rule_edara_service_charge_company" model="ir.rule">
+        <field name="name">EDARA Service Charge: multi-company</field>
+        <field name="model_id" ref="model_edara_service_charge"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_service_charge_assigned_only" model="ir.rule">
+        <field name="name">EDARA Service Charge: assigned branches only</field>
+        <field name="model_id" ref="model_edara_service_charge"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_service_charge_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Service Charge: company manager sees all</field>
+        <field name="model_id" ref="model_edara_service_charge"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.service.charge.line: branch_id is a stored related field -->
+    <record id="rule_edara_service_charge_line_company" model="ir.rule">
+        <field name="name">EDARA Service Charge Line: multi-company</field>
+        <field name="model_id" ref="model_edara_service_charge_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_service_charge_line_assigned_only" model="ir.rule">
+        <field name="name">EDARA Service Charge Line: assigned branches only</field>
+        <field name="model_id" ref="model_edara_service_charge_line"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_service_charge_line_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Service Charge Line: company manager sees all</field>
+        <field name="model_id" ref="model_edara_service_charge_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.maintenance.request: branch_id is a stored related field -->
+    <record id="rule_edara_maintenance_request_company" model="ir.rule">
+        <field name="name">EDARA Maintenance Request: multi-company</field>
+        <field name="model_id" ref="model_edara_maintenance_request"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_maintenance_request_assigned_only" model="ir.rule">
+        <field name="name">EDARA Maintenance Request: assigned branches only</field>
+        <field name="model_id" ref="model_edara_maintenance_request"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_maintenance_request_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Maintenance Request: company manager sees all</field>
+        <field name="model_id" ref="model_edara_maintenance_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!-- edara.renewal.request: branch_id is a stored related field -->
+    <record id="rule_edara_renewal_request_company" model="ir.rule">
+        <field name="name">EDARA Renewal Request: multi-company</field>
+        <field name="model_id" ref="model_edara_renewal_request"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_edara_renewal_request_assigned_only" model="ir.rule">
+        <field name="name">EDARA Renewal Request: assigned branches only</field>
+        <field name="model_id" ref="model_edara_renewal_request"/>
+        <field name="domain_force">['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_viewer'))]"/>
+    </record>
+    <record id="rule_edara_renewal_request_company_manager_all" model="ir.rule">
+        <field name="name">EDARA Renewal Request: company manager sees all</field>
+        <field name="model_id" ref="model_edara_renewal_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_company_manager'))]"/>
+    </record>
+
+    <!--
+        Portal tenant access: a tenant must only ever see/create their OWN records,
+        never another tenant's - never derivable via record id guessing (spec §39).
+        These are the only rules that apply to group_edara_portal_tenant (it does not
+        carry group_edara_viewer), so each is the complete restriction for that group.
+    -->
+    <record id="rule_edara_lease_contract_portal_own" model="ir.rule">
+        <field name="name">EDARA Lease Contract: portal tenant sees only their own</field>
+        <field name="model_id" ref="model_edara_lease_contract"/>
+        <field name="domain_force">[('tenant_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_portal_tenant'))]"/>
+    </record>
+    <record id="rule_edara_unit_portal_own" model="ir.rule">
+        <field name="name">EDARA Unit: portal tenant sees only their leased unit(s)</field>
+        <field name="model_id" ref="model_edara_unit"/>
+        <field name="domain_force">[('lease_contract_ids.tenant_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_portal_tenant'))]"/>
+    </record>
+    <record id="rule_edara_maintenance_request_portal_own" model="ir.rule">
+        <field name="name">EDARA Maintenance Request: portal tenant sees only their own</field>
+        <field name="model_id" ref="model_edara_maintenance_request"/>
+        <field name="domain_force">[('tenant_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_portal_tenant'))]"/>
+    </record>
+    <record id="rule_edara_renewal_request_portal_own" model="ir.rule">
+        <field name="name">EDARA Renewal Request: portal tenant sees only their own</field>
+        <field name="model_id" ref="model_edara_renewal_request"/>
+        <field name="domain_force">[('tenant_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('group_edara_portal_tenant'))]"/>
+    </record>
+</odoo>

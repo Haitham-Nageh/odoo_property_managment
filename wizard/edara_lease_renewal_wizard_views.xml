@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_lease_renewal_wizard_form" model="ir.ui.view">
+        <field name="name">edara.lease.renewal.wizard.form</field>
+        <field name="model">edara.lease.renewal.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Renew Contract">
+                <group>
+                    <field name="contract_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="new_start_date"/>
+                    <field name="new_end_date"/>
+                    <field name="new_rent_amount"/>
+                </group>
+                <footer>
+                    <button string="Renew" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_lease_renewal_wizard" model="ir.actions.act_window">
+        <field name="name">Renew Contract</field>
+        <field name="res_model">edara.lease.renewal.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

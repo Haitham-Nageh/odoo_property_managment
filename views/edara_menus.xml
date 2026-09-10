@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_edara_root" name="EDARA Property Management" groups="group_edara_viewer"
+              web_icon="property_managment,static/description/icon.png"/>
+
+    <menuitem id="menu_edara_dashboard" name="Dashboard" parent="menu_edara_root"
+              action="action_edara_dashboard_open" sequence="5"/>
+
+    <menuitem id="menu_edara_property" name="Properties" parent="menu_edara_root"
+              action="action_edara_property" sequence="10"/>
+
+    <menuitem id="menu_edara_building" name="Buildings" parent="menu_edara_root"
+              action="action_edara_building" sequence="20"/>
+
+    <menuitem id="menu_edara_unit" name="Units" parent="menu_edara_root"
+              action="action_edara_unit" sequence="30"/>
+
+    <menuitem id="menu_edara_lease_contract" name="Contracts" parent="menu_edara_root"
+              action="action_edara_lease_contract" sequence="40"/>
+
+    <menuitem id="menu_edara_payment_schedule_line" name="Payment Schedule" parent="menu_edara_root"
+              action="action_edara_payment_schedule_line" sequence="50"/>
+
+    <menuitem id="menu_edara_deposit" name="Security Deposits" parent="menu_edara_root"
+              action="action_edara_deposit" sequence="60"/>
+
+    <menuitem id="menu_edara_service_charge" name="Service Charges" parent="menu_edara_root"
+              action="action_edara_service_charge" sequence="70"/>
+
+    <menuitem id="menu_edara_maintenance_request" name="Maintenance" parent="menu_edara_root"
+              action="action_edara_maintenance_request" sequence="80"/>
+
+    <menuitem id="menu_edara_renewal_request" name="Renewal Requests" parent="menu_edara_root"
+              action="action_edara_renewal_request" sequence="90"/>
+
+    <menuitem id="menu_edara_reports" name="Reports" parent="menu_edara_root" sequence="95"
+              groups="group_edara_accountant,group_edara_branch_manager"/>
+
+    <menuitem id="menu_edara_revenue_report" name="Revenue" parent="menu_edara_reports"
+              action="action_edara_revenue_report" sequence="10"/>
+    <menuitem id="menu_edara_expense_report" name="Expenses" parent="menu_edara_reports"
+              action="action_edara_expense_report" sequence="20"/>
+    <menuitem id="menu_edara_receivables_report" name="Receivables" parent="menu_edara_reports"
+              action="action_edara_receivables_report" sequence="30"/>
+    <menuitem id="menu_edara_occupancy_report" name="Occupancy" parent="menu_edara_reports"
+              action="action_edara_occupancy_report" sequence="40"/>
+    <menuitem id="menu_edara_tenant_ledger_report" name="Tenant Ledger" parent="menu_edara_reports"
+              action="action_edara_tenant_ledger_report" sequence="50"/>
+
+    <menuitem id="menu_edara_configuration" name="Configuration" parent="menu_edara_root" sequence="100"
+              groups="group_edara_branch_manager"/>
+
+    <menuitem id="menu_edara_branch" name="Branches" parent="menu_edara_configuration"
+              action="action_edara_branch" sequence="10"/>
+
+    <menuitem id="menu_edara_settings" name="Settings" parent="menu_edara_configuration"
+              action="action_edara_config_settings" sequence="90"
+              groups="group_edara_company_manager"/>
+</odoo>

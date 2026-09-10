@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_deposit_transaction_wizard_form" model="ir.ui.view">
+        <field name="name">edara.deposit.transaction.wizard.form</field>
+        <field name="model">edara.deposit.transaction.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Record Deposit Transaction">
+                <field name="deposit_id" invisible="1"/>
+                <field name="company_id" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <group>
+                    <field name="transaction_type" invisible="1"/>
+                    <field name="amount"/>
+                    <field name="journal_id" invisible="transaction_type == 'deduction'"
+                           required="transaction_type != 'deduction'"/>
+                    <field name="description" invisible="transaction_type != 'deduction'"
+                           required="transaction_type == 'deduction'"/>
+                </group>
+                <footer>
+                    <button string="Confirm" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_deposit_transaction_wizard" model="ir.actions.act_window">
+        <field name="name">Record Deposit Transaction</field>
+        <field name="res_model">edara.deposit.transaction.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

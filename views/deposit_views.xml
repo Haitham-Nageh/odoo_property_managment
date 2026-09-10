@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_deposit_list" model="ir.ui.view">
+        <field name="name">edara.deposit.list</field>
+        <field name="model">edara.deposit</field>
+        <field name="arch" type="xml">
+            <list string="Security Deposits">
+                <field name="contract_id"/>
+                <field name="tenant_id"/>
+                <field name="amount"/>
+                <field name="balance"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_edara_deposit_form" model="ir.ui.view">
+        <field name="name">edara.deposit.form</field>
+        <field name="model">edara.deposit</field>
+        <field name="arch" type="xml">
+            <form string="Security Deposit">
+                <header>
+                    <button string="Collect Deposit" type="action"
+                            name="%(action_edara_deposit_transaction_wizard)d"
+                            context="{'default_transaction_type': 'held'}"
+                            class="btn-primary" invisible="balance &gt;= amount"/>
+                    <button string="Refund" type="action"
+                            name="%(action_edara_deposit_transaction_wizard)d"
+                            context="{'default_transaction_type': 'refund'}"
+                            invisible="balance &lt;= 0"/>
+                    <button string="Deduct" type="action"
+                            name="%(action_edara_deposit_transaction_wizard)d"
+                            context="{'default_transaction_type': 'deduction'}"
+                            invisible="balance &lt;= 0"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,held,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="contract_id" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="tenant_id" readonly="1"/>
+                            <field name="unit_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="amount"/>
+                            <field name="amount_held" readonly="1"/>
+                            <field name="amount_refunded" readonly="1"/>
+                            <field name="amount_deducted" readonly="1"/>
+                            <field name="balance" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Transactions" name="transactions">
+                            <field name="transaction_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="transaction_type" widget="badge"/>
+                                    <field name="amount"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="payment_id"/>
+                                    <field name="move_id"/>
+                                    <field name="description"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_deposit" model="ir.actions.act_window">
+        <field name="name">Security Deposits</field>
+        <field name="res_model">edara.deposit</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">
+                No security deposits yet
+            </p>
+            <p>
+                Deposits are created automatically when a lease contract with
+                "Deposit Required" is activated.
+            </p>
+        </field>
+    </record>
+</odoo>

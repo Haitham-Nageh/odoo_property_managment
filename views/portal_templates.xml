@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_my_home_edara" name="My Lease / Maintenance" inherit_id="portal.portal_my_home"
+              customize_show="True" priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">My Lease</t>
+                <t t-set="url" t-value="'/my/leases'"/>
+                <t t-set="text">View your lease, unit and request a renewal</t>
+                <t t-set="placeholder_count" t-value="'lease_count'"/>
+            </t>
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Maintenance Requests</t>
+                <t t-set="url" t-value="'/my/maintenance'"/>
+                <t t-set="text">Report an issue with your unit or follow up on one</t>
+                <t t-set="placeholder_count" t-value="'maintenance_count'"/>
+            </t>
+        </div>
+    </template>
+
+    <!-- ================= My Lease ================= -->
+
+    <template id="portal_my_leases" name="My Leases">
+        <t t-call="portal.portal_layout">
+            <t t-if="not contracts">
+                <p class="alert alert-warning">You do not have any lease contract yet.</p>
+            </t>
+            <t t-if="contracts" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Reference</th>
+                        <th>Unit</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Rent</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="contracts" t-as="contract">
+                        <td><a t-attf-href="/my/leases/#{contract.id}"><t t-out="contract.name"/></a></td>
+                        <td><t t-out="contract.unit_id.display_name"/></td>
+                        <td><span t-field="contract.start_date"/></td>
+                        <td><span t-field="contract.end_date"/></td>
+                        <td><span t-field="contract.rent_amount" t-options="{'widget': 'monetary', 'display_currency': contract.currency_id}"/></td>
+                        <td><span t-out="contract.state"/></td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <template id="portal_lease_detail" name="My Lease">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12">
+                    <h3><t t-out="contract.name"/></h3>
+                    <table class="table table-sm">
+                        <tr><td>Unit</td><td><t t-out="contract.unit_id.display_name"/></td></tr>
+                        <tr><td>Property</td><td><t t-out="contract.property_id.display_name"/></td></tr>
+                        <tr><td>Start Date</td><td><span t-field="contract.start_date"/></td></tr>
+                        <tr><td>End Date</td><td><span t-field="contract.end_date"/></td></tr>
+                        <tr><td>Rent</td><td><span t-field="contract.rent_amount" t-options="{'widget': 'monetary', 'display_currency': contract.currency_id}"/></td></tr>
+                        <tr><td>Status</td><td><t t-out="contract.state"/></td></tr>
+                    </table>
+
+                    <t t-if="contract.state == 'active' and not open_renewal">
+                        <h4 class="mt-4">Request a Renewal</h4>
+                        <form t-attf-action="/my/leases/#{contract.id}/renew" method="post" class="row g-3">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <div class="col-md-4">
+                                <label class="form-label">New Start Date</label>
+                                <input type="date" name="requested_start_date" class="form-control"
+                                       t-att-value="contract.end_date"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">New End Date</label>
+                                <input type="date" name="requested_end_date" class="form-control" required="required"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Proposed Rent</label>
+                                <input type="number" step="0.01" name="requested_rent_amount" class="form-control"
+                                       t-att-value="contract.rent_amount"/>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Message (optional)</label>
+                                <textarea name="note" class="form-control"/>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Submit Renewal Request</button>
+                            </div>
+                        </form>
+                    </t>
+                    <t t-if="open_renewal">
+                        <p class="alert alert-info mt-4">
+                            A renewal request for this lease is already pending review.
+                        </p>
+                    </t>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ================= My Maintenance Requests ================= -->
+
+    <template id="portal_my_maintenance" name="My Maintenance Requests">
+        <t t-call="portal.portal_layout">
+            <a href="/my/maintenance/new" class="btn btn-primary mb-3">New Maintenance Request</a>
+            <t t-if="not maintenance_requests">
+                <p class="alert alert-warning">You have not filed any maintenance request yet.</p>
+            </t>
+            <t t-if="maintenance_requests" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Reference</th>
+                        <th>Title</th>
+                        <th>Unit</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="maintenance_requests" t-as="maintenance_request">
+                        <td><a t-attf-href="/my/maintenance/#{maintenance_request.id}"><t t-out="maintenance_request.name"/></a></td>
+                        <td><t t-out="maintenance_request.title"/></td>
+                        <td><t t-out="maintenance_request.unit_id.display_name"/></td>
+                        <td><t t-out="maintenance_request.priority"/></td>
+                        <td><t t-out="maintenance_request.state"/></td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <template id="portal_maintenance_new" name="New Maintenance Request">
+        <t t-call="portal.portal_layout">
+            <h3>New Maintenance Request</h3>
+            <t t-if="not units">
+                <p class="alert alert-warning">You do not have an active lease to file a request against.</p>
+            </t>
+            <form t-if="units" action="/my/maintenance/new" method="post" class="row g-3">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="col-md-6">
+                    <label class="form-label">Unit</label>
+                    <select name="unit_id" class="form-select" required="required">
+                        <option t-foreach="units" t-as="unit" t-att-value="unit.id" t-out="unit.display_name"/>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-select">
+                        <option value="low">Low</option>
+                        <option value="normal" selected="selected">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control" required="required"/>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control"/>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Submit Request</button>
+                </div>
+            </form>
+        </t>
+    </template>
+
+    <template id="portal_maintenance_detail" name="Maintenance Request">
+        <t t-call="portal.portal_layout">
+            <h3><t t-out="maintenance_request.name"/> - <t t-out="maintenance_request.title"/></h3>
+            <table class="table table-sm">
+                <tr><td>Unit</td><td><t t-out="maintenance_request.unit_id.display_name"/></td></tr>
+                <tr><td>Priority</td><td><t t-out="maintenance_request.priority"/></td></tr>
+                <tr><td>Status</td><td><t t-out="maintenance_request.state"/></td></tr>
+                <tr><td>Requested On</td><td><span t-field="maintenance_request.requested_date"/></td></tr>
+                <tr t-if="maintenance_request.completed_date">
+                    <td>Completed On</td><td><span t-field="maintenance_request.completed_date"/></td>
+                </tr>
+            </table>
+            <p t-if="maintenance_request.description" t-out="maintenance_request.description"/>
+        </t>
+    </template>
+</odoo>

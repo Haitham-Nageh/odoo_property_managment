@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Per spec §55 "Use native Odoo accounting/reporting capabilities wherever
+        possible" - these are plain pivot/graph/list views on account.move and
+        edara.unit (no custom report engine, no parallel data model). Revenue and
+        Expenses rely on account.move's own amount_untaxed_signed convention,
+        which already nets credit notes/refunds against invoices correctly - see
+        edara_property.py's _compute_financial_summary for the sign-convention
+        notes verified against the actual Odoo 19 source. account.move has no
+        native pivot view of its own (only account.move.line does), so each
+        report action pins its own pivot view explicitly via view_id.
+    -->
+    <record id="view_edara_account_move_report_search" model="ir.ui.view">
+        <field name="name">edara.account.move.report.search</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <search string="EDARA Financial Report">
+                <field name="partner_id"/>
+                <field name="edara_branch_id"/>
+                <field name="edara_property_id"/>
+                <filter string="Posted" name="posted" domain="[('state', '=', 'posted')]"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <separator/>
+                <filter string="This Year" name="this_year"
+                        domain="[('invoice_date', '&gt;=', context_today().strftime('%Y-01-01'))]"/>
+                <group>
+                    <filter string="Branch" name="group_by_branch" context="{'group_by': 'edara_branch_id'}"/>
+                    <filter string="Property" name="group_by_property" context="{'group_by': 'edara_property_id'}"/>
+                    <filter string="Tenant/Partner" name="group_by_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Month" name="group_by_month" context="{'group_by': 'invoice_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_edara_revenue_report_pivot" model="ir.ui.view">
+        <field name="name">edara.revenue.report.pivot</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <pivot string="Revenue">
+                <field name="edara_branch_id" type="row"/>
+                <field name="edara_property_id" type="row"/>
+                <field name="invoice_date" interval="month" type="col"/>
+                <field name="amount_untaxed_signed" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_edara_revenue_report" model="ir.actions.act_window">
+        <field name="name">Revenue Report</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="view_id" ref="view_edara_revenue_report_pivot"/>
+        <field name="search_view_id" ref="view_edara_account_move_report_search"/>
+        <field name="domain">[('state', '=', 'posted'), ('move_type', 'in', ('out_invoice', 'out_refund'))]</field>
+        <field name="context">{'search_default_this_year': 1}</field>
+    </record>
+
+    <record id="view_edara_expense_report_pivot" model="ir.ui.view">
+        <field name="name">edara.expense.report.pivot</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <pivot string="Expenses">
+                <field name="edara_branch_id" type="row"/>
+                <field name="edara_property_id" type="row"/>
+                <field name="invoice_date" interval="month" type="col"/>
+                <field name="amount_untaxed_signed" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_edara_expense_report" model="ir.actions.act_window">
+        <field name="name">Expenses Report</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="view_id" ref="view_edara_expense_report_pivot"/>
+        <field name="search_view_id" ref="view_edara_account_move_report_search"/>
+        <field name="domain">[('state', '=', 'posted'), ('move_type', 'in', ('in_invoice', 'in_refund'))]</field>
+        <field name="context">{'search_default_this_year': 1}</field>
+    </record>
+
+    <record id="view_edara_receivables_report_pivot" model="ir.ui.view">
+        <field name="name">edara.receivables.report.pivot</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <pivot string="Receivables">
+                <field name="edara_property_id" type="row"/>
+                <field name="partner_id" type="row"/>
+                <field name="payment_state" type="col"/>
+                <field name="amount_residual_signed" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_edara_receivables_report" model="ir.actions.act_window">
+        <field name="name">Receivables Report</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="view_id" ref="view_edara_receivables_report_pivot"/>
+        <field name="search_view_id" ref="view_edara_account_move_report_search"/>
+        <field name="domain">[('state', '=', 'posted'), ('move_type', 'in', ('out_invoice', 'out_refund'))]</field>
+    </record>
+
+    <record id="view_edara_unit_report_search" model="ir.ui.view">
+        <field name="name">edara.unit.report.search</field>
+        <field name="model">edara.unit</field>
+        <field name="arch" type="xml">
+            <search string="EDARA Occupancy Report">
+                <field name="branch_id"/>
+                <field name="property_id"/>
+                <filter string="Rented" name="rented" domain="[('occupancy_status', '=', 'rented')]"/>
+                <filter string="Vacant" name="vacant" domain="[('occupancy_status', '=', 'vacant')]"/>
+                <group>
+                    <filter string="Branch" name="group_by_branch" context="{'group_by': 'branch_id'}"/>
+                    <filter string="Property" name="group_by_property" context="{'group_by': 'property_id'}"/>
+                    <filter string="Status" name="group_by_status" context="{'group_by': 'occupancy_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_edara_occupancy_report_pivot" model="ir.ui.view">
+        <field name="name">edara.occupancy.report.pivot</field>
+        <field name="model">edara.unit</field>
+        <field name="arch" type="xml">
+            <pivot string="Occupancy">
+                <field name="branch_id" type="row"/>
+                <field name="property_id" type="row"/>
+                <field name="occupancy_status" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_edara_occupancy_report" model="ir.actions.act_window">
+        <field name="name">Occupancy Report</field>
+        <field name="res_model">edara.unit</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="view_id" ref="view_edara_occupancy_report_pivot"/>
+        <field name="search_view_id" ref="view_edara_unit_report_search"/>
+    </record>
+
+    <record id="view_edara_tenant_ledger_list" model="ir.ui.view">
+        <field name="name">edara.tenant.ledger.list</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <list string="Tenant Ledger" default_order="partner_id, invoice_date">
+                <field name="partner_id"/>
+                <field name="invoice_date"/>
+                <field name="edara_invoice_type"/>
+                <field name="edara_property_id"/>
+                <field name="edara_unit_id"/>
+                <field name="amount_total_signed" sum="Total"/>
+                <field name="amount_residual_signed" sum="Outstanding"/>
+                <field name="payment_state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_edara_tenant_ledger_report" model="ir.actions.act_window">
+        <field name="name">Tenant Ledger</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,pivot</field>
+        <field name="view_id" ref="view_edara_tenant_ledger_list"/>
+        <field name="search_view_id" ref="view_edara_account_move_report_search"/>
+        <field name="domain">[('state', '=', 'posted'), ('partner_id.is_edara_tenant', '=', True),
+                               ('move_type', 'in', ('out_invoice', 'out_refund'))]</field>
+        <field name="context">{'search_default_group_by_partner': 1}</field>
+    </record>
+</odoo>
