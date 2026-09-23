@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <!-- Phase 6.6: MUST be t-inherit-mode="primary". "extension" mode
+         patches the shared web.ListView template in place (see
+         payment_schedule_filter_shortcuts.js header and Phase 6.3 in
+         EDARA_PROJECT_STATE.md), affecting every list view in the backend
+         regardless of js_class - "primary" instead creates this as an
+         independent template that only this controller opts into. -->
+    <t t-name="property_managment.PaymentScheduleFilterShortcutsListView" t-inherit="web.ListView" t-inherit-mode="primary">
+        <xpath expr="//t[@t-component='props.Renderer']" position="before">
+            <div class="o_edara_schedule_filter_shortcuts" t-if="edaraFilterShortcuts.length">
+                <button t-foreach="edaraFilterShortcuts" t-as="item" t-key="item.id"
+                        type="button"
+                        t-attf-class="btn btn-sm o_edara_schedule_filter_shortcut {{ item.isActive ? 'btn-primary' : 'btn-outline-primary' }}"
+                        t-on-click="() => this.onEdaraFilterShortcutClick(item.id)">
+                    <t t-esc="item.description"/>
+                </button>
+            </div>
+        </xpath>
+    </t>
+</templates>

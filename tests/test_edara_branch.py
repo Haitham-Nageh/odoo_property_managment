@@ -11,7 +11,9 @@ class TestEdaraBranch(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.branch_a = cls.env['edara.branch'].create({'name': 'Ramallah Branch', 'code': 'RAM'})
+        # Phase 6.4: 'RAM' collides with a real, legitimate branch already in
+        # this shared dev database (not test data - do not rename/delete it).
+        cls.branch_a = cls.env['edara.branch'].create({'name': 'Test Ramallah Branch', 'code': 'TRAM'})
         cls.branch_b = cls.env['edara.branch'].create({'name': 'Nablus Branch', 'code': 'NBL'})
 
     def test_branch_code_unique_per_company(self):
@@ -30,7 +32,13 @@ class TestEdaraBranch(TransactionCase):
             self.branch_b.with_user(user).read(['name'])
 
     def test_company_manager_sees_all_branches(self):
+        # Phase 6.4: assert against "every branch this company manager can
+        # see" rather than an exact count, since this shared dev database may
+        # already contain other real, legitimate branches beyond the two this
+        # test creates - the (1,'=',1) rule's job is to include ALL of them,
+        # not just these two.
+        pre_existing = self.env['edara.branch'].search([])
         user = new_test_user(self.env, login='edara_cm', groups='property_managment.group_edara_company_manager')
 
         branches = self.env['edara.branch'].with_user(user).search([])
-        self.assertEqual(branches, self.branch_a | self.branch_b)
+        self.assertEqual(branches, pre_existing | self.branch_a | self.branch_b)

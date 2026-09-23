@@ -79,6 +79,7 @@ class TestEdaraReports(TransactionCase):
         contract = self.env['edara.lease.contract'].create({
             'unit_id': unit.id, 'tenant_id': tenant.id,
             'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31), 'rent_amount': 800,
+            'deposit_required': False,
         })
         contract.action_activate()
         move = self.env['account.move'].create({

@@ -10,6 +10,7 @@ from . import edara_deposit_transaction
 from . import edara_service_charge
 from . import edara_service_charge_line
 from . import edara_maintenance_request
+from . import edara_recurring_maintenance
 from . import edara_renewal_request
 from . import res_partner
 from . import res_company

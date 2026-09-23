@@ -19,6 +19,14 @@ STATES = [
     ('expired', 'Expired'),
 ]
 
+# Notifications & Reminders Automation (2026-09-22): escalating lease-expiry
+# reminder windows, checked most-urgent-first. 30 matches BD-003's existing
+# "Expiring Soon" definition (dashboard's edara_dashboard.EXPIRING_SOON_WINDOW_DAYS) -
+# not duplicated as an independent number. 7 is one additional, more urgent
+# escalation, per the ticket's own suggested example; no third window is added
+# without a business need for one.
+EXPIRY_REMINDER_WINDOWS_DAYS = (30, 7)
+
 
 class EdaraLeaseContract(models.Model):
     _name = 'edara.lease.contract'
@@ -40,13 +48,43 @@ class EdaraLeaseContract(models.Model):
                                    default=lambda self: self.env.company.currency_id)
     rent_amount = fields.Monetary(string='Rent', required=True, currency_field='currency_id', tracking=True)
     billing_frequency = fields.Selection(BILLING_FREQUENCIES, required=True, default='monthly', tracking=True)
-    payment_day = fields.Integer(string='Payment Day of Month', default=1,
-                                  help="Day of the month rent is due (1-28, to stay valid in every month).")
+    payment_day = fields.Integer(string='Payment Day', compute='_compute_payment_day', store=True, readonly=True,
+                                  help="The billing anchor day, always derived from the Start Date's day of "
+                                       "month - not independently editable. It stays fixed even when a "
+                                       "particular month is too short to contain it (e.g. day 31 in "
+                                       "February): that month's boundary is clamped to its last day, but "
+                                       "the anchor itself is restored the moment a later month is long "
+                                       "enough again (see _period_boundary()).")
+    monthly_equivalent_rent = fields.Monetary(
+        compute='_compute_monthly_equivalent_rent', store=True, currency_field='currency_id',
+        help="rent_amount normalized to a monthly rate - the exact same "
+             "rent_amount/PERIOD_MONTHS formula _generate_schedule_lines() already "
+             "uses internally, now exposed as a field for the Rent Roll report "
+             "(Reporting & Management Intelligence, 2026-09-22) rather than a second "
+             "calculation. Stored since it's a cheap, rarely-changing derivation used "
+             "as a report column.")
+    unit_occupancy_status = fields.Selection(
+        related='unit_id.occupancy_status', string='Unit Occupancy', store=False,
+        help="Display-only passthrough of the unit's own occupancy_status, for the "
+             "Rent Roll report - never independently derived (BD-001's unit-level "
+             "logic remains the single source of truth).")
+
+    @api.depends('start_date')
+    def _compute_payment_day(self):
+        for contract in self:
+            contract.payment_day = contract.start_date.day if contract.start_date else False
+
+    @api.depends('rent_amount', 'billing_frequency')
+    def _compute_monthly_equivalent_rent(self):
+        for contract in self:
+            contract.monthly_equivalent_rent = (
+                contract.rent_amount / PERIOD_MONTHS[contract.billing_frequency] if contract.billing_frequency
+                else 0.0)
 
     deposit_required = fields.Boolean(default=True)
     deposit_amount = fields.Monetary(currency_field='currency_id')
 
-    state = fields.Selection(STATES, required=True, default='draft', tracking=True, copy=False)
+    state = fields.Selection(STATES, required=True, default='draft', tracking=True, copy=False, index=True)
     termination_date = fields.Date(copy=False, tracking=True)
     termination_reason = fields.Text(copy=False)
 
@@ -54,6 +92,14 @@ class EdaraLeaseContract(models.Model):
                                                readonly=True, copy=False)
     successor_contract_id = fields.Many2one('edara.lease.contract', string='Renewed Into',
                                              readonly=True, copy=False)
+
+    last_expiry_reminder_days = fields.Integer(
+        copy=False, default=0, help=(
+            "Which escalation window (see EXPIRY_REMINDER_WINDOWS_DAYS) the most recent "
+            "lease-expiry reminder was sent for - 0 means none sent yet. Lets "
+            "_cron_send_expiry_reminders() stay idempotent per window without depending on "
+            "mail.activity state, which a user may legitimately mark done before the next, "
+            "more urgent window is reached."))
 
     notes = fields.Text()
 
@@ -109,30 +155,72 @@ class EdaraLeaseContract(models.Model):
         action['views'] = [(False, 'form')]
         return action
 
+    def _period_boundary(self, months_elapsed):
+        """The billing anchor (payment_day = start_date.day) is immutable:
+        every period boundary must be calculated fresh from the original
+        start_date, never by chaining from a previously computed boundary.
+        Chaining is structurally unsafe - relativedelta's own day-of-month
+        clamping (e.g. 31/01 -> 28/02) would otherwise compound across
+        iterations and permanently lose the anchor day (28/02 + 1mo =
+        28/03, not the correct 31/03). Computing fresh from start_date each
+        time makes the anchor self-heal the moment a later month is long
+        enough to contain it again."""
+        self.ensure_one()
+        return self.start_date + relativedelta(months=months_elapsed)
+
     def _generate_schedule_lines(self):
-        """Generate one schedule line per billing period from start_date to
-        end_date, due on payment_day of each period's month. Only touches
-        uninvoiced lines - already-invoiced history is never regenerated."""
+        """Generate schedule lines covering [start_date, end_date) - end_date
+        is the exclusive boundary of the lease term, never itself a billable
+        period (MAT-FIND-005).
+
+        Each schedule line represents exactly ONE billing period at the
+        configured billing_frequency granularity (1/3/12 months for
+        Monthly/Quarterly/Yearly) - a full quarterly or yearly period is
+        always ONE line at the full configured rent_amount, never
+        decomposed into monthly-equivalent lines (MAT-FIND-013). Once a
+        full billing-frequency period no longer fits before end_date, the
+        entire remainder becomes ONE prorated line (monthly-equivalent
+        rate x occupied days / a standardized 30-day reference month) -
+        it is not further split at monthly granularity either. This
+        guarantees at least one line is always produced, even for a
+        contract shorter than its own billing frequency (MAT-FIND-011):
+        the loop's first period_start is always start_date itself, which
+        is always < end_date.
+
+        Only touches uninvoiced lines - already-invoiced history is never
+        regenerated."""
         self.ensure_one()
         self.schedule_line_ids.filtered(lambda l: not l.invoice_id).unlink()
-        months = PERIOD_MONTHS[self.billing_frequency]
-        # Not named "cursor": odoo.tools.translate._get_cr() treats any local
-        # variable literally named "cursor" as a DB cursor for _()'s frame
-        # inspection, which would misfire here since this is a plain date.
-        due_date = self.start_date.replace(day=self.payment_day)
-        if due_date < self.start_date:
-            due_date += relativedelta(months=months)
+        frequency_months = PERIOD_MONTHS[self.billing_frequency]
+        # Reuses the stored monthly_equivalent_rent field (Reporting & Management
+        # Intelligence, 2026-09-22) rather than recomputing the same formula here -
+        # one calculation, exposed both as a report column and used internally.
+        monthly_equivalent = self.monthly_equivalent_rent
+
         vals_list = []
         sequence = 10
-        while due_date <= self.end_date:
+        months_elapsed = 0
+        while True:
+            period_start = self._period_boundary(months_elapsed)
+            if period_start >= self.end_date:
+                break
+            next_boundary = self._period_boundary(months_elapsed + frequency_months)
+            period_end = min(next_boundary, self.end_date)
+            is_prorated = period_end != next_boundary
+            amount = (monthly_equivalent * (period_end - period_start).days / 30
+                      if is_prorated else self.rent_amount)
+            months_elapsed += frequency_months
             vals_list.append((0, 0, {
-                'due_date': due_date,
-                'amount': self.rent_amount,
+                'due_date': period_start,
+                'period_start': period_start,
+                'period_end': period_end,
+                'occupied_days': (period_end - period_start).days,
+                'is_prorated': is_prorated,
+                'amount': self.currency_id.round(amount),
                 'sequence': sequence,
-                'description': _("Rent due %(date)s", date=due_date),
+                'description': _("Rent %(start)s - %(end)s", start=period_start, end=period_end),
             }))
             sequence += 10
-            due_date += relativedelta(months=months)
         self.schedule_line_ids = vals_list
 
     def unlink(self):
@@ -159,14 +247,21 @@ class EdaraLeaseContract(models.Model):
             if contract.rent_amount <= 0:
                 raise ValidationError(_("Rent must be a positive amount."))
 
-    @api.constrains('payment_day')
-    def _check_payment_day(self):
+    @api.constrains('deposit_required', 'deposit_amount')
+    def _check_deposit_amount(self):
         for contract in self:
-            if not (1 <= contract.payment_day <= 28):
-                raise ValidationError(_("Payment day must be between 1 and 28."))
+            if contract.deposit_required and contract.deposit_amount <= 0:
+                raise ValidationError(_(
+                    "A positive Deposit Amount is required when Deposit Required is set."))
 
     @api.constrains('unit_id', 'start_date', 'end_date', 'state')
     def _check_no_overlap(self):
+        """MAT-FIND-012 (2026-09-22): end_date is EXCLUSIVE for overlap
+        purposes, consistent with _generate_schedule_lines()'s already-
+        exclusive billing boundary (MAT-FIND-005) - a lease ending on a date
+        no longer occupies that date, so a new lease may start exactly on
+        the prior lease's end_date (adjacent leases are allowed). Two ranges
+        [s1, e1) and [s2, e2) overlap iff s1 < e2 AND s2 < e1."""
         for contract in self:
             if contract.state != 'active':
                 continue
@@ -174,8 +269,8 @@ class EdaraLeaseContract(models.Model):
                 ('id', '!=', contract.id),
                 ('unit_id', '=', contract.unit_id.id),
                 ('state', '=', 'active'),
-                ('start_date', '<=', contract.end_date),
-                ('end_date', '>=', contract.start_date),
+                ('start_date', '<', contract.end_date),
+                ('end_date', '>', contract.start_date),
             ])
             if overlapping:
                 raise ValidationError(_(
@@ -194,9 +289,36 @@ class EdaraLeaseContract(models.Model):
                     "%(unit)s is under maintenance and cannot be leased right now.",
                     unit=contract.unit_id.display_name,
                 ))
+            if contract.deposit_required and contract.deposit_amount <= 0:
+                raise UserError(_(
+                    "Configure a positive Deposit Amount before activating this contract."))
             contract.state = 'active'
-            contract.unit_id.occupancy_status = 'rented'
+            # Date-aware occupancy per BD-001 (2026-09-21, resolves MAT-FIND-010):
+            # unconditionally forces the unit's occupancy to whatever its active
+            # contracts now imply - 'reserved' for a future start_date, 'rented'
+            # once start_date has arrived. Unlike unit._sync_occupancy_from_contracts()
+            # (used by termination/expiry/the reserved-to-rented cron), this always
+            # overwrites regardless of the unit's prior state, matching activation's
+            # existing "always force it" semantics (only sold/under_maintenance are
+            # blocked earlier, as preconditions above).
+            contract.unit_id.occupancy_status = contract.unit_id._lease_occupancy_state()
             contract._generate_schedule_lines()
+
+    def _unlink_future_uninvoiced_schedule_lines(self):
+        """Drop not-yet-due, uninvoiced schedule lines only - called by both
+        action_terminate() and _cron_expire_contracts() so the two paths can
+        never diverge (see MAT-FIND-007's precedent for this requirement).
+        Uninvoiced lines already due (computed state 'overdue', per
+        edara.payment.schedule.line._compute_state()) are deliberately left
+        alone - they represent real unpaid rent obligations, not cancelled
+        future periods, and must survive contract termination/expiry to
+        preserve financial/audit history (MAT-FIND-006). Already-invoiced
+        lines are never touched by this filter regardless of due date."""
+        self.ensure_one()
+        today = fields.Date.context_today(self)
+        self.schedule_line_ids.filtered(
+            lambda l: not l.invoice_id and l.due_date >= today
+        ).unlink()
 
     def action_terminate(self, reason=None):
         for contract in self:
@@ -207,12 +329,13 @@ class EdaraLeaseContract(models.Model):
                 'termination_date': fields.Date.context_today(contract),
                 'termination_reason': reason or contract.termination_reason,
             })
-            contract.unit_id.occupancy_status = 'available'
-            # Defense-in-depth #1: drop not-yet-invoiced future obligations now.
+            # Only frees the unit if no OTHER currently-active contract remains on it
+            # (e.g. terminating a future-dated contract must not clobber a still-active
+            # current lease on the same unit - see EDARA_PROJECT_STATE.md, MAT-020).
+            contract.unit_id._sync_occupancy_from_contracts()
+            # Defense-in-depth #1: drop not-yet-due, uninvoiced future obligations now.
             # Defense #2 is the invoicing cron re-checking state == 'active'.
-            contract.schedule_line_ids.filtered(
-                lambda l: not l.invoice_id and l.due_date > contract.termination_date
-            ).unlink()
+            contract._unlink_future_uninvoiced_schedule_lines()
 
     def action_renew(self, new_start_date, new_end_date, new_rent_amount):
         """Owner-initiated renewal: create the successor contract and activate it.
@@ -231,7 +354,6 @@ class EdaraLeaseContract(models.Model):
             'currency_id': self.currency_id.id,
             'rent_amount': new_rent_amount,
             'billing_frequency': self.billing_frequency,
-            'payment_day': self.payment_day,
             'deposit_required': self.deposit_required,
             'deposit_amount': self.deposit_amount,
             'predecessor_contract_id': self.id,
@@ -255,5 +377,68 @@ class EdaraLeaseContract(models.Model):
         contracts = self.search([('state', '=', 'active'), ('end_date', '<', today)])
         for contract in contracts:
             contract.state = 'expired'
-            contract.unit_id.occupancy_status = 'available'
-            contract.schedule_line_ids.filtered(lambda l: not l.invoice_id).unlink()
+            # Same sibling-aware recompute as action_terminate() - a future-dated
+            # active contract on the same unit must keep it Rented (MAT-020).
+            contract.unit_id._sync_occupancy_from_contracts()
+            contract._unlink_future_uninvoiced_schedule_lines()
+        return len(contracts)
+
+    def _get_reminder_responsible_user(self):
+        """Deterministic responsible user for an operational reminder: the
+        assigned Branch Manager, or - only when none is configured - the same
+        default-Administrator fallback this module already grants
+        base.user_admin on install (see group_edara_administrator's user_ids
+        in security/edara_security.xml). Not a new role, just reusing that
+        existing precedent instead of inventing one."""
+        self.ensure_one()
+        return self.branch_id.manager_id or self.env.ref('base.user_admin')
+
+    @api.model
+    def _cron_send_expiry_reminders(self):
+        """Notifications & Reminders Automation (2026-09-22). Escalating,
+        idempotent per EXPIRY_REMINDER_WINDOWS_DAYS window - see
+        last_expiry_reminder_days. Internal reminder is a mail.activity
+        assigned to the Branch Manager; the tenant is separately informed via
+        a chatter message addressed to them (native mail notification, no new
+        template infrastructure). Safe to run repeatedly the same day, safe to
+        run after a manual trigger already handled the same window."""
+        today = fields.Date.context_today(self)
+        widest_window = max(EXPIRY_REMINDER_WINDOWS_DAYS)
+        activity_type = self.env.ref('property_managment.mail_activity_type_edara_lease_expiry')
+        contracts = self.search([
+            ('state', '=', 'active'),
+            ('end_date', '>=', today),
+            ('end_date', '<=', today + relativedelta(days=widest_window)),
+        ])
+        sent = 0
+        for contract in contracts:
+            days_left = (contract.end_date - today).days
+            window = min((w for w in EXPIRY_REMINDER_WINDOWS_DAYS if days_left <= w), default=None)
+            if window is None:
+                continue
+            if contract.last_expiry_reminder_days and contract.last_expiry_reminder_days <= window:
+                continue
+            user = contract._get_reminder_responsible_user()
+            contract.activity_schedule(
+                activity_type_id=activity_type.id,
+                summary=_("Lease expiring in %(days)d day(s)", days=days_left),
+                note=_(
+                    "%(contract)s for %(tenant)s at %(unit)s expires on %(date)s. Review renewal "
+                    "or termination.",
+                    contract=contract.name, tenant=contract.tenant_id.display_name,
+                    unit=contract.unit_id.display_name, date=contract.end_date,
+                ),
+                user_id=user.id,
+                date_deadline=today,
+            )
+            contract.last_expiry_reminder_days = window
+            if contract.tenant_id:
+                contract.message_post(
+                    body=_(
+                        "Your lease %(contract)s expires on %(date)s.",
+                        contract=contract.name, date=contract.end_date,
+                    ),
+                    partner_ids=contract.tenant_id.ids,
+                )
+            sent += 1
+        return sent

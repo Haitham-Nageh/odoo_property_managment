@@ -1,10 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!--
+        Reporting & Management Intelligence Expansion (2026-09-22): shared by
+        the main Contracts action, the new Rent Roll report and the new Lease
+        Expiry report - one search view, not three. "Expiring Soon" reuses
+        BD-003's exact definition (ACTIVE contracts, end_date in
+        [today, today+30]) via relativedelta, matching
+        edara_dashboard._expiring_soon_domain() - not a second threshold.
+    -->
+    <record id="view_edara_lease_contract_search" model="ir.ui.view">
+        <field name="name">edara.lease.contract.search</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <search string="Lease Contracts">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="unit_id"/>
+                <field name="branch_id"/>
+                <field name="property_id"/>
+                <filter string="Active" name="active" domain="[('state', '=', 'active')]"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Renewed" name="renewed" domain="[('state', '=', 'renewed')]"/>
+                <filter string="Terminated" name="terminated" domain="[('state', '=', 'terminated')]"/>
+                <filter string="Expired" name="expired" domain="[('state', '=', 'expired')]"/>
+                <separator/>
+                <filter string="Expiring Soon (30d)" name="expiring_soon"
+                        domain="[('state', '=', 'active'),
+                                 ('end_date', '&gt;=', context_today().strftime('%Y-%m-%d')),
+                                 ('end_date', '&lt;=', (context_today() + relativedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter string="Branch" name="group_by_branch" context="{'group_by': 'branch_id'}"/>
+                    <filter string="Property" name="group_by_property" context="{'group_by': 'property_id'}"/>
+                    <filter string="Building" name="group_by_building" context="{'group_by': 'building_id'}"/>
+                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
+                    <filter string="Expiry Month" name="group_by_expiry_month" context="{'group_by': 'end_date:month'}"/>
+                </group>
+                <!-- Dashboard UX Hardening 6.1 (2026-09-23): same native,
+                     zero-JS quick-action equivalent as the Units search view -
+                     always-visible counted status list, click to filter this
+                     same page. -->
+                <searchpanel>
+                    <field name="state" enable_counters="1"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
     <record id="view_edara_lease_contract_list" model="ir.ui.view">
         <field name="name">edara.lease.contract.list</field>
         <field name="model">edara.lease.contract</field>
         <field name="arch" type="xml">
-            <list string="Lease Contracts" decoration-success="state == 'active'"
+            <list string="Lease Contracts"
+                  decoration-success="state == 'active'"
                   decoration-muted="state in ('terminated', 'expired', 'renewed')">
                 <field name="name"/>
                 <field name="tenant_id"/>
@@ -15,6 +62,50 @@
                 <field name="currency_id" column_invisible="1"/>
                 <field name="state" widget="badge"/>
             </list>
+        </field>
+    </record>
+
+    <!--
+        MAT/UI-032 §9/§10 - Kanban (workflow visualization, same pattern as
+        the existing maintenance_request/renewal_request kanbans) and
+        Calendar (lease start/end timeline - the closest native substitute
+        for a Gantt view). A true Gantt view was investigated and is NOT
+        implemented: the `web_gantt` module (Odoo Enterprise) does not exist
+        anywhere in this Odoo 19 Community installation's addons paths -
+        confirmed by inspecting the addons directories, no `<gantt>` view
+        type is registered at all. Adding a <gantt> view arch without that
+        module would break module installation, not just degrade gracefully.
+        This mirrors the project's existing Phase 12 precedent (2D-only unit
+        kanban, no 3D - "avoid unnecessary third-party dependencies").
+    -->
+    <record id="view_edara_lease_contract_kanban" model="ir.ui.view">
+        <field name="name">edara.lease.contract.kanban</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_small_column">
+                <templates>
+                    <t t-name="card">
+                        <field name="name" class="fw-bold"/>
+                        <div class="text-muted"><field name="unit_id"/> - <field name="tenant_id"/></div>
+                        <footer class="pt-1">
+                            <field name="start_date"/> - <field name="end_date"/>
+                        </footer>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_edara_lease_contract_calendar" model="ir.ui.view">
+        <field name="name">edara.lease.contract.calendar</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <calendar string="Lease Contracts" date_start="start_date" date_stop="end_date"
+                      mode="month" color="state">
+                <field name="unit_id"/>
+                <field name="tenant_id"/>
+                <field name="state"/>
+            </calendar>
         </field>
     </record>
 
@@ -30,7 +121,7 @@
                             invisible="state != 'active'"/>
                     <button string="Terminate" type="object" name="action_terminate"
                             invisible="state != 'active'" confirm="Terminate this lease contract?"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,active,terminated"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,renewed,terminated,expired"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -64,13 +155,14 @@
                             <field name="rent_amount"/>
                             <field name="currency_id" groups="base.group_multi_currency"/>
                             <field name="billing_frequency"/>
-                            <field name="payment_day"/>
+                            <field name="payment_day" readonly="1"/>
                         </group>
                     </group>
                     <group>
                         <group string="Deposit">
                             <field name="deposit_required"/>
-                            <field name="deposit_amount" invisible="not deposit_required"/>
+                            <field name="deposit_amount" invisible="not deposit_required"
+                                   required="deposit_required"/>
                         </group>
                         <group string="Renewal / Termination" invisible="not predecessor_contract_id and not successor_contract_id and state != 'terminated'">
                             <field name="predecessor_contract_id" readonly="1"/>
@@ -93,7 +185,8 @@
     <record id="action_edara_lease_contract" model="ir.actions.act_window">
         <field name="name">Lease Contracts</field>
         <field name="res_model">edara.lease.contract</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,calendar,form</field>
+        <field name="search_view_id" ref="view_edara_lease_contract_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">
                 Create your first lease contract

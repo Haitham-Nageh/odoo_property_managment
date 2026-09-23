@@ -7,16 +7,46 @@
         </xpath>
         <div id="portal_client_category" position="inside">
             <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Dashboard</t>
+                <t t-set="url" t-value="'/my/dashboard'"/>
+                <t t-set="text">Your lease, rent, balance and requests at a glance</t>
+            </t>
+            <t t-call="portal.portal_docs_entry">
                 <t t-set="title">My Lease</t>
                 <t t-set="url" t-value="'/my/leases'"/>
                 <t t-set="text">View your lease, unit and request a renewal</t>
                 <t t-set="placeholder_count" t-value="'lease_count'"/>
             </t>
             <t t-call="portal.portal_docs_entry">
+                <t t-set="title">My Unit</t>
+                <t t-set="url" t-value="'/my/units'"/>
+                <t t-set="text">Details about the unit(s) you lease</t>
+            </t>
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Billing</t>
+                <t t-set="url" t-value="'/my/billing'"/>
+                <t t-set="text">Invoices, payment history and outstanding balance</t>
+            </t>
+            <t t-call="portal.portal_docs_entry">
                 <t t-set="title">Maintenance Requests</t>
                 <t t-set="url" t-value="'/my/maintenance'"/>
                 <t t-set="text">Report an issue with your unit or follow up on one</t>
                 <t t-set="placeholder_count" t-value="'maintenance_count'"/>
+            </t>
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Documents</t>
+                <t t-set="url" t-value="'/my/documents'"/>
+                <t t-set="text">Files attached to your lease, unit or requests</t>
+            </t>
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Notifications</t>
+                <t t-set="url" t-value="'/my/notifications'"/>
+                <t t-set="text">Updates about your lease, payments and requests</t>
+            </t>
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">My Profile</t>
+                <t t-set="url" t-value="'/my/account'"/>
+                <t t-set="text">Update your contact details</t>
             </t>
         </div>
     </template>
@@ -98,6 +128,28 @@
                         <p class="alert alert-info mt-4">
                             A renewal request for this lease is already pending review.
                         </p>
+                    </t>
+
+                    <t t-if="renewal_history">
+                        <h4 class="mt-4">Renewal Requests</h4>
+                        <t t-call="portal.portal_table">
+                            <thead>
+                                <tr class="active">
+                                    <th>Requested On</th>
+                                    <th>New End Date</th>
+                                    <th>Proposed Rent</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="renewal_history" t-as="renewal">
+                                    <td><span t-field="renewal.create_date"/></td>
+                                    <td><span t-field="renewal.requested_end_date"/></td>
+                                    <td><span t-field="renewal.requested_rent_amount" t-options="{'widget': 'monetary', 'display_currency': renewal.currency_id}"/></td>
+                                    <td><t t-out="renewal.state"/></td>
+                                </tr>
+                            </tbody>
+                        </t>
                     </t>
                 </div>
             </div>
@@ -186,6 +238,190 @@
                 </tr>
             </table>
             <p t-if="maintenance_request.description" t-out="maintenance_request.description"/>
+        </t>
+    </template>
+
+    <!-- ================= Tenant Dashboard ================= -->
+
+    <template id="portal_dashboard" name="My Dashboard">
+        <t t-call="portal.portal_layout">
+            <h3>Dashboard</h3>
+            <t t-if="not contract">
+                <p class="alert alert-warning">You do not have an active lease at the moment.</p>
+            </t>
+            <div t-if="contract" class="row g-3">
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h5>Current Lease</h5>
+                        <p class="mb-1"><a t-attf-href="/my/leases/#{contract.id}"><t t-out="contract.name"/></a></p>
+                        <p class="mb-1"><t t-out="contract.unit_id.display_name"/></p>
+                        <p class="mb-0">Rent: <span t-field="contract.rent_amount" t-options="{'widget': 'monetary', 'display_currency': contract.currency_id}"/></p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h5>Next Payment</h5>
+                        <t t-if="next_line">
+                            <p class="mb-1">Due: <span t-field="next_line.due_date"/></p>
+                            <p class="mb-0"><span t-field="next_line.amount" t-options="{'widget': 'monetary', 'display_currency': contract.currency_id}"/></p>
+                        </t>
+                        <t t-if="not next_line">
+                            <p class="mb-0 text-muted">Nothing due right now.</p>
+                        </t>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h5>Outstanding Balance</h5>
+                        <p class="mb-0 fs-4">
+                            <t t-esc="'%.2f' % outstanding"/> <t t-out="currency.symbol"/>
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h5>Renewal Status</h5>
+                        <p t-if="open_renewal" class="mb-0">A renewal request is pending review.</p>
+                        <p t-if="not open_renewal" class="mb-0 text-muted">No renewal request in progress.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h5>Active Maintenance Requests</h5>
+                        <p class="mb-0 fs-4"><t t-out="maintenance_count"/></p>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="mt-4">Recent Notifications</h4>
+            <t t-if="not notifications">
+                <p class="text-muted">No notifications yet.</p>
+            </t>
+            <ul t-if="notifications" class="list-group">
+                <li t-foreach="notifications" t-as="notification" class="list-group-item">
+                    <span t-field="notification.date"/> - <span t-raw="notification.body"/>
+                </li>
+            </ul>
+        </t>
+    </template>
+
+    <!-- ================= My Unit ================= -->
+
+    <template id="portal_my_units" name="My Units">
+        <t t-call="portal.portal_layout">
+            <t t-if="not units">
+                <p class="alert alert-warning">You do not have a unit on record.</p>
+            </t>
+            <t t-if="units" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Unit</th>
+                        <th>Property</th>
+                        <th>Building</th>
+                        <th>Floor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="units" t-as="unit">
+                        <td><a t-attf-href="/my/units/#{unit.id}"><t t-out="unit.display_name"/></a></td>
+                        <td><t t-out="unit.property_id.display_name"/></td>
+                        <td><t t-out="unit.building_id.display_name"/></td>
+                        <td><t t-out="unit.floor"/></td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <template id="portal_unit_detail" name="My Unit">
+        <t t-call="portal.portal_layout">
+            <h3><t t-out="unit.display_name"/></h3>
+            <table class="table table-sm">
+                <tr><td>Property</td><td><t t-out="unit.property_id.display_name"/></td></tr>
+                <tr><td>Building</td><td><t t-out="unit.building_id.display_name"/></td></tr>
+                <tr><td>Floor</td><td><t t-out="unit.floor"/></td></tr>
+                <tr><td>Type</td><td><t t-out="unit.unit_type"/></td></tr>
+                <tr t-if="unit.area"><td>Area</td><td><t t-out="unit.area"/> sqm</td></tr>
+                <tr t-if="unit.bedrooms"><td>Bedrooms</td><td><t t-out="unit.bedrooms"/></td></tr>
+                <tr t-if="unit.bathrooms"><td>Bathrooms</td><td><t t-out="unit.bathrooms"/></td></tr>
+            </table>
+        </t>
+    </template>
+
+    <!-- ================= Billing ================= -->
+
+    <template id="portal_billing" name="My Billing">
+        <t t-call="portal.portal_layout">
+            <h3>Billing</h3>
+            <p class="fs-4">Outstanding: <t t-esc="'%.2f' % outstanding"/> <t t-out="currency.symbol"/></p>
+            <t t-if="not moves">
+                <p class="alert alert-warning">You do not have any invoices yet.</p>
+            </t>
+            <t t-if="moves" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Invoice</th>
+                        <th>Date</th>
+                        <th>Due Date</th>
+                        <th>Amount</th>
+                        <th>Amount Due</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="moves" t-as="move">
+                        <td><a t-attf-href="/my/invoices/#{move.id}"><t t-out="move.name"/></a></td>
+                        <td><span t-field="move.invoice_date"/></td>
+                        <td><span t-field="move.invoice_date_due"/></td>
+                        <td><span t-field="move.amount_total" t-options="{'widget': 'monetary', 'display_currency': move.currency_id}"/></td>
+                        <td><span t-field="move.amount_residual" t-options="{'widget': 'monetary', 'display_currency': move.currency_id}"/></td>
+                        <td><t t-out="move.payment_state"/></td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================= Documents ================= -->
+
+    <template id="portal_documents" name="My Documents">
+        <t t-call="portal.portal_layout">
+            <h3>Documents</h3>
+            <t t-if="not documents">
+                <p class="alert alert-warning">No documents are available yet.</p>
+            </t>
+            <t t-if="documents" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Document</th>
+                        <th>Related To</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="documents" t-as="document">
+                        <td><a t-attf-href="/web/content/#{document['attachment'].id}?download=true" t-out="document['attachment'].name"/></td>
+                        <td><t t-out="document['record'].display_name if document['record'] else ''"/></td>
+                        <td><span t-field="document['attachment'].create_date"/></td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================= Notifications ================= -->
+
+    <template id="portal_notifications" name="My Notifications">
+        <t t-call="portal.portal_layout">
+            <h3>Notifications</h3>
+            <t t-if="not notifications">
+                <p class="alert alert-warning">You do not have any notifications yet.</p>
+            </t>
+            <ul t-if="notifications" class="list-group">
+                <li t-foreach="notifications" t-as="notification" class="list-group-item">
+                    <span t-field="notification.date"/> - <span t-raw="notification.body"/>
+                </li>
+            </ul>
         </t>
     </template>
 </odoo>

@@ -8,11 +8,13 @@
                 <field name="deposit_id" invisible="1"/>
                 <field name="company_id" invisible="1"/>
                 <field name="currency_id" invisible="1"/>
+                <field name="has_journal_browse_access" invisible="1"/>
                 <group>
                     <field name="transaction_type" invisible="1"/>
                     <field name="amount"/>
                     <field name="journal_id" invisible="transaction_type == 'deduction'"
-                           required="transaction_type != 'deduction'"/>
+                           required="transaction_type != 'deduction'"
+                           readonly="transaction_type != 'deduction' and not has_journal_browse_access"/>
                     <field name="description" invisible="transaction_type != 'deduction'"
                            required="transaction_type == 'deduction'"/>
                 </group>

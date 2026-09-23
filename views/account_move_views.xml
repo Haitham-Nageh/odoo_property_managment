@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The edara_* tag fields on account.move (models/account_move.py) have
+         existed since Phase 7 with onchange cascading and a cross-consistency
+         constraint, but were never exposed on the invoice/bill form - a user
+         had no UI way to tag a vendor bill with a property/unit/branch at all.
+         Fixed 2026-09-13 alongside MAT-020, see EDARA_PROJECT_STATE.md. -->
+    <record id="view_move_form_edara" model="ir.ui.view">
+        <field name="name">account.move.form.edara</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <group id="other_tab_group" position="inside">
+                <group string="EDARA Tagging" name="edara_tag_group">
+                    <field name="edara_invoice_type"/>
+                    <field name="edara_contract_id"/>
+                    <field name="edara_branch_id"/>
+                    <field name="edara_property_id"/>
+                    <field name="edara_building_id"/>
+                    <field name="edara_unit_id"/>
+                </group>
+            </group>
+        </field>
+    </record>
+</odoo>

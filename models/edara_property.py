@@ -30,6 +30,15 @@ class EdaraProperty(models.Model):
     total_expenses = fields.Monetary(compute='_compute_financial_summary', currency_field='currency_id')
     net_operating_result = fields.Monetary(compute='_compute_financial_summary', currency_field='currency_id')
     total_outstanding = fields.Monetary(compute='_compute_financial_summary', currency_field='currency_id')
+    maintenance_cost = fields.Monetary(compute='_compute_financial_summary', currency_field='currency_id', help=(
+        "Posted Vendor Bills tagged edara_invoice_type='maintenance' for this property "
+        "(Reporting & Management Intelligence, 2026-09-22) - already included in "
+        "total_expenses, shown separately so a manager can see how much of a "
+        "property's expenses are maintenance-driven."))
+    has_accounting_access = fields.Boolean(compute='_compute_financial_summary', help=(
+        "Whether the current user has native Odoo read access to account.move "
+        "- drives whether the Financial Summary page is shown at all (same "
+        "permission-aware pattern as edara.dashboard, MAT-FIND-014)."))
 
     _code_company_uniq = models.Constraint(
         'unique(company_id, code)',
@@ -62,15 +71,30 @@ class EdaraProperty(models.Model):
     def get_analytic_account(self):
         """Return this property's analytic account, creating it on first use.
         Lazy creation avoids cluttering the analytic account list with entries
-        for properties that never get invoiced (e.g. still in setup)."""
+        for properties that never get invoiced (e.g. still in setup).
+
+        MAT-FIND-015: no EDARA role implies a native Accounting/Analytic
+        group (by design - see EDARA_PROJECT_STATE.md), so an EDARA-only
+        user cannot create the underlying account.analytic.account record
+        without a narrow, scoped elevation. Authorization first: explicitly
+        require normal EDARA write access to THIS property (ACL + record
+        rules, e.g. branch scoping) before any elevation runs - a Viewer
+        (read-only) must never reach the elevated create() just because
+        get_analytic_account() happens to be called from a method they
+        could otherwise invoke. The elevation itself is limited to this
+        single create() call for this single property; the id is written
+        back through the normal (non-elevated) environment so the caller
+        never holds a broadly-privileged analytic-account recordset."""
         self.ensure_one()
+        self.check_access('write')
         if not self.analytic_account_id:
             plan = self.env.ref('property_managment.analytic_plan_edara_property')
-            self.analytic_account_id = self.env['account.analytic.account'].create({
+            new_account = self.env['account.analytic.account'].sudo().create({
                 'name': self.display_name,
                 'plan_id': plan.id,
                 'company_id': self.company_id.id,
             })
+            self.analytic_account_id = new_account.id
         return self.analytic_account_id
 
     def action_view_units(self):
@@ -85,9 +109,26 @@ class EdaraProperty(models.Model):
         """Not stored, not recomputed automatically - a report-style snapshot
         evaluated whenever the field is read (e.g. the form is opened). Uses
         account.move's own signed-amount conventions (see EDARA_PROJECT_STATE.md
-        "Architecture Decisions") so credit notes/refunds net out correctly."""
+        "Architecture Decisions") so credit notes/refunds net out correctly.
+
+        MAT-FIND-014: a Property is a Viewer-readable record (see
+        access_edara_property_viewer), so simply opening one must not raise a
+        raw account.move AccessError for a user without native Accounting
+        read access. Skip the account.move reads entirely when the user
+        lacks that access and expose has_accounting_access so the view can
+        hide the whole Financial Summary page rather than show misleading
+        zeros - same pattern as edara.dashboard._compute_kpis()."""
         Move = self.env['account.move']
+        has_accounting_access = Move.has_access('read')
         for prop in self:
+            prop.has_accounting_access = has_accounting_access
+            if not has_accounting_access:
+                prop.total_revenue = 0.0
+                prop.total_expenses = 0.0
+                prop.net_operating_result = 0.0
+                prop.total_outstanding = 0.0
+                prop.maintenance_cost = 0.0
+                continue
             revenue_row = Move._read_group(
                 [('edara_property_id', '=', prop.id), ('state', '=', 'posted'),
                  ('move_type', 'in', ('out_invoice', 'out_refund'))],
@@ -98,10 +139,16 @@ class EdaraProperty(models.Model):
                  ('move_type', 'in', ('in_invoice', 'in_refund'))],
                 [], ['amount_untaxed_signed:sum'])
             expenses = -(expense_row[0][0] if expense_row else 0.0)
+            maintenance_row = Move._read_group(
+                [('edara_property_id', '=', prop.id), ('state', '=', 'posted'),
+                 ('move_type', 'in', ('in_invoice', 'in_refund')), ('edara_invoice_type', '=', 'maintenance')],
+                [], ['amount_untaxed_signed:sum'])
+            maintenance_cost = -(maintenance_row[0][0] if maintenance_row else 0.0)
             prop.total_revenue = revenue or 0.0
             prop.total_expenses = expenses or 0.0
             prop.net_operating_result = (revenue or 0.0) - (expenses or 0.0)
             prop.total_outstanding = outstanding or 0.0
+            prop.maintenance_cost = maintenance_cost or 0.0
 
     def action_view_expenses(self):
         self.ensure_one()

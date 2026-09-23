@@ -1,5 +1,5 @@
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 STATES = [
     ('draft', 'Not Collected'),
@@ -11,6 +11,7 @@ STATES = [
 class EdaraDeposit(models.Model):
     _name = 'edara.deposit'
     _description = 'EDARA Security Deposit'
+    _inherit = ['mail.thread']
     _order = 'id desc'
 
     contract_id = fields.Many2one('edara.lease.contract', string='Contract', required=True,
@@ -30,12 +31,21 @@ class EdaraDeposit(models.Model):
     amount_refunded = fields.Monetary(compute='_compute_amounts', store=True, currency_field='currency_id')
     amount_deducted = fields.Monetary(compute='_compute_amounts', store=True, currency_field='currency_id')
     balance = fields.Monetary(compute='_compute_amounts', store=True, currency_field='currency_id')
-    state = fields.Selection(STATES, compute='_compute_amounts', store=True)
+    state = fields.Selection(STATES, compute='_compute_amounts', store=True, tracking=True)
 
     _contract_uniq = models.Constraint(
         'unique(contract_id)',
         'A contract can only have one security deposit record.',
     )
+
+    @api.constrains('amount', 'contract_id')
+    def _check_amount(self):
+        for deposit in self:
+            if deposit.amount < 0:
+                raise ValidationError(_("Deposit amount cannot be negative."))
+            if deposit.contract_id.deposit_required and deposit.amount <= 0:
+                raise ValidationError(_(
+                    "This contract requires a security deposit; the deposit amount must be positive."))
 
     @api.depends('transaction_ids.transaction_type', 'transaction_ids.amount')
     def _compute_amounts(self):
@@ -54,38 +64,68 @@ class EdaraDeposit(models.Model):
             else:
                 deposit.state = 'held'
 
-    def action_collect(self, journal_id, amount=None):
+    def _default_transaction_amount(self, transaction_type):
+        """Suggested amount for a given transaction type, reused by the wizard's
+        default and by action_collect()/action_refund()'s own amount=None
+        fallback: Collect -> remaining uncollected amount, Refund/Deduct ->
+        current balance. Never negative (clamped to 0)."""
         self.ensure_one()
-        amount = self.amount - self.amount_held if amount is None else amount
+        if transaction_type == 'held':
+            return max(self.amount - self.amount_held, 0.0)
+        return max(self.balance, 0.0)
+
+    def action_collect(self, journal_id, amount=None):
+        """MAT-FIND-015: authorization first. `edara.deposit.transaction` is
+        created BEFORE the native payment (not after, as a plain audit
+        record would suggest) specifically so that its own ACL/record-rule
+        check - which a Viewer fails, an Accountant/Branch Manager+ passes -
+        gates entry to this method's native Accounting elevation. Creating
+        the native payment first and the transaction record second would let
+        an unauthorized caller trigger a real account.payment before EDARA's
+        own authorization ever ran. See _create_deposit_payment() for the
+        elevation itself."""
+        self.ensure_one()
+        self.check_access('write')
+        amount = self._default_transaction_amount('held') if amount is None else amount
         if amount <= 0:
             raise UserError(_("There is nothing left to collect for this deposit."))
-        payment = self._create_deposit_payment('inbound', journal_id, amount)
-        self.env['edara.deposit.transaction'].create({
+        transaction = self.env['edara.deposit.transaction'].create({
             'deposit_id': self.id,
             'transaction_type': 'held',
             'amount': amount,
-            'payment_id': payment.id,
         })
+        payment = self._create_deposit_payment('inbound', journal_id, amount)
+        transaction.payment_id = payment.id
         return payment
 
     def action_refund(self, journal_id, amount=None):
+        """MAT-FIND-015: same authorization-first ordering as action_collect()
+        above - see its docstring."""
         self.ensure_one()
-        amount = self.balance if amount is None else amount
+        self.check_access('write')
+        amount = self._default_transaction_amount('refund') if amount is None else amount
         if amount <= 0:
             raise UserError(_("There is no deposit balance left to refund."))
         if amount > self.balance:
             raise UserError(_("Cannot refund more than the remaining deposit balance."))
-        payment = self._create_deposit_payment('outbound', journal_id, amount)
-        self.env['edara.deposit.transaction'].create({
+        transaction = self.env['edara.deposit.transaction'].create({
             'deposit_id': self.id,
             'transaction_type': 'refund',
             'amount': amount,
-            'payment_id': payment.id,
         })
+        payment = self._create_deposit_payment('outbound', journal_id, amount)
+        transaction.payment_id = payment.id
         return payment
 
     def action_deduct(self, amount, description):
+        """MAT-FIND-015: authorization first, same principle as
+        action_collect()/action_refund() above - the edara.deposit.transaction
+        record (gated by its own ACL/record rules) is created BEFORE the
+        native journal entry, not after, so an unauthorized caller can never
+        trigger the elevated account.move.create() below. Amount/accounts/
+        partner are already fully resolved server-side above."""
         self.ensure_one()
+        self.check_access('write')
         if amount <= 0:
             raise UserError(_("Deduction amount must be positive."))
         if amount > self.balance:
@@ -101,7 +141,13 @@ class EdaraDeposit(models.Model):
                 "(Settings > EDARA Property Management) before recording a deduction.",
                 company=company.display_name,
             ))
-        move = self.env['account.move'].create({
+        transaction = self.env['edara.deposit.transaction'].create({
+            'deposit_id': self.id,
+            'transaction_type': 'deduction',
+            'amount': amount,
+            'description': description,
+        })
+        move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
             'date': fields.Date.context_today(self),
             'company_id': company.id,
@@ -118,20 +164,21 @@ class EdaraDeposit(models.Model):
             ],
         })
         move.action_post()
-        self.env['edara.deposit.transaction'].create({
-            'deposit_id': self.id,
-            'transaction_type': 'deduction',
-            'amount': amount,
-            'move_id': move.id,
-            'description': description,
-        })
-        return move
+        transaction.move_id = move.id
+        return self.env['account.move'].browse(move.id)
 
     def _create_deposit_payment(self, payment_type, journal_id, amount):
+        """MAT-FIND-015: narrow, scoped elevation for the native payment
+        create+post - see action_collect()/action_refund() above for the
+        authorization-first ordering that gates entry to this method.
+        `journal_id` is expected to already be a real, company-appropriate
+        journal id - resolved by the wizard's own narrowly-scoped
+        _resolve_deposit_journal() lookup, or supplied directly by
+        already-privileged callers (tests, future business-workflow code)."""
         self.ensure_one()
         if not self.company_id.edara_deposit_liability_account_id:
             raise UserError(_("Configure a Security Deposit account before recording deposits."))
-        payment = self.env['account.payment'].create({
+        payment = self.env['account.payment'].sudo().create({
             'payment_type': payment_type,
             'partner_type': 'customer',
             'partner_id': self.tenant_id.id,
@@ -143,4 +190,4 @@ class EdaraDeposit(models.Model):
             'memo': _("Security deposit - %(contract)s", contract=self.contract_id.display_name),
         })
         payment.action_post()
-        return payment
+        return self.env['account.payment'].browse(payment.id)

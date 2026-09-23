@@ -62,8 +62,19 @@
                         </group>
                     </group>
                     <group>
-                        <field name="note" readonly="1"/>
-                        <field name="decision_note" invisible="state == 'submitted'"/>
+                        <!-- MAT-FIND-008 (2026-09-22): was unconditionally readonly="1", unlike
+                             every sibling field, which blocked a staff member from typing the
+                             tenant's message when creating a request on a tenant's behalf (the
+                             portal flow itself sets note at create() time via controllers/portal.py,
+                             bypassing this view entirely, so it never relied on this being
+                             immutable). Now mirrors the same submitted-only-editable pattern as
+                             the request's other fields; locked once a decision is made. -->
+                        <field name="note" readonly="state != 'submitted'"/>
+                        <!-- BD-002 (2026-09-22): visible+editable while submitted so a reason
+                             can be entered before Reject (now required, see action_reject());
+                             read-only once a decision has been made. -->
+                        <field name="decision_note" readonly="state != 'submitted'"
+                               placeholder="Required before rejecting - reason for the decision"/>
                         <field name="new_contract_id" readonly="1" invisible="not new_contract_id"/>
                     </group>
                 </sheet>

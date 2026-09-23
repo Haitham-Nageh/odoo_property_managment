@@ -9,6 +9,28 @@
                 <field name="edara_national_id" placeholder="National ID / Registration No."/>
                 <field name="is_edara_owner" invisible="1"/>
                 <field name="is_edara_tenant" invisible="1"/>
+                <field name="is_edara_vendor" invisible="1"/>
+            </xpath>
+            <!-- Maintenance Phase 2 (2026-09-23): only shown for a partner
+                 actually referenced as a vendor on at least one maintenance
+                 request - never shown by default on every contact. -->
+            <xpath expr="//notebook" position="inside">
+                <page string="EDARA Vendor" name="edara_vendor" invisible="not is_edara_vendor">
+                    <field name="edara_vendor_has_accounting_access" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="edara_vendor_request_count"/>
+                            <field name="edara_vendor_open_request_count"/>
+                            <field name="edara_vendor_last_service_date"/>
+                        </group>
+                        <group>
+                            <field name="edara_vendor_avg_response_hours"/>
+                            <field name="edara_vendor_avg_resolution_hours"/>
+                            <field name="edara_vendor_maintenance_cost_total"
+                                   invisible="not edara_vendor_has_accounting_access"/>
+                        </group>
+                    </group>
+                </page>
             </xpath>
         </field>
     </record>

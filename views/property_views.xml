@@ -30,12 +30,14 @@
                         <button type="object" name="action_view_units" class="oe_stat_button" icon="fa-home">
                             <field name="unit_count" widget="statinfo" string="Units"/>
                         </button>
-                        <button type="object" name="action_view_expenses" class="oe_stat_button" icon="fa-money">
+                        <button type="object" name="action_view_expenses" class="oe_stat_button" icon="fa-money"
+                                invisible="not has_accounting_access">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Expenses</span>
                             </div>
                         </button>
-                        <button type="object" name="action_view_invoices" class="oe_stat_button" icon="fa-file-text-o">
+                        <button type="object" name="action_view_invoices" class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not has_accounting_access">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Invoices</span>
                             </div>
@@ -51,6 +53,7 @@
                             <field name="branch_id"/>
                             <field name="company_id" groups="base.group_multi_company" readonly="1"/>
                             <field name="active" invisible="1"/>
+                            <field name="has_accounting_access" invisible="1"/>
                         </group>
                         <group>
                             <field name="street"/>
@@ -78,13 +81,14 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Financial Summary" name="financials">
+                        <page string="Financial Summary" name="financials" invisible="not has_accounting_access">
                             <group>
                                 <field name="currency_id" invisible="1"/>
                                 <field name="total_revenue"/>
                                 <field name="total_expenses"/>
                                 <field name="net_operating_result"/>
                                 <field name="total_outstanding"/>
+                                <field name="maintenance_cost"/>
                             </group>
                         </page>
                     </notebook>

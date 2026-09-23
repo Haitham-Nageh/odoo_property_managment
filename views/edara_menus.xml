@@ -30,12 +30,18 @@
     <menuitem id="menu_edara_maintenance_request" name="Maintenance" parent="menu_edara_root"
               action="action_edara_maintenance_request" sequence="80"/>
 
+    <menuitem id="menu_edara_recurring_maintenance" name="Recurring Maintenance" parent="menu_edara_root"
+              action="action_edara_recurring_maintenance" sequence="85"
+              groups="group_edara_property_manager"/>
+
     <menuitem id="menu_edara_renewal_request" name="Renewal Requests" parent="menu_edara_root"
               action="action_edara_renewal_request" sequence="90"/>
 
     <menuitem id="menu_edara_reports" name="Reports" parent="menu_edara_root" sequence="95"
               groups="group_edara_accountant,group_edara_branch_manager"/>
 
+    <menuitem id="menu_edara_rent_roll_report" name="Rent Roll" parent="menu_edara_reports"
+              action="action_edara_rent_roll_report" sequence="5"/>
     <menuitem id="menu_edara_revenue_report" name="Revenue" parent="menu_edara_reports"
               action="action_edara_revenue_report" sequence="10"/>
     <menuitem id="menu_edara_expense_report" name="Expenses" parent="menu_edara_reports"
@@ -46,6 +52,10 @@
               action="action_edara_occupancy_report" sequence="40"/>
     <menuitem id="menu_edara_tenant_ledger_report" name="Tenant Ledger" parent="menu_edara_reports"
               action="action_edara_tenant_ledger_report" sequence="50"/>
+    <menuitem id="menu_edara_lease_expiry_report" name="Lease Expiry" parent="menu_edara_reports"
+              action="action_edara_lease_expiry_report" sequence="60"/>
+    <menuitem id="menu_edara_maintenance_cost_report" name="Maintenance Cost" parent="menu_edara_reports"
+              action="action_edara_maintenance_cost_report" sequence="70"/>
 
     <menuitem id="menu_edara_configuration" name="Configuration" parent="menu_edara_root" sequence="100"
               groups="group_edara_branch_manager"/>

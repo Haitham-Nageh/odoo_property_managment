@@ -1,3 +1,5 @@
+from lxml import etree
+
 from odoo.exceptions import ValidationError
 from odoo.tests import TransactionCase, tagged
 
@@ -54,3 +56,15 @@ class TestEdaraHardening(TransactionCase):
             {'name': 'Unit A2-1', 'code': 'HA2U1', 'building_id': building_a2.id})
         with self.assertRaises(ValidationError):
             self._make_move(edara_building_id=building_a.id, edara_unit_id=unit_a2.id)
+
+    def test_move_form_exposes_edara_tag_fields(self):
+        """The tag fields had onchange/constraint logic since Phase 7 but were
+        never actually shown on the invoice/bill form - fixed 2026-09-13
+        (views/account_move_views.xml). Regression: confirm the fields are
+        really reachable from the rendered form, not just present on the model."""
+        arch = self.env['account.move'].get_view(view_id=self.env.ref('account.view_move_form').id)['arch']
+        tree = etree.fromstring(arch)
+        for field_name in ('edara_invoice_type', 'edara_contract_id', 'edara_branch_id',
+                            'edara_property_id', 'edara_building_id', 'edara_unit_id'):
+            self.assertTrue(tree.xpath("//field[@name='%s']" % field_name),
+                             "%s should be present on the account.move form" % field_name)

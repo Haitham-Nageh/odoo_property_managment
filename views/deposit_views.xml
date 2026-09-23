@@ -24,7 +24,7 @@
                     <button string="Collect Deposit" type="action"
                             name="%(action_edara_deposit_transaction_wizard)d"
                             context="{'default_transaction_type': 'held'}"
-                            class="btn-primary" invisible="balance &gt;= amount"/>
+                            class="btn-primary" invisible="amount &lt;= 0 or balance &gt;= amount"/>
                     <button string="Refund" type="action"
                             name="%(action_edara_deposit_transaction_wizard)d"
                             context="{'default_transaction_type': 'refund'}"
@@ -69,6 +69,7 @@
                         </page>
                     </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -82,8 +83,9 @@
                 No security deposits yet
             </p>
             <p>
-                Deposits are created automatically when a lease contract with
-                "Deposit Required" is activated.
+                A deposit record is created the first time you open the Deposit
+                smart button on a contract with "Deposit Required" set - not
+                automatically when the contract is activated.
             </p>
         </field>
     </record>

@@ -37,6 +37,7 @@
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="manager_id"/>
                             <field name="active" invisible="1"/>
+                            <field name="has_accounting_access" invisible="1"/>
                         </group>
                         <group>
                             <field name="street"/>
@@ -49,13 +50,20 @@
                         <page string="Assigned Staff" name="staff">
                             <field name="user_ids"/>
                         </page>
-                        <page string="Financial Summary" name="financials">
+                        <page string="Maintenance SLA" name="maintenance_sla">
+                            <group>
+                                <field name="sla_response_hours"/>
+                                <field name="sla_resolution_hours"/>
+                            </group>
+                        </page>
+                        <page string="Financial Summary" name="financials" invisible="not has_accounting_access">
                             <group>
                                 <field name="currency_id" invisible="1"/>
                                 <field name="total_revenue"/>
                                 <field name="total_expenses"/>
                                 <field name="net_operating_result"/>
                                 <field name="total_outstanding"/>
+                                <field name="maintenance_cost"/>
                             </group>
                         </page>
                     </notebook>

@@ -67,15 +67,18 @@ class EdaraServiceCharge(models.Model):
         units = self.building_id.unit_ids.filtered('active')
         if not units:
             raise UserError(_("This building has no units to allocate a service charge to."))
-        amounts = self._compute_allocation(units)
-        vals_list = []
-        for unit, amount in amounts.items():
-            tenant = unit.lease_contract_ids.filtered(lambda c: c.state == 'active')[:1].tenant_id
-            if not tenant:
-                continue
-            vals_list.append((0, 0, {'unit_id': unit.id, 'tenant_id': tenant.id, 'amount': amount}))
-        if not vals_list:
+        tenant_by_unit = {
+            unit: unit.lease_contract_ids.filtered(lambda c: c.state == 'active')[:1].tenant_id
+            for unit in units
+        }
+        eligible_units = units.filtered(lambda u: tenant_by_unit[u])
+        if not eligible_units:
             raise UserError(_("None of this building's units currently have an active tenant to charge."))
+        amounts = self._compute_allocation(eligible_units)
+        vals_list = [
+            (0, 0, {'unit_id': unit.id, 'tenant_id': tenant_by_unit[unit].id, 'amount': amount})
+            for unit, amount in amounts.items()
+        ]
         self.line_ids = vals_list
 
     def _compute_allocation(self, units):

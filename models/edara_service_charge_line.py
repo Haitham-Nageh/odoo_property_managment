@@ -34,7 +34,17 @@ class EdaraServiceChargeLine(models.Model):
         return super().unlink()
 
     def _create_invoice(self):
+        """MAT-FIND-015: no EDARA role implies a native Accounting group (by
+        design - see EDARA_PROJECT_STATE.md), so creating/posting the native
+        invoice needs a narrow, scoped elevation. Every value below is
+        already resolved server-side from `self` and its related records,
+        never from client input. Authorization first: explicitly require
+        normal EDARA write access to THIS line (ACL + record rules, e.g.
+        branch scoping) before any elevation runs - read-only access (a
+        Viewer has that) must never be enough to reach the elevated
+        create()/action_post() below."""
         self.ensure_one()
+        self.check_access('write')
         if self.invoice_id:
             return self.invoice_id
         company = self.company_id
@@ -46,7 +56,7 @@ class EdaraServiceChargeLine(models.Model):
                 company=company.display_name,
             ))
         analytic_account = self.property_id.get_analytic_account()
-        invoice = self.env['account.move'].create({
+        invoice = self.env['account.move'].sudo().create({
             'move_type': 'out_invoice',
             'partner_id': self.tenant_id.id,
             'invoice_date': fields.Date.context_today(self),
@@ -67,4 +77,4 @@ class EdaraServiceChargeLine(models.Model):
         })
         invoice.action_post()
         self.invoice_id = invoice.id
-        return invoice
+        return self.invoice_id

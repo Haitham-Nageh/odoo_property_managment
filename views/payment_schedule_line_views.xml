@@ -1,18 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!--
+        Phase 6.6 (2026-09-23): search filters for Paid/Overdue/Draft - these
+        did not exist before this ticket (this model had no dedicated search
+        view at all, only the auto-generated default). The filter shortcut
+        buttons on the list below activate these SAME filters via
+        searchModel.toggleSearchItem() - no separate domain-building logic.
+    -->
+    <record id="view_edara_payment_schedule_line_search" model="ir.ui.view">
+        <field name="name">edara.payment.schedule.line.search</field>
+        <field name="model">edara.payment.schedule.line</field>
+        <field name="arch" type="xml">
+            <search string="Payment Schedule">
+                <field name="contract_id"/>
+                <field name="description"/>
+                <filter string="Paid" name="paid" domain="[('state', '=', 'paid')]"/>
+                <filter string="Overdue" name="overdue" domain="[('state', '=', 'overdue')]"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <group>
+                    <filter string="Status" name="group_by_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="view_edara_payment_schedule_line_list" model="ir.ui.view">
         <field name="name">edara.payment.schedule.line.list</field>
         <field name="model">edara.payment.schedule.line</field>
         <field name="arch" type="xml">
+            <!-- js_class: Phase 6.6 (2026-09-23) - mounts 3 compact filter-
+                 shortcut buttons (Paid/Overdue/Draft) above this list only.
+                 Each button calls searchModel.toggleSearchItem() on the
+                 matching named <filter> above - the exact same mechanism as
+                 clicking that filter in the native Search Bar. No domain is
+                 built here, no action/navigation is created. See
+                 static/src/js/payment_schedule_filter_shortcuts.js. Uses
+                 t-inherit-mode="primary" (NOT "extension") so this never
+                 touches the shared web.ListView template - the Phase 6.2/6.3
+                 mistake this ticket explicitly forbids repeating. -->
             <list string="Payment Schedule" editable="bottom" create="0"
+                  js_class="edara_payment_schedule_filter_shortcuts"
                   decoration-danger="state == 'overdue'" decoration-success="state == 'paid'">
                 <field name="sequence" widget="handle"/>
                 <field name="contract_id" column_invisible="1"/>
                 <field name="due_date"/>
+                <field name="period_start" optional="hide"/>
+                <field name="period_end" optional="hide"/>
+                <field name="occupied_days" optional="hide"/>
+                <field name="is_prorated" optional="hide" widget="boolean_toggle"/>
                 <field name="description"/>
                 <field name="amount"/>
                 <field name="currency_id" column_invisible="1"/>
-                <field name="invoice_id"/>
+                <field name="invoice_id" readonly="1"/>
                 <field name="state" widget="badge"/>
             </list>
         </field>
@@ -32,6 +71,10 @@
                     <group>
                         <field name="contract_id" readonly="1"/>
                         <field name="due_date"/>
+                        <field name="period_start" readonly="1"/>
+                        <field name="period_end" readonly="1"/>
+                        <field name="occupied_days" readonly="1"/>
+                        <field name="is_prorated" readonly="1"/>
                         <field name="amount"/>
                         <field name="currency_id" invisible="1"/>
                         <field name="description"/>
@@ -39,6 +82,7 @@
                         <field name="state" widget="badge"/>
                     </group>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -47,6 +91,7 @@
         <field name="name">Payment Schedule</field>
         <field name="res_model">edara.payment.schedule.line</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_edara_payment_schedule_line_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">
                 No payment schedule lines yet

@@ -24,10 +24,23 @@
                 <separator/>
                 <filter string="This Year" name="this_year"
                         domain="[('invoice_date', '&gt;=', context_today().strftime('%Y-01-01'))]"/>
+                <separator/>
+                <!-- Reporting & Management Intelligence (2026-09-22): lets any of the
+                     4 account.move-based reports below be sliced by EDARA invoice type
+                     (Rent/Late Fee/Service Charge/Maintenance/Ad-hoc), satisfying
+                     "distinguish rental/service charge/late fee income" and "maintenance
+                     expenses" without a dedicated report per type. -->
+                <filter string="Rent" name="type_rent" domain="[('edara_invoice_type', '=', 'rent')]"/>
+                <filter string="Late Fee" name="type_late_fee" domain="[('edara_invoice_type', '=', 'late_fee')]"/>
+                <filter string="Service Charge" name="type_service_charge"
+                        domain="[('edara_invoice_type', '=', 'service_charge')]"/>
+                <filter string="Maintenance" name="type_maintenance"
+                        domain="[('edara_invoice_type', '=', 'maintenance')]"/>
                 <group>
                     <filter string="Branch" name="group_by_branch" context="{'group_by': 'edara_branch_id'}"/>
                     <filter string="Property" name="group_by_property" context="{'group_by': 'edara_property_id'}"/>
                     <filter string="Tenant/Partner" name="group_by_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Invoice Type" name="group_by_invoice_type" context="{'group_by': 'edara_invoice_type'}"/>
                     <filter string="Month" name="group_by_month" context="{'group_by': 'invoice_date:month'}"/>
                 </group>
             </search>
@@ -110,7 +123,7 @@
                 <field name="branch_id"/>
                 <field name="property_id"/>
                 <filter string="Rented" name="rented" domain="[('occupancy_status', '=', 'rented')]"/>
-                <filter string="Vacant" name="vacant" domain="[('occupancy_status', '=', 'vacant')]"/>
+                <filter string="Vacant" name="vacant" domain="[('occupancy_status', '=', 'available')]"/>
                 <group>
                     <filter string="Branch" name="group_by_branch" context="{'group_by': 'branch_id'}"/>
                     <filter string="Property" name="group_by_property" context="{'group_by': 'property_id'}"/>
@@ -166,5 +179,114 @@
         <field name="domain">[('state', '=', 'posted'), ('partner_id.is_edara_tenant', '=', True),
                                ('move_type', 'in', ('out_invoice', 'out_refund'))]</field>
         <field name="context">{'search_default_group_by_partner': 1}</field>
+    </record>
+
+    <!--
+        Reporting & Management Intelligence Expansion (2026-09-22): the 3
+        genuinely new reports the audit found missing - Rent Roll, Lease
+        Expiry and Maintenance Cost. All 3 reuse existing model fields (no
+        second calculation engine - see monthly_equivalent_rent/
+        vendor_bill_amount_total in models/) and existing native list/pivot
+        architecture, same as the 5 reports above.
+    -->
+    <record id="view_edara_rent_roll_list" model="ir.ui.view">
+        <field name="name">edara.rent.roll.list</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <list string="Rent Roll" default_order="property_id, unit_id">
+                <field name="property_id"/>
+                <field name="building_id"/>
+                <field name="unit_id"/>
+                <field name="tenant_id"/>
+                <field name="name" string="Lease"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="rent_amount" sum="Total Rent"/>
+                <field name="billing_frequency"/>
+                <field name="payment_day"/>
+                <field name="monthly_equivalent_rent" sum="Total Monthly Equivalent"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+                <field name="unit_occupancy_status" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_edara_rent_roll_report" model="ir.actions.act_window">
+        <field name="name">Rent Roll</field>
+        <field name="res_model">edara.lease.contract</field>
+        <field name="view_mode">list,pivot</field>
+        <field name="view_id" ref="view_edara_rent_roll_list"/>
+        <field name="search_view_id" ref="view_edara_lease_contract_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+
+    <record id="view_edara_lease_expiry_report_list" model="ir.ui.view">
+        <field name="name">edara.lease.expiry.report.list</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <list string="Lease Expiry Report" default_order="end_date">
+                <field name="branch_id"/>
+                <field name="property_id"/>
+                <field name="building_id"/>
+                <field name="unit_id"/>
+                <field name="tenant_id"/>
+                <field name="name" string="Lease"/>
+                <field name="end_date"/>
+                <field name="rent_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_edara_lease_expiry_report" model="ir.actions.act_window">
+        <field name="name">Lease Expiry</field>
+        <field name="res_model">edara.lease.contract</field>
+        <field name="view_mode">list,pivot</field>
+        <field name="view_id" ref="view_edara_lease_expiry_report_list"/>
+        <field name="search_view_id" ref="view_edara_lease_contract_search"/>
+        <field name="context">{'search_default_expiring_soon': 1}</field>
+    </record>
+
+    <record id="view_edara_maintenance_cost_report_list" model="ir.ui.view">
+        <field name="name">edara.maintenance.cost.report.list</field>
+        <field name="model">edara.maintenance.request</field>
+        <field name="arch" type="xml">
+            <list string="Maintenance Cost Report" default_order="requested_date desc">
+                <field name="branch_id"/>
+                <field name="property_id"/>
+                <field name="building_id"/>
+                <field name="unit_id"/>
+                <field name="name"/>
+                <field name="title"/>
+                <field name="vendor_id"/>
+                <field name="requested_date"/>
+                <field name="completed_date"/>
+                <field name="state" widget="badge"/>
+                <field name="cost" sum="Total Estimated Cost"/>
+                <field name="vendor_bill_id"/>
+                <field name="vendor_bill_amount_total" sum="Total Posted Vendor Bill"
+                       invisible="not has_accounting_access"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="has_accounting_access" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_edara_maintenance_cost_report" model="ir.actions.act_window">
+        <!-- List-only, deliberately no pivot: vendor_bill_amount_total is a
+             non-stored, permission-gated compute field (MAT-FIND-014 pattern),
+             not a real read_group-aggregatable column - a pivot view would
+             silently fall back to loading every matching record client-side to
+             sum it (§20 scalability). The list's own column sum is fine (bounded
+             by pagination); true aggregate maintenance-cost reporting belongs to
+             the Expenses report's native amount_untaxed_signed measure (filter
+             it to "Maintenance" via the new Invoice Type filter above). -->
+        <field name="name">Maintenance Cost</field>
+        <field name="res_model">edara.maintenance.request</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_edara_maintenance_cost_report_list"/>
+        <field name="search_view_id" ref="property_managment.view_edara_maintenance_request_search"/>
     </record>
 </odoo>

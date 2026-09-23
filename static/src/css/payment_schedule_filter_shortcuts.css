@@ -1,0 +1,14 @@
+/* Phase 6.6: compact filter-shortcut buttons above the Payment Schedule
+   list only. Scoped to .o_edara_schedule_filter_shortcuts so this never
+   affects any other list view's styling. */
+
+.o_edara_schedule_filter_shortcuts {
+    display: flex;
+    gap: 4px;
+    padding: 4px 16px;
+}
+
+.o_edara_schedule_filter_shortcut {
+    padding: 2px 10px;
+    font-size: .8125rem;
+}

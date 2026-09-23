@@ -4,7 +4,8 @@
         <field name="name">edara.unit.list</field>
         <field name="model">edara.unit</field>
         <field name="arch" type="xml">
-            <list string="Units" decoration-success="occupancy_status == 'available'"
+            <list string="Units"
+                  decoration-success="occupancy_status == 'available'"
                   decoration-danger="occupancy_status == 'rented'"
                   decoration-warning="occupancy_status == 'reserved'"
                   decoration-muted="operational_status == 'under_maintenance'">
@@ -18,6 +19,7 @@
                 <field name="currency_id" column_invisible="1"/>
                 <field name="occupancy_status"/>
                 <field name="operational_status"/>
+                <field name="active_tenant_name" string="Tenant"/>
             </list>
         </field>
     </record>
@@ -27,20 +29,47 @@
         <field name="model">edara.unit</field>
         <field name="arch" type="xml">
             <!--
-                Per spec §48 "Visual Property Management" - a floor/unit grid
-                visualization where status is obvious at a glance, built with
-                plain native kanban/QWeb (grouped by floor, one column per
-                floor exactly like the spec's ASCII mockup) and Bootstrap
-                utility classes for color - no OWL component, no CSS file,
-                no third-party dependency.
+                Dashboard UX Hardening 6.1 (2026-09-23): the original
+                default_group_by="floor" grouping (spec §48) produced
+                meaningless "None (17) / 1 (1)" columns in real data (floor
+                is a free-text Char, almost never populated) and implicit
+                drag-and-drop between them would silently rewrite a unit's
+                floor. A Unit is a record, not a workflow stage - it must
+                never be draggable. No grouping by default (records_draggable
+                is irrelevant without groups, but set false anyway as
+                defense-in-depth per the ticket's explicit "no meaningless
+                drag" requirement, and matches records_draggable="false"
+                already being the right setting for a non-stage model). The
+                card itself now surfaces the real information a manager scans
+                for: building/floor, occupancy + operational state as
+                colored badges, and (only when present) the active tenant
+                and lease reference - all read from fields that already
+                exist on the model (occupancy_status/operational_status
+                directly, active_tenant_name/active_contract_name a thin
+                read-only projection of lease_contract_ids, not new data).
             -->
-            <kanban default_group_by="floor" class="o_kanban_small_column">
+            <kanban class="o_kanban_small_column" records_draggable="false">
                 <templates>
                     <t t-name="card">
-                        <div t-attf-class="text-center rounded p-2 text-white #{record.operational_status.raw_value == 'under_maintenance' ? 'bg-warning' : (record.occupancy_status.raw_value == 'rented' ? 'bg-danger' : (record.occupancy_status.raw_value == 'available' ? 'bg-success' : 'bg-secondary'))}">
-                            <field name="operational_status" invisible="1"/>
-                            <div class="fw-bold"><field name="name"/></div>
-                            <div class="small"><field name="occupancy_status"/></div>
+                        <div class="p-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong><field name="name"/></strong>
+                                <span t-attf-class="badge #{record.operational_status.raw_value == 'under_maintenance' ? 'text-bg-warning' : (record.occupancy_status.raw_value == 'rented' ? 'text-bg-danger' : (record.occupancy_status.raw_value == 'available' ? 'text-bg-success' : 'text-bg-secondary'))}">
+                                    <field name="occupancy_status"/>
+                                </span>
+                            </div>
+                            <div class="text-muted small">
+                                <field name="building_id"/>
+                                <span t-if="record.floor.raw_value"> - Floor <field name="floor"/></span>
+                            </div>
+                            <div t-if="record.active_tenant_name.raw_value" class="small mt-1">
+                                <i class="fa fa-user-o me-1" title="Tenant"/><field name="active_tenant_name"/>
+                                <span t-if="record.active_contract_name.raw_value" class="text-muted"> (<field name="active_contract_name"/>)</span>
+                            </div>
+                            <span t-if="record.operational_status.raw_value == 'under_maintenance'"
+                                  class="badge text-bg-warning mt-1">
+                                <field name="operational_status"/>
+                            </span>
                         </div>
                     </t>
                 </templates>
@@ -65,6 +94,18 @@
                     <filter string="Floor" name="group_by_floor" context="{'group_by': 'floor'}"/>
                     <filter string="Occupancy" name="group_by_occupancy" context="{'group_by': 'occupancy_status'}"/>
                 </group>
+                <!--
+                    Dashboard UX Hardening 6.1 (2026-09-23): native, zero-JS
+                    quick-action equivalent living directly on the Units page
+                    itself (not just the Dashboard) - an always-visible,
+                    counted category list, click to filter the SAME list/
+                    kanban already open (no new page, no new action, no
+                    duplicated view). enable_counters computes each count
+                    with one read_group per category, not a query per row.
+                -->
+                <searchpanel>
+                    <field name="occupancy_status" enable_counters="1"/>
+                </searchpanel>
             </search>
         </field>
     </record>
@@ -116,6 +157,18 @@
                             <field name="operational_status"/>
                         </group>
                     </group>
+                    <field name="has_accounting_access" invisible="1"/>
+                    <notebook>
+                        <page string="Financial Summary" name="financials" invisible="not has_accounting_access">
+                            <group>
+                                <field name="currency_id" invisible="1"/>
+                                <field name="total_revenue"/>
+                                <field name="total_expenses"/>
+                                <field name="total_outstanding"/>
+                                <field name="maintenance_cost"/>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
                 <chatter/>
             </form>
@@ -125,7 +178,7 @@
     <record id="action_edara_unit" model="ir.actions.act_window">
         <field name="name">Units</field>
         <field name="res_model">edara.unit</field>
-        <field name="view_mode">kanban,list,form</field>
+        <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="view_edara_unit_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">

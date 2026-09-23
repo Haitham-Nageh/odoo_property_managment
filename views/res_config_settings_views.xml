@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app data-string="EDARA Property Management" string="EDARA Property Management"
-                     name="property_managment">
+                     name="property_managment" groups="property_managment.group_edara_company_manager">
                     <block title="Accounting" name="edara_accounting_setting_container">
                         <setting id="edara_rental_income_account_setting"
                                  help="Account credited when a rent invoice is posted.">
@@ -32,6 +32,10 @@
                         <setting id="edara_deposit_deduction_income_account_setting"
                                  help="Income account credited when a deposit deduction (e.g. damage recovery) is recorded.">
                             <field name="edara_deposit_deduction_income_account_id"/>
+                        </setting>
+                        <setting id="edara_maintenance_expense_account_setting"
+                                 help="Expense account debited when a maintenance vendor bill is created.">
+                            <field name="edara_maintenance_expense_account_id"/>
                         </setting>
                     </block>
                 </app>

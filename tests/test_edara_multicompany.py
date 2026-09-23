@@ -13,7 +13,13 @@ class TestEdaraMultiCompany(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.company_a = cls.env.company
+        # Phase 6.4: company_a used to be cls.env.company (the real default
+        # company), which already holds real, legitimate branch/property/unit
+        # data in this shared dev database - "sees exactly branch_a" then
+        # silently also matched that real data. Use a second isolated company
+        # here too, matching company_b's own pattern, so both sides of this
+        # test are genuinely clean.
+        cls.company_a = cls.env['res.company'].create({'name': 'EDARA Test Company A'})
         cls.company_b = cls.env['res.company'].create({'name': 'EDARA Test Company B'})
         cls.branch_a = cls.env['edara.branch'].create(
             {'name': 'Branch A', 'code': 'MCA', 'company_id': cls.company_a.id})

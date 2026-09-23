@@ -68,3 +68,33 @@ class TestEdaraMaintenanceRequest(TransactionCase):
         self._make_request()
         self._make_request(title='Broken window')
         self.assertEqual(self.unit.maintenance_request_count, 2)
+
+    def test_action_assign_without_user_id_uses_already_set_assigned_user(self):
+        """Wired to the header button, which calls action_assign() with no
+        arguments - it must use whatever assigned_user_id is already set on
+        the form rather than requiring a Python-only call."""
+        request = self._make_request(assigned_user_id=self.staff.id)
+        request.action_assign()
+        self.assertEqual(request.state, 'assigned')
+        self.assertEqual(request.assigned_user_id, self.staff)
+
+    def test_action_assign_without_user_id_and_without_assigned_user_blocked(self):
+        request = self._make_request()
+        with self.assertRaises(UserError):
+            request.action_assign()
+
+    def test_cannot_delete_assigned_request(self):
+        request = self._make_request()
+        request.action_assign(self.staff.id)
+        with self.assertRaises(UserError):
+            request.unlink()
+
+    def test_can_delete_new_request(self):
+        request = self._make_request()
+        request.unlink()
+        self.assertFalse(request.exists())
+
+    def test_state_field_is_indexed(self):
+        """Product Readiness Review (2026-09-22): state is the Dashboard's
+        most-filtered column on this model."""
+        self.assertTrue(self.env['edara.maintenance.request']._fields['state'].index)

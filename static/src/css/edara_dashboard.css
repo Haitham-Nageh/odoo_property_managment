@@ -1,0 +1,115 @@
+/* EDARA Management Command Center - Dashboard UX Hardening.
+   Scoped entirely to .o_edara_dashboard so it never affects any other form's
+   oe_stat_button/button-box (e.g. a real record's smart buttons). Odoo's own
+   oe_stat_button styling only applies inside a native .o-form-buttonbox (the
+   small form-header smart-button strip); this dashboard is a full-page KPI
+   grid, not a button box, so it gets its own card treatment.
+
+   Phase 6.1 note: the "css error occured, using an old style" fallback the
+   user saw was NOT caused by this file or by :has() below - the actual cause
+   was the whole backend SCSS bundle (hundreds of native Odoo .scss files)
+   failing to compile because the `libsass` Python package required by
+   requirements.txt was never actually installed in server/.venv. That is
+   fixed at the environment level (pip install), not in this stylesheet.
+   :has() itself compiled cleanly once libsass was present, and Odoo's own
+   button_box.scss already relies on :has() - it was never the problem. */
+
+.o_edara_dashboard .o_horizontal_separator {
+    border-bottom: 2px solid var(--border-color, #dee2e6);
+    padding-bottom: 6px;
+    margin-top: 28px;
+}
+
+/* Equal-height, equal-width grid: bootstrap's .row is already a flex
+   container with align-items: stretch by default, so height: 100% on the
+   card is enough to make every card in a row match the tallest one - no
+   custom grid system needed. */
+.o_edara_dashboard .row > div {
+    display: flex;
+}
+
+/* Phase 6.3: several KPI rows have card counts that aren't multiples of 4
+   (Units: 7, Lease Contracts: 6, Maintenance: 5, Maintenance Phase 2: 3).
+   Bootstrap's col-lg-3/col-md-4/col-6 compile to `flex: 0 0 auto; width: X%`
+   (odoo/addons/web/static/lib/bootstrap/scss/mixins/_grid.scss make-col()) -
+   flex-grow is 0, so a wrapped line with fewer cards than fit its
+   breakpoint leaves dead grid columns (e.g. Maintenance's 2nd line has 1
+   card out of 4, leaving 75% of that line blank) - this is the "large
+   empty rectangle" reported after Phase 6.2. Overriding only flex-grow (not
+   width/flex-basis) lets the trailing cards on an underfilled line stretch
+   to fill it, with zero effect on any row/line that already divides evenly
+   (no leftover space to distribute) - the per-breakpoint card count and
+   wrap points are untouched. */
+.o_edara_dashboard .row > div[class*="col-"] {
+    flex-grow: 1;
+}
+
+.o_edara_dashboard .oe_stat_button,
+.o_edara_dashboard .o_stat_info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+    width: 100%;
+    height: 100%;
+    min-height: 112px;
+    padding: 16px 12px;
+    margin-bottom: 16px;
+    background-color: var(--EdaraCard-bg, #fafbfc);
+    border: 1px solid var(--border-color, #e3e6ea);
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+}
+
+.o_edara_dashboard button.oe_stat_button {
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+
+.o_edara_dashboard button.oe_stat_button:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
+    transform: translateY(-1px);
+}
+
+/* Hierarchy: icon, then label, then number - in that DOM order already
+   (Odoo's own form compiler puts the icon element before o_stat_info), so a
+   plain column flex is enough to stack them correctly without repositioning
+   anything absolutely. */
+.o_edara_dashboard .oe_stat_button .o_button_icon {
+    margin: 0 0 6px 0 !important;
+    font-size: 1.3em;
+    opacity: .55;
+}
+
+.o_edara_dashboard .o_stat_text {
+    order: 1;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--muted-text-color, #6c757d);
+    margin-bottom: 8px;
+}
+
+/* The number: visually separated from its label with its own background,
+   border, padding and rounded corners - never glued to the label text. */
+.o_edara_dashboard .o_stat_value {
+    order: 2;
+    display: inline-block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 5px 16px;
+    background-color: #fff;
+    border: 1px solid var(--border-color, #d8dce1);
+    border-radius: 6px;
+    color: var(--body-color, #2b2b2b);
+}
+
+/* State accent on the number badge only - reuses the text-success/warning/
+   danger/primary classes already present on each tile's icon, no new state
+   model, no JS. */
+.o_edara_dashboard .oe_stat_button:has(.text-danger) .o_stat_value { border-color: var(--danger, #dc3545); color: var(--danger, #dc3545); }
+.o_edara_dashboard .oe_stat_button:has(.text-warning) .o_stat_value { border-color: var(--warning, #b8860b); color: var(--warning, #b8860b); }
+.o_edara_dashboard .oe_stat_button:has(.text-success) .o_stat_value { border-color: var(--success, #28a745); color: var(--success, #28a745); }
+.o_edara_dashboard .oe_stat_button:has(.text-primary) .o_stat_value { border-color: var(--primary, #714b67); color: var(--primary, #714b67); }

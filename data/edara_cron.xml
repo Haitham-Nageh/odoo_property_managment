@@ -19,4 +19,76 @@
         <field name="interval_type">days</field>
         <field name="active" eval="True"/>
     </record>
+
+    <record id="ir_cron_edara_sync_reserved_occupancy" model="ir.cron">
+        <field name="name">EDARA: Transition Reserved units to Rented once their lease starts</field>
+        <field name="model_id" ref="model_edara_unit"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_sync_reserved_occupancy()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Notifications & Reminders Automation (2026-09-22) -->
+    <record id="ir_cron_edara_lease_expiry_reminders" model="ir.cron">
+        <field name="name">EDARA: Send lease expiry reminders</field>
+        <field name="model_id" ref="model_edara_lease_contract"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_expiry_reminders()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_edara_renewal_reminders" model="ir.cron">
+        <field name="name">EDARA: Send renewal decision reminders</field>
+        <field name="model_id" ref="model_edara_renewal_request"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_renewal_reminders()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_edara_overdue_payment_reminders" model="ir.cron">
+        <field name="name">EDARA: Send overdue payment reminders</field>
+        <field name="model_id" ref="model_edara_payment_schedule_line"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_overdue_reminders()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_edara_maintenance_reminders" model="ir.cron">
+        <field name="name">EDARA: Send maintenance follow-up reminders</field>
+        <field name="model_id" ref="model_edara_maintenance_request"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_maintenance_reminders()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Maintenance Phase 2 (2026-09-23) -->
+    <record id="ir_cron_edara_maintenance_sla_notifications" model="ir.cron">
+        <field name="name">EDARA: Send maintenance SLA alerts</field>
+        <field name="model_id" ref="model_edara_maintenance_request"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_sla_notifications()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_edara_generate_recurring_maintenance" model="ir.cron">
+        <field name="name">EDARA: Generate recurring maintenance requests</field>
+        <field name="model_id" ref="model_edara_recurring_maintenance"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate_recurring_maintenance()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

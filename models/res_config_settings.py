@@ -19,6 +19,9 @@ class ResConfigSettings(models.TransientModel):
     edara_deposit_deduction_income_account_id = fields.Many2one(
         related='company_id.edara_deposit_deduction_income_account_id', readonly=False,
         string='Deposit Deduction Income Account')
+    edara_maintenance_expense_account_id = fields.Many2one(
+        related='company_id.edara_maintenance_expense_account_id', readonly=False,
+        string='Maintenance Expense Account')
     edara_late_fee_amount = fields.Monetary(
         related='company_id.edara_late_fee_amount', readonly=False,
         string='Late Fee Amount', currency_field='currency_id')

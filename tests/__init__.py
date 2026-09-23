@@ -2,6 +2,7 @@ from . import test_edara_branch
 from . import test_edara_property
 from . import test_edara_lease_contract
 from . import test_edara_payment_schedule
+from . import test_edara_lease_billing
 from . import test_edara_deposit
 from . import test_edara_service_charge
 from . import test_edara_maintenance_request
@@ -10,3 +11,10 @@ from . import test_edara_reports
 from . import test_edara_dashboard
 from . import test_edara_hardening
 from . import test_edara_multicompany
+from . import test_edara_security_isolation
+from . import test_edara_mat015_scoped_accounting
+from . import test_edara_renewal_request
+from . import test_edara_maintenance_vendor_bill
+from . import test_edara_notifications
+from . import test_edara_reporting_phase2
+from . import test_edara_maintenance_phase2

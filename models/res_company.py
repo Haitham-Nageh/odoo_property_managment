@@ -10,6 +10,8 @@ class ResCompany(models.Model):
     edara_deposit_liability_account_id = fields.Many2one('account.account', string='Security Deposit Liability Account')
     edara_deposit_deduction_income_account_id = fields.Many2one(
         'account.account', string='Deposit Deduction Income Account')
+    edara_maintenance_expense_account_id = fields.Many2one(
+        'account.account', string='Maintenance Expense Account')
     edara_late_fee_amount = fields.Monetary(
         string='Late Fee Amount', currency_field='currency_id',
         help="Flat amount charged when a Property Manager manually charges a "

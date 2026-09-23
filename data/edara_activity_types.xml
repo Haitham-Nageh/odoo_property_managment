@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Notifications & Reminders Automation (2026-09-22): one activity type
+         per reminder domain, reused across both the create-time/state-driven
+         trigger and its companion staleness cron where one exists - see
+         models/edara_lease_contract.py, edara_renewal_request.py,
+         edara_payment_schedule_line.py and edara_maintenance_request.py. -->
+    <record id="mail_activity_type_edara_lease_expiry" model="mail.activity.type">
+        <field name="name">EDARA: Lease Expiry Follow-up</field>
+        <field name="summary">Lease Expiry Follow-up</field>
+        <field name="icon">fa-calendar</field>
+    </record>
+
+    <record id="mail_activity_type_edara_renewal_pending" model="mail.activity.type">
+        <field name="name">EDARA: Renewal Decision Pending</field>
+        <field name="summary">Renewal Decision Pending</field>
+        <field name="icon">fa-refresh</field>
+    </record>
+
+    <record id="mail_activity_type_edara_payment_overdue" model="mail.activity.type">
+        <field name="name">EDARA: Overdue Payment Follow-up</field>
+        <field name="summary">Overdue Payment Follow-up</field>
+        <field name="icon">fa-money</field>
+    </record>
+
+    <record id="mail_activity_type_edara_maintenance" model="mail.activity.type">
+        <field name="name">EDARA: Maintenance Follow-up</field>
+        <field name="summary">Maintenance Follow-up</field>
+        <field name="icon">fa-wrench</field>
+    </record>
+
+    <!-- Maintenance Phase 2 (2026-09-23): distinct from the generic
+         Maintenance Follow-up type above - specifically for the branch's
+         configured SLA target being at risk or breached, see
+         edara_maintenance_request.py._cron_send_sla_notifications(). -->
+    <record id="mail_activity_type_edara_maintenance_sla" model="mail.activity.type">
+        <field name="name">EDARA: Maintenance SLA Alert</field>
+        <field name="summary">Maintenance SLA Alert</field>
+        <field name="icon">fa-exclamation-triangle</field>
+    </record>
+</odoo>
