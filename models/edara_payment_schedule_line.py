@@ -66,6 +66,13 @@ class EdaraPaymentScheduleLine(models.Model):
         'An invoice cannot be linked to more than one payment schedule line.',
     )
 
+    def write(self, vals):
+        # Phase 7: once invoiced, the line's amount is the frozen basis of that invoice.
+        # (Uninvoiced lines stay editable - the list/form views intentionally allow it.)
+        if 'amount' in vals and not self.env.su and any(line.invoice_id for line in self):
+            raise AccessError(_("The amount of an invoiced payment schedule line cannot be modified."))
+        return super().write(vals)
+
     def unlink(self):
         """The invoice itself is already protected by native Odoo (a posted
         account.move cannot be unlinked without first resetting to draft, a
@@ -136,7 +143,8 @@ class EdaraPaymentScheduleLine(models.Model):
             })],
         })
         invoice.action_post()
-        self.invoice_id = invoice.id
+        # Phase 7: invoice_id is system-managed (edara.system.field.guard); check_access('write') above.
+        self.sudo().invoice_id = invoice.id
         return invoice
 
     def action_charge_late_fee(self):
@@ -213,7 +221,8 @@ class EdaraPaymentScheduleLine(models.Model):
         created = skipped = errors = 0
         for line in self:
             try:
-                if line.invoice_id or line.contract_id.state != 'active':
+                # 'renewed' stays billable: see edara.lease.contract.action_renew().
+                if line.invoice_id or line.contract_id.state not in ('active', 'renewed'):
                     skipped += 1
                     continue
                 line._create_invoice()

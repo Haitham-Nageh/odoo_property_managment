@@ -319,11 +319,15 @@ class EdaraMaintenanceRequest(models.Model):
                 "(Settings > EDARA Property Management) before creating a vendor bill.",
                 company=company.display_name,
             ))
+        analytic_account = self.property_id.get_analytic_account()
         bill = self.env['account.move'].sudo().create({
             'move_type': 'in_invoice',
             'partner_id': self.vendor_id.id,
             'invoice_date': fields.Date.context_today(self),
             'company_id': company.id,
+            # Phase 7: cost is denominated in the request's own currency_id, so the
+            # bill must be too (it previously fell back to the company currency).
+            'currency_id': self.currency_id.id,
             'edara_invoice_type': 'maintenance',
             'edara_unit_id': self.unit_id.id,
             'edara_building_id': self.building_id.id,
@@ -334,6 +338,10 @@ class EdaraMaintenanceRequest(models.Model):
                 'quantity': 1,
                 'price_unit': self.cost,
                 'account_id': expense_account.id,
+                # Phase 7: same property analytic account rent/late-fee/service-charge
+                # invoices already use, so maintenance cost reaches the property's
+                # analytic reporting.
+                'analytic_distribution': {str(analytic_account.id): 100.0},
             })],
         })
         self.vendor_bill_id = bill.id

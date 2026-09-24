@@ -279,6 +279,10 @@ class EdaraLeaseContract(models.Model):
                 ))
 
     def action_activate(self):
+        # Phase 7: `state` is a system-managed field (edara.system.field.guard) - it is
+        # only ever changed here, after the caller's own write access is verified,
+        # through a scoped sudo() write (a client cannot forge env.su via RPC).
+        self.check_access('write')
         for contract in self:
             if contract.state != 'draft':
                 raise UserError(_("Only draft contracts can be activated."))
@@ -292,7 +296,7 @@ class EdaraLeaseContract(models.Model):
             if contract.deposit_required and contract.deposit_amount <= 0:
                 raise UserError(_(
                     "Configure a positive Deposit Amount before activating this contract."))
-            contract.state = 'active'
+            contract.sudo().state = 'active'
             # Date-aware occupancy per BD-001 (2026-09-21, resolves MAT-FIND-010):
             # unconditionally forces the unit's occupancy to whatever its active
             # contracts now imply - 'reserved' for a future start_date, 'rented'
@@ -321,10 +325,11 @@ class EdaraLeaseContract(models.Model):
         ).unlink()
 
     def action_terminate(self, reason=None):
+        self.check_access('write')
         for contract in self:
             if contract.state != 'active':
                 raise UserError(_("Only active contracts can be terminated."))
-            contract.write({
+            contract.sudo().write({
                 'state': 'terminated',
                 'termination_date': fields.Date.context_today(contract),
                 'termination_reason': reason or contract.termination_reason,
@@ -344,6 +349,7 @@ class EdaraLeaseContract(models.Model):
         owner approval - it never bypasses these checks.
         """
         self.ensure_one()
+        self.check_access('write')
         if self.state != 'active':
             raise UserError(_("Only an active contract can be renewed."))
         new_contract = self.create({
@@ -358,7 +364,17 @@ class EdaraLeaseContract(models.Model):
             'deposit_amount': self.deposit_amount,
             'predecessor_contract_id': self.id,
         })
-        self.write({'state': 'renewed', 'successor_contract_id': new_contract.id})
+        self.sudo().write({'state': 'renewed', 'successor_contract_id': new_contract.id})
+        # Phase 7 (early-renewal semantics, see EDARA_PROJECT_STATE.md): a renewed
+        # contract stays financially responsible for its own term - the successor
+        # normally starts at/after this contract's end_date - so its remaining
+        # uninvoiced periods stay billable (edara.payment.schedule.line
+        # ._process_due_invoices accepts 'renewed'). Only periods the successor
+        # itself covers (period_start >= successor start) are dropped, so an
+        # overlapping renewal never double-bills.
+        self.schedule_line_ids.filtered(
+            lambda l: not l.invoice_id and l.period_start and l.period_start >= new_start_date
+        ).unlink()
         new_contract.action_activate()
         return new_contract
 
@@ -376,7 +392,7 @@ class EdaraLeaseContract(models.Model):
         today = fields.Date.context_today(self)
         contracts = self.search([('state', '=', 'active'), ('end_date', '<', today)])
         for contract in contracts:
-            contract.state = 'expired'
+            contract.sudo().state = 'expired'
             # Same sibling-aware recompute as action_terminate() - a future-dated
             # active contract on the same unit must keep it Rented (MAT-020).
             contract.unit_id._sync_occupancy_from_contracts()

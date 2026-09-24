@@ -17,9 +17,12 @@ class TestEdaraBranch(TransactionCase):
         cls.branch_b = cls.env['edara.branch'].create({'name': 'Nablus Branch', 'code': 'NBL'})
 
     def test_branch_code_unique_per_company(self):
+        # Phase 7: creates its own original instead of assuming a pre-existing 'RAM'
+        # branch (which only existed in the old Community dev DB, not a clean DB).
+        self.env['edara.branch'].create({'name': 'Original', 'code': 'UNIQ1'})
         with mute_logger('odoo.sql_db'), self.assertRaises(UniqueViolation):
             with self.env.cr.savepoint():
-                self.env['edara.branch'].create({'name': 'Duplicate', 'code': 'RAM'})
+                self.env['edara.branch'].create({'name': 'Duplicate', 'code': 'UNIQ1'})
 
     def test_viewer_sees_only_assigned_branch(self):
         user = new_test_user(self.env, login='edara_viewer_a', groups='property_managment.group_edara_viewer')
