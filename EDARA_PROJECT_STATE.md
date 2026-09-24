@@ -2416,3 +2416,45 @@ Maintenance requests "P7 live ILS/USD/JOD" (+3 paid vendor bills); 9 rent invoic
 
 ### Remaining issues / next recommended phase
 1. Deposit deduction currency (above). 2. Occupancy `reserved` for a renewed-but-in-term contract (business decision). 3. Extend the system-field guard to other lifecycle `state` fields and invoiced-line audit fields (`due_date`, `period_*`) if desired. 4. Arabic `.po` content remains open from Phase 15. Recommended next: a small "currency correctness" ticket (deposit deduction + audit of every place that builds `account.move`/lines without an explicit currency), then the occupancy decision.
+
+
+## Phase 8 - Currency Correctness & Full Accounting Entry Audit (2026-09-24)
+
+**Status: Implemented, tested (red/green proven), verified live on Odoo 19 Enterprise. 413/413 automated tests, 0 failed, 0 errors (403 previous + 10 new).**
+
+### Defect: foreign-currency deposit deduction (MEDIUM)
+- **Root cause:** `edara.deposit.action_deduct` built a plain `account.move` (entry) with `debit/credit = amount` and no `currency_id`/`amount_currency`, so a USD 200 deduction posted as ILS 200. Collect/refund (native `account.payment` with `currency_id`) were already correct, so the liability account no longer netted to zero for non-company-currency deposits.
+- **Odoo mechanics (verified in `account_move_line.py`):** for a non-invoice entry, `_compute_balance` does NOT derive `balance` from `amount_currency`; a foreign-currency line needs `currency_id` + `amount_currency` (transaction amount) AND an explicit company-currency `debit/credit`. The fix converts with the native `currency._convert(amount, company_currency, company, entry_date)` (rounded in company currency), the same call `account.payment` uses; both lines carry `currency_id`/`±amount_currency`. Entry date = deduction date (today); rate = the native rate valid on that date.
+- **Extra defects found by the audit and fixed:**
+  1. **Late fee** - `res.company.edara_late_fee_amount` is a Monetary in the COMPANY currency but was used as `price_unit` of an invoice in the CONTRACT currency (a USD contract was charged 50 USD instead of the configured 50 ILS). Now converted company->contract currency at the invoice date (`_convert`). Invariant tested: the fee's company-currency value equals the configured amount. (Business reading chosen: the fee is defined in company currency; the tenant is billed in their contract currency.)
+  2. **Portal outstanding** (`controllers/portal.py`, dashboard + billing page) - summed `amount_residual` (each invoice's own currency) across mixed-currency invoices and labelled it with the contract currency; credit notes were added instead of subtracted. Now sums `amount_residual_signed` (company currency, nets credit notes) and shows the company currency. Live: tenant with ILS+USD invoices shows 33,968.53 (was 9,463.50 mixed).
+
+### Accounting entry inventory / audit (write side = every place EDARA hands an amount to native Accounting)
+| Flow | Source amount / currency | Currency handling | Status |
+|---|---|---|---|
+| Rent invoice (`payment_schedule_line._create_invoice`) | line.amount, contract currency | explicit `currency_id`; native invoice conversion at `invoice_date` = due_date | Verified correct (tests: contract-currency, due-date rate not today's, analytic 100%, sale journal, payment reconciles) |
+| Late fee (`action_charge_late_fee`) | company late-fee amount (company currency) | was: used as contract-currency number | **FIXED** (convert at invoice date) |
+| Service charge (`service_charge_line._create_invoice`) | charge.total/lines, charge `currency_id` | explicit `currency_id`, native conversion at today | Verified correct |
+| Deposit collect / refund (`_create_deposit_payment`) | deposit.amount, deposit currency | native `account.payment` with `currency_id`; liability line carries currency | Verified correct |
+| Deposit deduction (`action_deduct`) | deposit currency | no currency at all | **FIXED** |
+| Maintenance vendor bill | request.cost, request currency | explicit currency (Phase 7); native conversion; analytic 100% | Verified correct |
+| Customer/vendor payments | native `account.payment.register` | fully native (EDARA creates none except deposits) | Verified correct (paid + residual 0 for ILS/USD/JOD) |
+| Reversals / credit notes | - | EDARA creates none (no reverse/refund code exists); native only | N/A |
+| Read side: dashboard, branch/property/unit financial summaries, report pivots | `amount_untaxed_signed` / `amount_residual_signed` (company currency) | correct company-currency aggregation | Verified correct |
+| Portal invoice lists | per-invoice `amount_total/residual` shown in `move.currency_id` | correct per document | Verified correct; only the summed "outstanding" was wrong (fixed) |
+
+Rate-date policy (native, verified by tests with distinct 2020 vs today rates): rent -> due date; late fee, service charge, deposit collect/deduct/refund, maintenance bill -> today.
+
+### Tests (`tests/test_edara_phase8_currency.py`, 10 tests)
+Deterministic: the tests create their own `res.currency.rate` rows (old rate 3.0 on 2020-01-01, 4.0 today) and iterate ILS, USD, JOD - whichever equals the company currency acts as the same-currency case (rate 1). Assertions inspect posted journal items (currency_id, amount_currency, debit/credit/balance, partner, company, date, analytic), not only documents: deposit full lifecycle nets to 0 in amount_currency AND balance; deduction entry lines; partial deduction leaves -800 / converted balance; collect payment lines; late fee currency/amount/company-currency value; rent invoice currency + due-date rate + analytic; rent payment reconciles; service charge; maintenance bill expense line + analytic line; portal residual semantics. **Red/green proven:** with the two fixed model files reverted the suite failed exactly on deduction currency, lifecycle balance (150 off), late fee and partial liability (4 failures); restored -> all pass.
+
+### Live Enterprise verification (dev DB, company ILS, real rates USD 0.27 / JOD 0.19)
+New deposits collect 1000 / deduct 200 / refund 800: ILS - liability amount_currency 0 and balance 0; USD - lines 3703.70 / 740.74 / 2962.96 ILS, sums 0 and 0; JOD - 5263.16 / 1052.63 / 4210.53, sums 0 and 0; deposits `closed`, posted journal balance 0.00. USD late fee = 13.50 USD = ILS 50.00 (configured). Payment Schedule shortcuts (real browser, 0 console/page errors) and the Phase 7 system-field guard (branch_id/state/forged context rejected over RPC, legit write OK) re-verified.
+
+### Remaining accounting risks
+1. **Legacy data (dev DB only):** deposit LC/2026/0007 (USD) was cycled BEFORE this fix; its posted deduction is ILS 200 with no currency, leaving the liability account at -540.75 ILS (amount_currency -200 USD / +200 ILS). Posted history was not rewritten; correct only with a proper reversing/adjusting entry if that data matters.
+2. **FX on the liability account:** collect and refund/deduct happen on different dates; if the rate moves, the liability's company-currency balance keeps an exchange difference even though its amount_currency is 0 (liability accounts are not reconcilable, so native FX-difference entries are not generated). Enterprise "Foreign Currency Revaluation" (account_reports) is the native tool - not configured/tested here.
+3. Deduction date is always "today" (no back-dating parameter exists).
+
+### Next recommended phase
+Decide FX policy for held deposits (revaluation vs accept), and the still-open occupancy decision for renewed-but-in-term contracts (Phase 7). Optional: extend the Phase 7 system-field guard to other lifecycle `state` fields.

@@ -184,10 +184,16 @@ class EdaraPaymentScheduleLine(models.Model):
                 company=company.display_name,
             ))
         analytic_account = self.property_id.get_analytic_account()
+        invoice_date = fields.Date.context_today(self)
+        # Phase 8: edara_late_fee_amount is a Monetary in the COMPANY currency, but the
+        # invoice is in the contract's currency - convert (native rate at the invoice
+        # date) instead of reusing the number as if it were already in that currency.
+        late_fee = company.currency_id._convert(
+            company.edara_late_fee_amount, self.currency_id, company, invoice_date)
         invoice = self.env['account.move'].sudo().create({
             'move_type': 'out_invoice',
             'partner_id': self.tenant_id.id,
-            'invoice_date': fields.Date.context_today(self),
+            'invoice_date': invoice_date,
             'currency_id': self.currency_id.id,
             'company_id': company.id,
             'edara_invoice_type': 'late_fee',
@@ -200,7 +206,7 @@ class EdaraPaymentScheduleLine(models.Model):
                 'name': _("Late fee - %(contract)s due %(due_date)s",
                           contract=self.contract_id.display_name, due_date=self.due_date),
                 'quantity': 1,
-                'price_unit': company.edara_late_fee_amount,
+                'price_unit': late_fee,
                 'account_id': income_account.id,
                 'analytic_distribution': {str(analytic_account.id): 100.0},
             })],

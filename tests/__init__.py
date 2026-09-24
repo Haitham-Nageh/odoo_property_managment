@@ -19,3 +19,4 @@ from . import test_edara_notifications
 from . import test_edara_reporting_phase2
 from . import test_edara_maintenance_phase2
 from . import test_edara_phase7_hardening
+from . import test_edara_phase8_currency

@@ -147,19 +147,31 @@ class EdaraDeposit(models.Model):
             'amount': amount,
             'description': description,
         })
+        # Phase 8 (currency correctness): `amount` is denominated in the deposit's own
+        # currency (same as the collect/refund payments, which carry currency_id and
+        # let native accounting convert). A non-invoice entry line must carry BOTH
+        # currency_id/amount_currency (the transaction amount) AND an explicit
+        # company-currency balance - Odoo does not derive balance from amount_currency
+        # for plain entries - converted at the entry date with the native rate table.
+        entry_date = fields.Date.context_today(self)
+        currency = self.currency_id
+        company_currency = company.currency_id
+        balance = company_currency.round(currency._convert(amount, company_currency, company, entry_date))
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
-            'date': fields.Date.context_today(self),
+            'date': entry_date,
             'company_id': company.id,
             'partner_id': self.tenant_id.id,
             'line_ids': [
                 (0, 0, {
                     'account_id': liability_account.id, 'partner_id': self.tenant_id.id,
-                    'debit': amount, 'credit': 0.0, 'name': description,
+                    'currency_id': currency.id, 'amount_currency': amount,
+                    'debit': balance, 'credit': 0.0, 'name': description,
                 }),
                 (0, 0, {
                     'account_id': income_account.id, 'partner_id': self.tenant_id.id,
-                    'debit': 0.0, 'credit': amount, 'name': description,
+                    'currency_id': currency.id, 'amount_currency': -amount,
+                    'debit': 0.0, 'credit': balance, 'name': description,
                 }),
             ],
         })

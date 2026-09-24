@@ -187,7 +187,9 @@ class EdaraPortal(CustomerPortal):
             ('partner_id', '=', partner.id), ('move_type', 'in', ('out_invoice', 'out_refund')),
             ('state', '=', 'posted'),
         ])
-        outstanding = sum(moves.mapped('amount_residual'))
+        # Phase 8: amount_residual is in each invoice's own currency (a tenant can hold ILS and
+        # USD invoices); the signed company-currency residual is summable and nets credit notes.
+        outstanding = sum(moves.mapped('amount_residual_signed'))
         open_renewal = request.env['edara.renewal.request'].sudo().search(
             [('tenant_id', '=', partner.id), ('state', '=', 'submitted')], limit=1)
         maintenance_count = request.env['edara.maintenance.request'].sudo().search_count([
@@ -200,7 +202,7 @@ class EdaraPortal(CustomerPortal):
             'contract': contract,
             'next_line': next_line,
             'outstanding': outstanding,
-            'currency': contract.currency_id or request.env.company.currency_id,
+            'currency': request.env.company.currency_id,
             'open_renewal': open_renewal,
             'maintenance_count': maintenance_count,
             'notifications': notifications,
@@ -255,7 +257,9 @@ class EdaraPortal(CustomerPortal):
             ('partner_id', '=', partner.id), ('move_type', 'in', ('out_invoice', 'out_refund')),
             ('state', '=', 'posted'),
         ], order='invoice_date desc')
-        outstanding = sum(moves.mapped('amount_residual'))
+        # Phase 8: amount_residual is in each invoice's own currency (a tenant can hold ILS and
+        # USD invoices); the signed company-currency residual is summable and nets credit notes.
+        outstanding = sum(moves.mapped('amount_residual_signed'))
         values = self._prepare_portal_layout_values()
         values.update({
             'page_name': 'billing',
