@@ -1,7 +1,10 @@
 from dateutil.relativedelta import relativedelta
+from fractions import Fraction
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+from . import edara_proration as proration
 
 BILLING_FREQUENCIES = [
     ('monthly', 'Monthly'),
@@ -11,12 +14,16 @@ BILLING_FREQUENCIES = [
 
 PERIOD_MONTHS = {'monthly': 1, 'quarterly': 3, 'yearly': 12}
 
+# Phase 10.1: 'scheduled' = confirmed, start_date still in the future (protects the unit from
+# double-leasing, never invoiced); 'cancelled' = a scheduled lease withdrawn before it started.
 STATES = [
     ('draft', 'Draft'),
+    ('scheduled', 'Scheduled'),
     ('active', 'Active'),
     ('renewed', 'Renewed'),
     ('terminated', 'Terminated'),
     ('expired', 'Expired'),
+    ('cancelled', 'Cancelled'),
 ]
 
 # Notifications & Reminders Automation (2026-09-22): escalating lease-expiry
@@ -26,6 +33,9 @@ STATES = [
 # escalation, per the ticket's own suggested example; no third window is added
 # without a business need for one.
 EXPIRY_REMINDER_WINDOWS_DAYS = (30, 7)
+
+# States in which a lease holds its unit (overlap protection); only 'active' occupies it today.
+LIVE_STATES = ['scheduled', 'active']
 
 
 class EdaraLeaseContract(models.Model):
@@ -42,8 +52,10 @@ class EdaraLeaseContract(models.Model):
     unit_id = fields.Many2one('edara.unit', string='Unit', required=True, index=True, tracking=True)
     tenant_id = fields.Many2one('res.partner', string='Tenant', required=True, index=True, tracking=True)
 
-    start_date = fields.Date(required=True, tracking=True)
-    end_date = fields.Date(required=True, tracking=True)
+    start_date = fields.Date(required=True, tracking=True, help="First occupied day.")
+    end_date = fields.Date(required=True, tracking=True, help=(
+        "LAST occupied day (inclusive): 01/01 - 31/12 means the tenant is in the unit through "
+        "31/12. Interval logic uses the exclusive boundary end_date + 1 day, see _term_boundary()."))
     currency_id = fields.Many2one('res.currency', string='Currency', required=True,
                                    default=lambda self: self.env.company.currency_id)
     rent_amount = fields.Monetary(string='Rent', required=True, currency_field='currency_id', tracking=True)
@@ -168,60 +180,58 @@ class EdaraLeaseContract(models.Model):
         self.ensure_one()
         return self.start_date + relativedelta(months=months_elapsed)
 
-    def _generate_schedule_lines(self):
-        """Generate schedule lines covering [start_date, end_date) - end_date
-        is the exclusive boundary of the lease term, never itself a billable
-        period (MAT-FIND-005).
-
-        Each schedule line represents exactly ONE billing period at the
-        configured billing_frequency granularity (1/3/12 months for
-        Monthly/Quarterly/Yearly) - a full quarterly or yearly period is
-        always ONE line at the full configured rent_amount, never
-        decomposed into monthly-equivalent lines (MAT-FIND-013). Once a
-        full billing-frequency period no longer fits before end_date, the
-        entire remainder becomes ONE prorated line (monthly-equivalent
-        rate x occupied days / a standardized 30-day reference month) -
-        it is not further split at monthly granularity either. This
-        guarantees at least one line is always produced, even for a
-        contract shorter than its own billing frequency (MAT-FIND-011):
-        the loop's first period_start is always start_date itself, which
-        is always < end_date.
-
-        Only touches uninvoiced lines - already-invoiced history is never
-        regenerated."""
+    def _term_boundary(self):
+        """The exclusive end of the term: end_date is the last occupied day, so the half-open
+        interval every subsystem uses is [start_date, _term_boundary()). The only place the
+        +1 day lives (Phase 10.1, RULE-02)."""
         self.ensure_one()
-        self.schedule_line_ids.filtered(lambda l: not l.invoice_id).unlink()
-        frequency_months = PERIOD_MONTHS[self.billing_frequency]
-        # Reuses the stored monthly_equivalent_rent field (Reporting & Management
-        # Intelligence, 2026-09-22) rather than recomputing the same formula here -
-        # one calculation, exposed both as a report column and used internally.
-        monthly_equivalent = self.monthly_equivalent_rent
+        return proration.term_boundary(self.end_date)
 
+    def _generate_schedule_lines(self):
+        """Create the schedule lines for the part of [start_date, _term_boundary()) that no
+        line covers yet - generate by coverage, never by regeneration (RULE-11/13).
+
+        Kept as they are: every invoiced line, and every uninvoiced line that covers a whole
+        billing period. Dropped and recomputed: uninvoiced prorated lines (an unbilled partial
+        tail is re-cut inside the new range on extension). Generation starts at the end of the
+        last kept line, so a period that is already invoiced can never be created again, and an
+        invoiced partial tail is completed by a stub line up to the next anchor boundary.
+
+        One line per billing period at the contract's frequency (1/3/12 months): a whole period
+        bills exactly rent_amount; a part of a period bills round(F(b)) - round(F(a)) - see
+        edara_proration (Period-Relative Actual/Actual, cumulative rounding). Only the exact
+        rent_amount / months is used; the stored, rounded monthly_equivalent_rent never is."""
+        self.ensure_one()
+        self.schedule_line_ids.filtered(lambda l: not l.invoice_id and l.is_prorated).unlink()
+        covered_to = max([d for d in self.schedule_line_ids.mapped('period_end') if d] or [self.start_date])
+        rent = Fraction(str(self.rent_amount))
+        rounding = Fraction(str(self.currency_id.rounding))
+        sequence = max(self.schedule_line_ids.mapped('sequence') or [0]) + 10
         vals_list = []
-        sequence = 10
-        months_elapsed = 0
-        while True:
-            period_start = self._period_boundary(months_elapsed)
-            if period_start >= self.end_date:
-                break
-            next_boundary = self._period_boundary(months_elapsed + frequency_months)
-            period_end = min(next_boundary, self.end_date)
-            is_prorated = period_end != next_boundary
-            amount = (monthly_equivalent * (period_end - period_start).days / 30
-                      if is_prorated else self.rent_amount)
-            months_elapsed += frequency_months
+        for period_start, period_end, is_prorated, amount in proration.piece_lines(
+                self.start_date, PERIOD_MONTHS[self.billing_frequency], rent, rounding,
+                covered_to, self._term_boundary()):
+            occupied_days = (period_end - period_start).days
             vals_list.append((0, 0, {
                 'due_date': period_start,
                 'period_start': period_start,
                 'period_end': period_end,
-                'occupied_days': (period_end - period_start).days,
+                'occupied_days': occupied_days,
                 'is_prorated': is_prorated,
                 'amount': self.currency_id.round(amount),
                 'sequence': sequence,
-                'description': _("Rent %(start)s - %(end)s", start=period_start, end=period_end),
+                'description': self._schedule_line_description(period_start, period_end, is_prorated),
             }))
             sequence += 10
         self.schedule_line_ids = vals_list
+
+    def _schedule_line_description(self, period_start, period_end, is_prorated):
+        """Invoice-line text: business-facing (last occupied day, not the exclusive boundary)."""
+        last_day = period_end - relativedelta(days=1)
+        text = _("Rent %(start)s - %(end)s", start=period_start, end=last_day)
+        if is_prorated:
+            text += _(" (prorated, %(days)s days)", days=(period_end - period_start).days)
+        return text
 
     def unlink(self):
         if any(contract.state != 'draft' for contract in self):
@@ -238,8 +248,8 @@ class EdaraLeaseContract(models.Model):
     @api.constrains('start_date', 'end_date')
     def _check_dates(self):
         for contract in self:
-            if contract.end_date <= contract.start_date:
-                raise ValidationError(_("The end date must be after the start date."))
+            if contract.end_date < contract.start_date:
+                raise ValidationError(_("The end date cannot be before the start date."))
 
     @api.constrains('rent_amount')
     def _check_rent_amount(self):
@@ -256,21 +266,19 @@ class EdaraLeaseContract(models.Model):
 
     @api.constrains('unit_id', 'start_date', 'end_date', 'state')
     def _check_no_overlap(self):
-        """MAT-FIND-012 (2026-09-22): end_date is EXCLUSIVE for overlap
-        purposes, consistent with _generate_schedule_lines()'s already-
-        exclusive billing boundary (MAT-FIND-005) - a lease ending on a date
-        no longer occupies that date, so a new lease may start exactly on
-        the prior lease's end_date (adjacent leases are allowed). Two ranges
-        [s1, e1) and [s2, e2) overlap iff s1 < e2 AND s2 < e1."""
+        """end_date is the last occupied day (inclusive), so two leases on one unit overlap iff
+        s1 <= e2 AND s2 <= e1; a successor may start on the day after the predecessor's end_date.
+        Scheduled leases count: a signed, not-yet-started lease protects the unit from
+        double-leasing."""
         for contract in self:
-            if contract.state != 'active':
+            if contract.state not in LIVE_STATES:
                 continue
             overlapping = self.search([
                 ('id', '!=', contract.id),
                 ('unit_id', '=', contract.unit_id.id),
-                ('state', '=', 'active'),
-                ('start_date', '<', contract.end_date),
-                ('end_date', '>', contract.start_date),
+                ('state', 'in', LIVE_STATES),
+                ('start_date', '<=', contract.end_date),
+                ('end_date', '>=', contract.start_date),
             ])
             if overlapping:
                 raise ValidationError(_(
@@ -278,35 +286,75 @@ class EdaraLeaseContract(models.Model):
                     unit=contract.unit_id.display_name, other=overlapping[0].name,
                 ))
 
+    def write(self, vals):
+        """The end date of a confirmed lease only ever moves LATER (an extension); shortening is
+        Terminate. A later end date creates the missing schedule lines and nothing else."""
+        if 'end_date' not in vals:
+            return super().write(vals)
+        new_end = fields.Date.to_date(vals['end_date'])
+        live = self.filtered(lambda c: c.state in LIVE_STATES)
+        if any(new_end < c.end_date for c in live):
+            raise UserError(_("A confirmed lease's end date can only be moved later. To end it "
+                              "earlier, terminate the contract."))
+        res = super().write(vals)
+        for contract in live:
+            contract._generate_schedule_lines()
+        return res
+
     def action_activate(self):
+        """Confirm a draft lease: preconditions, lifecycle state and the payment schedule.
+        A lease starting in the future becomes 'scheduled' (unit reserved, no invoice can be
+        raised); one that has started is 'active'. The schedule is created here, independent
+        of activation (see _activate_scheduled()) and of invoicing."""
         # Phase 7: `state` is a system-managed field (edara.system.field.guard) - it is
         # only ever changed here, after the caller's own write access is verified,
         # through a scoped sudo() write (a client cannot forge env.su via RPC).
         self.check_access('write')
+        today = fields.Date.context_today(self)
         for contract in self:
             if contract.state != 'draft':
                 raise UserError(_("Only draft contracts can be activated."))
-            if contract.unit_id.occupancy_status == 'sold':
-                raise UserError(_("%(unit)s has been sold and cannot be leased.", unit=contract.unit_id.display_name))
-            if contract.unit_id.operational_status == 'under_maintenance':
-                raise UserError(_(
-                    "%(unit)s is under maintenance and cannot be leased right now.",
-                    unit=contract.unit_id.display_name,
-                ))
-            if contract.deposit_required and contract.deposit_amount <= 0:
-                raise UserError(_(
-                    "Configure a positive Deposit Amount before activating this contract."))
-            contract.sudo().state = 'active'
-            # Date-aware occupancy per BD-001 (2026-09-21, resolves MAT-FIND-010):
-            # unconditionally forces the unit's occupancy to whatever its active
-            # contracts now imply - 'reserved' for a future start_date, 'rented'
-            # once start_date has arrived. Unlike unit._sync_occupancy_from_contracts()
-            # (used by termination/expiry/the reserved-to-rented cron), this always
-            # overwrites regardless of the unit's prior state, matching activation's
-            # existing "always force it" semantics (only sold/under_maintenance are
-            # blocked earlier, as preconditions above).
+            contract._check_can_start()
+            contract.sudo().state = 'scheduled' if contract.start_date > today else 'active'
+            # Date-aware occupancy per BD-001: the unit follows what its live leases imply -
+            # 'rented' once a lease covers today, 'reserved' while only a scheduled one exists.
             contract.unit_id.occupancy_status = contract.unit_id._lease_occupancy_state()
             contract._generate_schedule_lines()
+
+    def _check_can_start(self):
+        self.ensure_one()
+        if self.unit_id.occupancy_status == 'sold':
+            raise UserError(_("%(unit)s has been sold and cannot be leased.", unit=self.unit_id.display_name))
+        if self.unit_id.operational_status == 'under_maintenance':
+            raise UserError(_(
+                "%(unit)s is under maintenance and cannot be leased right now.",
+                unit=self.unit_id.display_name,
+            ))
+        if self.deposit_required and self.deposit_amount <= 0:
+            raise UserError(_("Configure a positive Deposit Amount before activating this contract."))
+
+    def _activate_scheduled(self):
+        """scheduled -> active on/after start_date. Lifecycle only: the schedule already exists
+        and is left untouched. A lease that cannot start (unit sold / under maintenance, or an
+        overlap with another live lease) stays scheduled and gets one to-do for the branch
+        manager instead of failing the whole daily job."""
+        started = self.browse()
+        for contract in self:
+            try:
+                with self.env.cr.savepoint():
+                    contract._check_can_start()
+                    contract.sudo().state = 'active'
+            except UserError as error:
+                contract.invalidate_recordset(['state'])
+                summary = _("Scheduled lease could not start")
+                if not contract.activity_ids.filtered(lambda a: a.summary == summary):
+                    contract.activity_schedule(
+                        summary=summary, note=str(error),
+                        user_id=contract._get_reminder_responsible_user().id,
+                        date_deadline=fields.Date.context_today(contract))
+                continue
+            started |= contract
+        return started
 
     def _unlink_future_uninvoiced_schedule_lines(self):
         """Drop not-yet-due, uninvoiced schedule lines only - called by both
@@ -334,24 +382,48 @@ class EdaraLeaseContract(models.Model):
                 'termination_date': fields.Date.context_today(contract),
                 'termination_reason': reason or contract.termination_reason,
             })
-            # Only frees the unit if no OTHER currently-active contract remains on it
-            # (e.g. terminating a future-dated contract must not clobber a still-active
-            # current lease on the same unit - see EDARA_PROJECT_STATE.md, MAT-020).
+            # A scheduled renewal for a tenant who has left must not start (OD-B9).
+            successor = contract.successor_contract_id
+            if successor.state == 'scheduled':
+                successor.action_cancel()
+                contract.message_post(body=_("Scheduled renewal %(name)s was cancelled.", name=successor.name))
+            # Only frees the unit if no OTHER live contract remains on it (MAT-020).
             contract.unit_id._sync_occupancy_from_contracts()
             # Defense-in-depth #1: drop not-yet-due, uninvoiced future obligations now.
             # Defense #2 is the invoicing cron re-checking state == 'active'.
             contract._unlink_future_uninvoiced_schedule_lines()
 
+    def action_cancel(self):
+        """Withdraw a scheduled lease before it starts: no invoice can exist yet, so the schedule
+        is removed and the reservation released. Nothing posted is touched."""
+        self.check_access('write')
+        for contract in self:
+            if contract.state != 'scheduled':
+                raise UserError(_("Only a scheduled contract can be cancelled."))
+            contract.schedule_line_ids.filtered(lambda l: not l.invoice_id).unlink()
+            contract.sudo().state = 'cancelled'
+            predecessor = contract.predecessor_contract_id
+            if predecessor.successor_contract_id == contract:
+                predecessor.sudo().successor_contract_id = False
+            contract.unit_id._sync_occupancy_from_contracts()
+
     def action_renew(self, new_start_date, new_end_date, new_rent_amount):
-        """Owner-initiated renewal: create the successor contract and activate it.
-        Tenant-requested renewals go through edara.renewal.request (added once the
-        tenant portal exists, Phase 9) which calls into this same method after
-        owner approval - it never bypasses these checks.
-        """
+        """Owner-initiated renewal: create the successor and confirm it (scheduled while its
+        start is in the future). The current contract is untouched - it keeps occupying the unit,
+        stays active and keeps billing until its own term ends; only the daily job then moves it
+        to 'renewed' (_cron_expire_contracts). Tenant-requested renewals go through
+        edara.renewal.request, which calls this same method after owner approval."""
         self.ensure_one()
         self.check_access('write')
         if self.state != 'active':
             raise UserError(_("Only an active contract can be renewed."))
+        if self.successor_contract_id.state in LIVE_STATES:
+            raise UserError(_("%(name)s already has a renewal (%(succ)s).",
+                              name=self.name, succ=self.successor_contract_id.name))
+        if new_start_date < self._term_boundary():
+            raise UserError(_(
+                "A renewal starts when the current term ends (%(date)s at the earliest); to change "
+                "terms mid-term, end the current contract first.", date=self._term_boundary()))
         new_contract = self.create({
             'unit_id': self.unit_id.id,
             'tenant_id': self.tenant_id.id,
@@ -364,40 +436,30 @@ class EdaraLeaseContract(models.Model):
             'deposit_amount': self.deposit_amount,
             'predecessor_contract_id': self.id,
         })
-        self.sudo().write({'state': 'renewed', 'successor_contract_id': new_contract.id})
-        # Phase 7 (early-renewal semantics, see EDARA_PROJECT_STATE.md): a renewed
-        # contract stays financially responsible for its own term - the successor
-        # normally starts at/after this contract's end_date - so its remaining
-        # uninvoiced periods stay billable (edara.payment.schedule.line
-        # ._process_due_invoices accepts 'renewed'). Only periods the successor
-        # itself covers (period_start >= successor start) are dropped, so an
-        # overlapping renewal never double-bills.
-        self.schedule_line_ids.filtered(
-            lambda l: not l.invoice_id and l.period_start and l.period_start >= new_start_date
-        ).unlink()
+        self.sudo().successor_contract_id = new_contract.id
         new_contract.action_activate()
         return new_contract
 
     @api.model
     def _cron_expire_contracts(self):
-        """Daily. A contract that was never renewed (action_renew already
-        flips it to 'renewed' the moment renewal happens, so an active
-        contract past its own end_date is by definition un-renewed) or
-        terminated moves to EXPIRED - reachable state per spec §14, otherwise
-        unreachable. Naturally idempotent: the state='active' filter excludes
-        anything this method already expired on a prior run. No per-record
-        commit/lock dance needed (unlike the invoicing cron) since this only
-        flips plain fields in one transaction, with no partial-failure risk
-        across records and no external financial posting."""
+        """Daily lifecycle job, one run, in this order:
+        1. scheduled leases whose start_date has arrived become active;
+        2. active leases whose term is over (end_date < today: end_date is the last occupied
+           day) become 'renewed' if a live successor exists, else 'expired';
+        3. occupancy of every touched unit is recomputed.
+        The successor starts at the predecessor's boundary, so both are briefly 'active' with
+        disjoint dates (never an overlap). Idempotent: it only picks contracts still in the
+        source state. Returns the number of contracts closed in step 2."""
         today = fields.Date.context_today(self)
-        contracts = self.search([('state', '=', 'active'), ('end_date', '<', today)])
-        for contract in contracts:
-            contract.sudo().state = 'expired'
-            # Same sibling-aware recompute as action_terminate() - a future-dated
-            # active contract on the same unit must keep it Rented (MAT-020).
-            contract.unit_id._sync_occupancy_from_contracts()
+        scheduled = self.search([('state', '=', 'scheduled'), ('start_date', '<=', today)])
+        started = scheduled._activate_scheduled()
+        finished = self.search([('state', '=', 'active'), ('end_date', '<', today)])
+        for contract in finished:
+            renewed = contract.successor_contract_id.state in ('scheduled', 'active')
+            contract.sudo().state = 'renewed' if renewed else 'expired'
             contract._unlink_future_uninvoiced_schedule_lines()
-        return len(contracts)
+        (started | finished).unit_id._sync_occupancy_from_contracts()
+        return len(finished)
 
     def _get_reminder_responsible_user(self):
         """Deterministic responsible user for an operational reminder: the

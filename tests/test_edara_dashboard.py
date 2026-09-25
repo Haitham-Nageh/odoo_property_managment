@@ -157,11 +157,12 @@ class TestEdaraDashboard(TransactionCase):
             {'name': 'D-107', 'code': 'D107', 'building_id': self.building.id})
         renew_contract = self.env['edara.lease.contract'].create({
             'unit_id': renew_unit.id, 'tenant_id': tenant2.id,
-            'start_date': today, 'end_date': today + timedelta(days=365),
+            'start_date': today - timedelta(days=400), 'end_date': today - timedelta(days=1),
             'rent_amount': 900, 'deposit_required': False,
         })
         renew_contract.action_activate()
-        renew_contract.action_renew(today + timedelta(days=1), today + timedelta(days=730), 950)
+        # successor starts the day after the last occupied day; the daily job below then closes the old term
+        renew_contract.action_renew(today, today + timedelta(days=729), 950)
 
         terminate_unit = self.env['edara.unit'].create(
             {'name': 'D-108', 'code': 'D108', 'building_id': self.building.id})

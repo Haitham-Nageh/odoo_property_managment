@@ -63,23 +63,24 @@ class TestEdaraLeaseContract(TransactionCase):
         with self.assertRaises(ValidationError):
             contract_2.action_activate()
 
-    # -- MAT-FIND-012 (2026-09-22): exclusive end_date overlap boundary --
+    # -- MAT-FIND-012 / Phase 10.1: end_date is the last occupied day (inclusive) --
 
     def test_overlap_adjacent_leases_are_allowed(self):
-        """end_date is exclusive - a new lease may start exactly on the
+        """end_date is inclusive - a new lease may start the day AFTER the
         prior lease's end_date."""
         existing = self._make_contract(start_date=date(2026, 1, 1), end_date=date(2026, 6, 30))
         existing.action_activate()
         adjacent = self._make_contract(
-            tenant_id=self.tenant.id, start_date=date(2026, 6, 30), end_date=date(2026, 12, 31))
+            tenant_id=self.tenant.id, start_date=date(2026, 7, 1), end_date=date(2026, 12, 31))
         adjacent.action_activate()  # must not raise
         self.assertEqual(adjacent.state, 'active')
 
     def test_overlap_one_day_before_adjacent_is_blocked(self):
+        """Both leases would occupy 30/06 (the existing one's last occupied day)."""
         existing = self._make_contract(start_date=date(2026, 1, 1), end_date=date(2026, 6, 30))
         existing.action_activate()
         overlapping = self._make_contract(
-            tenant_id=self.tenant.id, start_date=date(2026, 6, 29), end_date=date(2026, 12, 31))
+            tenant_id=self.tenant.id, start_date=date(2026, 6, 30), end_date=date(2026, 12, 31))
         with self.assertRaises(ValidationError):
             overlapping.action_activate()
 
@@ -133,19 +134,16 @@ class TestEdaraLeaseContract(TransactionCase):
         self.assertEqual(self.unit.occupancy_status, 'available')
         self.assertFalse(contract.termination_reason)
 
-    def test_renew_creates_active_successor_and_marks_predecessor_renewed(self):
+    def test_renew_creates_scheduled_successor_and_keeps_predecessor_active(self):
+        """Phase 10.1: a renewal creates a scheduled successor; the current lease stays active
+        (and the unit rented) until its own term ends - only the daily job then renews it."""
         contract = self._make_contract()
         contract.action_activate()
-        today = date.today()
-        # An immediate renewal (new start = today) is used here so the
-        # successor is in force right away and the assertion below stays
-        # 'rented' - BD-001 (2026-09-21) makes a *future*-dated renewal
-        # RESERVED instead, which is exactly what action_activate() (called
-        # internally by action_renew()) already covers and asserts elsewhere.
-        new_contract = contract.action_renew(today, today + timedelta(days=365), 1650)
-        self.assertEqual(contract.state, 'renewed')
+        new_contract = contract.action_renew(
+            contract.end_date + timedelta(days=1), contract.end_date + timedelta(days=366), 1650)
+        self.assertEqual(contract.state, 'active')
         self.assertEqual(contract.successor_contract_id, new_contract)
-        self.assertEqual(new_contract.state, 'active')
+        self.assertEqual(new_contract.state, 'scheduled')
         self.assertEqual(new_contract.predecessor_contract_id, contract)
         self.assertEqual(new_contract.rent_amount, 1650)
         self.assertEqual(self.unit.occupancy_status, 'rented')
@@ -211,16 +209,16 @@ class TestEdaraLeaseContract(TransactionCase):
     def test_current_and_future_sequential_contracts_can_both_be_active(self):
         current, future = self._make_current_and_future_contracts()
         self.assertEqual(current.state, 'active')
-        self.assertEqual(future.state, 'active')
+        self.assertEqual(future.state, 'scheduled')
         self.assertEqual(self.unit.occupancy_status, 'rented')
 
     def test_terminate_future_contract_keeps_unit_rented_via_current_contract(self):
-        """MAT-020 regression: terminating a future-dated contract must not
+        """MAT-020 regression: withdrawing a future-dated (scheduled) contract must not
         clobber occupancy still held by a currently-active contract on the
         same unit."""
         current, future = self._make_current_and_future_contracts()
-        future.action_terminate(reason='MAT-020 regression test')
-        self.assertEqual(future.state, 'terminated')
+        future.action_cancel()
+        self.assertEqual(future.state, 'cancelled')
         self.assertEqual(current.state, 'active')
         self.assertEqual(self.unit.occupancy_status, 'rented')
 
@@ -232,7 +230,7 @@ class TestEdaraLeaseContract(TransactionCase):
         current, future = self._make_current_and_future_contracts()
         current.action_terminate(reason='Current lease ended early')
         self.assertEqual(current.state, 'terminated')
-        self.assertEqual(future.state, 'active')
+        self.assertEqual(future.state, 'scheduled')
         self.assertEqual(self.unit.occupancy_status, 'reserved')
 
     def test_cron_expiry_with_future_contract_still_active_leaves_unit_reserved(self):
@@ -250,7 +248,7 @@ class TestEdaraLeaseContract(TransactionCase):
         self.env['edara.lease.contract']._cron_expire_contracts()
 
         self.assertEqual(current.state, 'expired')
-        self.assertEqual(future.state, 'active')
+        self.assertEqual(future.state, 'scheduled')
         self.assertEqual(self.unit.occupancy_status, 'reserved')
 
     def test_terminated_historical_contract_does_not_affect_later_occupancy(self):
@@ -290,7 +288,7 @@ class TestEdaraLeaseContract(TransactionCase):
         future = self._make_contract(
             start_date=today + timedelta(days=90), end_date=today + timedelta(days=450))
         future.action_activate()
-        self.assertEqual(future.state, 'active')
+        self.assertEqual(future.state, 'scheduled')
         self.assertEqual(self.unit.occupancy_status, 'reserved')
 
     def test_activate_same_day_start_contract_marks_unit_rented(self):
@@ -324,9 +322,13 @@ class TestEdaraLeaseContract(TransactionCase):
 
         future.start_date = today - timedelta(days=1)
         self.env['edara.unit']._cron_sync_reserved_occupancy()
+        self.assertEqual(self.unit.occupancy_status, 'reserved')   # still 'scheduled': the lease job starts it
+        self.env['edara.lease.contract']._cron_expire_contracts()
+        self.assertEqual(future.state, 'active')
         self.assertEqual(self.unit.occupancy_status, 'rented')
 
-        # Idempotent: running it again does nothing further (no error, still rented).
+        # Idempotent: running them again does nothing further (no error, still rented).
+        self.env['edara.lease.contract']._cron_expire_contracts()
         self.env['edara.unit']._cron_sync_reserved_occupancy()
         self.assertEqual(self.unit.occupancy_status, 'rented')
 
@@ -339,8 +341,8 @@ class TestEdaraLeaseContract(TransactionCase):
         future.action_activate()
         self.assertEqual(self.unit.occupancy_status, 'reserved')
 
-        future.action_terminate(reason='Cancelled before move-in')
-        self.assertEqual(future.state, 'terminated')
+        future.action_cancel()
+        self.assertEqual(future.state, 'cancelled')
         self.assertEqual(self.unit.occupancy_status, 'available')
 
     def test_overlap_prevented_between_reserved_and_new_active_contract(self):

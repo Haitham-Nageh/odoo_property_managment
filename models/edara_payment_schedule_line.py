@@ -1,7 +1,8 @@
 import logging
+from datetime import timedelta
 
 from odoo import _, api, fields, models, modules
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -51,8 +52,12 @@ class EdaraPaymentScheduleLine(models.Model):
     # period/amount remain the frozen, auditable basis for that invoice
     # even if the contract's rent_amount changes later.
     due_date = fields.Date(required=True, index=True)
-    period_start = fields.Date(string='Period Start')
-    period_end = fields.Date(string='Period End')
+    period_start = fields.Date(string='Period Start', help="First day of the period.")
+    period_end = fields.Date(string='Period End', help=(
+        "EXCLUSIVE boundary: the first day after the period (the next period starts here). "
+        "The last day the period covers is 'Period Last Day'."))
+    period_last_day = fields.Date(compute='_compute_period_last_day', help=(
+        "Business-facing last day covered by the period (Period End - 1 day)."))
     occupied_days = fields.Integer(string='Occupied Days')
     is_prorated = fields.Boolean(string='Prorated')
     amount = fields.Monetary(required=True, currency_field='currency_id')
@@ -65,6 +70,28 @@ class EdaraPaymentScheduleLine(models.Model):
         'unique(invoice_id)',
         'An invoice cannot be linked to more than one payment schedule line.',
     )
+
+    @api.depends('period_end')
+    def _compute_period_last_day(self):
+        for line in self:
+            line.period_last_day = line.period_end - timedelta(days=1) if line.period_end else False
+
+    @api.constrains('unit_id', 'period_start', 'period_end')
+    def _check_periods_disjoint(self):
+        """A contractual period is never billed twice: for one unit the half-open periods
+        [period_start, period_end) of all lines (across contracts, whatever the invoice state -
+        a cancelled/reversed invoice still consumes its period) are pairwise disjoint."""
+        for line in self.filtered(lambda l: l.period_start and l.period_end):
+            other = self.search([
+                ('id', '!=', line.id), ('unit_id', '=', line.unit_id.id),
+                ('period_start', '<', line.period_end), ('period_end', '>', line.period_start),
+            ], limit=1)
+            if other:
+                raise ValidationError(_(
+                    "The period %(start)s to %(end)s overlaps an existing payment schedule line "
+                    "(%(contract)s, %(o_start)s to %(o_end)s) of the same unit; a period cannot be "
+                    "billed twice.", start=line.period_start, end=line.period_last_day,
+                    contract=other.contract_id.name, o_start=other.period_start, o_end=other.period_last_day))
 
     def write(self, vals):
         # Phase 7: once invoiced, the line's amount is the frozen basis of that invoice.
@@ -227,7 +254,8 @@ class EdaraPaymentScheduleLine(models.Model):
         created = skipped = errors = 0
         for line in self:
             try:
-                # 'renewed' stays billable: see edara.lease.contract.action_renew().
+                # 'renewed' stays billable: the daily job moves a finished lease to 'renewed'
+                # while its last periods may still be unpaid/uninvoiced. 'scheduled' never bills.
                 if line.invoice_id or line.contract_id.state not in ('active', 'renewed'):
                     skipped += 1
                     continue

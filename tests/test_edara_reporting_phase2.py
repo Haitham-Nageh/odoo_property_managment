@@ -87,15 +87,17 @@ class TestEdaraRentRoll(TestEdaraReportingPhase2Base):
         contract = self._make_contract(rent_amount=12000, billing_frequency='yearly')
         self.assertAlmostEqual(contract.monthly_equivalent_rent, 1000)
 
-    def test_monthly_equivalent_reused_by_schedule_line_proration(self):
-        """_generate_schedule_lines() must reuse monthly_equivalent_rent, not
-        recompute it independently - a second engine could silently drift."""
+    def test_monthly_equivalent_is_report_only_not_a_proration_input(self):
+        """Phase 10.1 (RULE-07): the stored monthly_equivalent_rent is ROUNDED, so the schedule
+        engine uses the exact rent / months instead - 1,000 per quarter is 333.333... a month,
+        and 10 of January's 31 days is 107.53 (from the rounded 333.33 it would be 107.52)."""
         contract = self._make_contract(
-            rent_amount=3000, billing_frequency='quarterly',
-            start_date=date(2026, 1, 1), end_date=date(2026, 2, 15))
+            rent_amount=1000, billing_frequency='quarterly',
+            start_date=date(2026, 1, 1), end_date=date(2026, 1, 10))
         prorated_line = contract.schedule_line_ids[:1]
         self.assertTrue(prorated_line.is_prorated)
-        self.assertAlmostEqual(prorated_line.amount, contract.monthly_equivalent_rent * 45 / 30)
+        self.assertEqual(contract.monthly_equivalent_rent, 333.33)
+        self.assertEqual(prorated_line.amount, 107.53)
 
     def test_unit_occupancy_status_tracks_unit(self):
         contract = self._make_contract()

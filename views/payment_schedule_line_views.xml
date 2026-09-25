@@ -46,6 +46,7 @@
                 <field name="due_date"/>
                 <field name="period_start" optional="hide"/>
                 <field name="period_end" optional="hide"/>
+                <field name="period_last_day" optional="hide"/>
                 <field name="occupied_days" optional="hide"/>
                 <field name="is_prorated" optional="hide" widget="boolean_toggle"/>
                 <field name="description"/>
@@ -73,6 +74,7 @@
                         <field name="due_date"/>
                         <field name="period_start" readonly="1"/>
                         <field name="period_end" readonly="1"/>
+                        <field name="period_last_day"/>
                         <field name="occupied_days" readonly="1"/>
                         <field name="is_prorated" readonly="1"/>
                         <field name="amount"/>

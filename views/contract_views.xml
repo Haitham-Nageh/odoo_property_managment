@@ -18,6 +18,7 @@
                 <field name="unit_id"/>
                 <field name="branch_id"/>
                 <field name="property_id"/>
+                <filter string="Scheduled" name="scheduled" domain="[('state', '=', 'scheduled')]"/>
                 <filter string="Active" name="active" domain="[('state', '=', 'active')]"/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Renewed" name="renewed" domain="[('state', '=', 'renewed')]"/>
@@ -52,7 +53,7 @@
         <field name="arch" type="xml">
             <list string="Lease Contracts"
                   decoration-success="state == 'active'"
-                  decoration-muted="state in ('terminated', 'expired', 'renewed')">
+                  decoration-muted="state in ('terminated', 'expired', 'renewed', 'cancelled')">
                 <field name="name"/>
                 <field name="tenant_id"/>
                 <field name="unit_id"/>
@@ -120,8 +121,10 @@
                     <button string="Renew" type="action" name="%(action_edara_lease_renewal_wizard)d"
                             invisible="state != 'active'"/>
                     <button string="Terminate" type="object" name="action_terminate"
-                            invisible="state != 'active'" confirm="Terminate this lease contract?"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,active,renewed,terminated,expired"/>
+                            invisible="state != 'active'" confirm="Terminate this lease contract? A scheduled renewal is cancelled with it."/>
+                    <button string="Cancel Scheduled Lease" type="object" name="action_cancel"
+                            invisible="state != 'scheduled'" confirm="Cancel this scheduled lease?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,active,renewed,terminated,expired"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -151,7 +154,7 @@
                         </group>
                         <group>
                             <field name="start_date" readonly="state != 'draft'"/>
-                            <field name="end_date" readonly="state not in ('draft', 'active')"/>
+                            <field name="end_date" readonly="state not in ('draft', 'scheduled', 'active')"/>
                             <field name="rent_amount"/>
                             <field name="currency_id" groups="base.group_multi_currency"/>
                             <field name="billing_frequency"/>

@@ -156,7 +156,7 @@ class TestEdaraDeposit(TransactionCase):
             'rent_amount': 1000, 'deposit_required': False, 'deposit_amount': 0,
         })
         contract.action_activate()
-        self.assertEqual(contract.state, 'active')
+        self.assertEqual(contract.state, 'scheduled')   # start_date is in the future
 
     def test_deposit_amount_independent_of_rent_amount(self):
         contract = self.env['edara.lease.contract'].create({

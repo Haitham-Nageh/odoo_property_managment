@@ -54,8 +54,8 @@ class EdaraRenewalRequest(models.Model):
     @api.constrains('requested_start_date', 'requested_end_date')
     def _check_dates(self):
         for request in self:
-            if request.requested_end_date <= request.requested_start_date:
-                raise ValidationError(_("The requested end date must be after the requested start date."))
+            if request.requested_end_date < request.requested_start_date:
+                raise ValidationError(_("The requested end date cannot be before the requested start date."))
 
     def action_approve(self):
         for request in self:

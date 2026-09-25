@@ -5,10 +5,11 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged('post_install', '-at_install')
 class TestEdaraLeaseBilling(TransactionCase):
-    """Regression coverage for the finalized billing-anchor / proration
-    rules: Payment Day derived from Start Date, exclusive End Date, a
-    standardized 30-day proration reference, and a fresh-from-start_date
-    billing anchor that never drifts (day-31 / leap-day)."""
+    """Regression coverage for the billing-anchor / proration rules: Payment Day derived
+    from Start Date, INCLUSIVE End Date (the last occupied day; the internal boundary is
+    end_date + 1), Period-Relative Actual/Actual proration (Phase 10.1, replaces the 30-day
+    reference) and a fresh-from-start_date billing anchor that never drifts (day-31 /
+    leap-day). period_end on a line stays the exclusive boundary."""
 
     @classmethod
     def setUpClass(cls):
@@ -26,7 +27,7 @@ class TestEdaraLeaseBilling(TransactionCase):
             'unit_id': self.unit.id,
             'tenant_id': self.tenant.id,
             'start_date': date(2026, 9, 1),
-            'end_date': date(2027, 9, 1),
+            'end_date': date(2027, 8, 31),
             'rent_amount': 900,
             'billing_frequency': 'monthly',
             'deposit_required': False,
@@ -42,7 +43,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 1: Monthly full period --
 
     def test_monthly_full_period(self):
-        contract = self._activate(start_date=date(2026, 9, 1), end_date=date(2026, 10, 1), rent_amount=900)
+        contract = self._activate(start_date=date(2026, 9, 1), end_date=date(2026, 9, 30), rent_amount=900)
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines.period_start, date(2026, 9, 1))
@@ -53,7 +54,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 2: Monthly partial, short --
 
     def test_monthly_partial_short(self):
-        contract = self._activate(start_date=date(2026, 9, 3), end_date=date(2026, 9, 10), rent_amount=900)
+        contract = self._activate(start_date=date(2026, 9, 3), end_date=date(2026, 9, 9), rent_amount=900)
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines.is_prorated)
@@ -63,7 +64,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 3: Monthly partial spanning full months + a prorated tail --
 
     def test_monthly_partial_with_full_months(self):
-        contract = self._activate(start_date=date(2026, 9, 3), end_date=date(2026, 12, 1), rent_amount=900)
+        contract = self._activate(start_date=date(2026, 9, 3), end_date=date(2026, 11, 30), rent_amount=900)
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 3)
         self.assertEqual(lines.mapped('period_start'), [date(2026, 9, 3), date(2026, 10, 3), date(2026, 11, 3)])
@@ -75,7 +76,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 4: Monthly full, mid-month anchor --
 
     def test_monthly_full_midmonth(self):
-        contract = self._activate(start_date=date(2026, 9, 15), end_date=date(2026, 10, 15), rent_amount=900)
+        contract = self._activate(start_date=date(2026, 9, 15), end_date=date(2026, 10, 14), rent_amount=900)
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertFalse(lines.is_prorated)
@@ -84,35 +85,35 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 5: Annual, 6-month contract --
 
     def test_annual_six_month_contract(self):
-        """MAT-FIND-013: shorter than one full yearly period -> ONE
-        prorated line (181 real days / 30), not six monthly-equivalent
-        lines - a yearly-billed contract is never decomposed by month."""
+        """MAT-FIND-013: shorter than one full yearly period -> ONE prorated line, not six
+        monthly-equivalent lines. Phase 10.1: six complete contractual months bill exactly
+        6,000.00 (the 30-day rule gave 6,033.33)."""
         contract = self._activate(
-            start_date=date(2026, 1, 1), end_date=date(2026, 7, 1),
+            start_date=date(2026, 1, 1), end_date=date(2026, 6, 30),
             rent_amount=12000, billing_frequency='yearly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines.is_prorated)
         self.assertEqual(lines.occupied_days, 181)
-        self.assertEqual(lines.amount, 6033.33)
+        self.assertEqual(lines.amount, 6000.00)
 
     # -- 6: Annual, 15-day contract --
 
     def test_annual_fifteen_day_contract(self):
         contract = self._activate(
-            start_date=date(2026, 1, 1), end_date=date(2026, 1, 16),
+            start_date=date(2026, 1, 1), end_date=date(2026, 1, 15),
             rent_amount=12000, billing_frequency='yearly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines.is_prorated)
         self.assertEqual(lines.occupied_days, 15)
-        self.assertEqual(lines.amount, 500)
+        self.assertEqual(lines.amount, 483.87)   # 1,000 x 15/31 (30-day rule: 500.00)
 
     # -- 7: Full quarterly period stays ONE line --
 
     def test_quarterly_full_period(self):
         contract = self._activate(
-            start_date=date(2026, 1, 1), end_date=date(2026, 4, 1),
+            start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
             rent_amount=3000, billing_frequency='quarterly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
@@ -124,18 +125,19 @@ class TestEdaraLeaseBilling(TransactionCase):
 
     def test_quarterly_partial_period(self):
         contract = self._activate(
-            start_date=date(2026, 1, 15), end_date=date(2026, 4, 1),
+            start_date=date(2026, 1, 15), end_date=date(2026, 3, 31),
             rent_amount=3000, billing_frequency='quarterly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines.is_prorated)
         self.assertEqual(lines.occupied_days, 76)
-        self.assertEqual(lines.amount, 2533.33)
+        # two whole contractual months (1,000 each) + 17 of the 31 days of 15/03 - 15/04
+        self.assertEqual(lines.amount, 2548.39)   # 30-day rule: 2,533.33
 
     def test_quarterly_multiple_full_periods(self):
         """MAT-FIND-013 matrix #7: multiple full quarters -> one line per quarter."""
         contract = self._activate(
-            start_date=date(2026, 1, 1), end_date=date(2026, 7, 1),
+            start_date=date(2026, 1, 1), end_date=date(2026, 6, 30),
             rent_amount=3000, billing_frequency='quarterly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 2)
@@ -148,31 +150,31 @@ class TestEdaraLeaseBilling(TransactionCase):
         """MAT-FIND-013 matrix #8: full quarters stay whole, only the
         leftover shorter-than-a-quarter remainder is prorated."""
         contract = self._activate(
-            start_date=date(2026, 1, 15), end_date=date(2026, 8, 1),
+            start_date=date(2026, 1, 15), end_date=date(2026, 7, 31),
             rent_amount=3000, billing_frequency='quarterly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 3)
         self.assertEqual(lines.mapped('is_prorated'), [False, False, True])
-        self.assertEqual(lines.mapped('amount'), [3000, 3000, 566.67])
+        self.assertEqual(lines.mapped('amount'), [3000, 3000, 548.39])   # 3,000/3 x 17/31 (30-day rule: 566.67)
         self.assertEqual(lines[2].occupied_days, 17)
 
     def test_quarterly_short_period_does_not_decompose_into_monthly_lines(self):
         """MAT-FIND-013 matrix #9: a 2-month quarterly stub must stay ONE
         line, not split into two monthly-equivalent lines."""
         contract = self._activate(
-            start_date=date(2026, 9, 15), end_date=date(2026, 11, 15),
+            start_date=date(2026, 9, 15), end_date=date(2026, 11, 14),
             rent_amount=3000, billing_frequency='quarterly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines.is_prorated)
         self.assertEqual(lines.occupied_days, 61)
-        self.assertEqual(lines.amount, 2033.33)
+        self.assertEqual(lines.amount, 2000.00)   # two whole contractual months (30-day rule: 2,033.33)
 
     # -- 10-13: Yearly billing granularity --
 
     def test_yearly_full_period(self):
         contract = self._activate(
-            start_date=date(2026, 9, 1), end_date=date(2027, 9, 1),
+            start_date=date(2026, 9, 1), end_date=date(2027, 8, 31),
             rent_amount=12000, billing_frequency='yearly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
@@ -181,17 +183,17 @@ class TestEdaraLeaseBilling(TransactionCase):
 
     def test_yearly_short_period_single_prorated_line(self):
         contract = self._activate(
-            start_date=date(2026, 9, 15), end_date=date(2026, 12, 1),
+            start_date=date(2026, 9, 15), end_date=date(2026, 11, 30),
             rent_amount=12000, billing_frequency='yearly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines.is_prorated)
         self.assertEqual(lines.occupied_days, 77)
-        self.assertEqual(lines.amount, 2566.67)
+        self.assertEqual(lines.amount, 2533.33)   # 2 whole months + 16/30 of 15/11 - 15/12 (30-day rule: 2,566.67)
 
     def test_yearly_multiple_full_periods(self):
         contract = self._activate(
-            start_date=date(2025, 1, 1), end_date=date(2028, 1, 1),
+            start_date=date(2025, 1, 1), end_date=date(2027, 12, 31),
             rent_amount=12000, billing_frequency='yearly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 3)
@@ -200,19 +202,19 @@ class TestEdaraLeaseBilling(TransactionCase):
 
     def test_yearly_full_period_plus_prorated_remainder(self):
         contract = self._activate(
-            start_date=date(2025, 1, 1), end_date=date(2026, 7, 15),
+            start_date=date(2025, 1, 1), end_date=date(2026, 7, 14),
             rent_amount=12000, billing_frequency='yearly')
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 2)
         self.assertEqual(lines.mapped('is_prorated'), [False, True])
         self.assertEqual(lines[0].amount, 12000)
         self.assertEqual(lines[1].occupied_days, 195)
-        self.assertEqual(lines[1].amount, 6500)
+        self.assertEqual(lines[1].amount, 6451.61)   # 6 whole months + 14/31 of July (30-day rule: 6,500)
 
     # -- 9: MAT-FIND-011 - must produce exactly one line, never zero --
 
     def test_mat_find_011_scenario(self):
-        contract = self._activate(start_date=date(2026, 9, 2), end_date=date(2026, 10, 1), rent_amount=1600)
+        contract = self._activate(start_date=date(2026, 9, 2), end_date=date(2026, 9, 30), rent_amount=1600)
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertEqual(contract.payment_day, 2)
@@ -222,10 +224,10 @@ class TestEdaraLeaseBilling(TransactionCase):
         self.assertTrue(lines.is_prorated)
         self.assertEqual(lines.amount, 1546.67)
 
-    # -- 10: MAT-FIND-005 - end_date must remain exclusive --
+    # -- 10: MAT-FIND-005 - the period boundary is exclusive; end_date is the last occupied day --
 
     def test_mat_find_005_scenario(self):
-        contract = self._activate(start_date=date(2026, 8, 1), end_date=date(2026, 9, 1), rent_amount=1500)
+        contract = self._activate(start_date=date(2026, 8, 1), end_date=date(2026, 8, 31), rent_amount=1500)
         lines = contract.schedule_line_ids
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines.due_date, date(2026, 8, 1))
@@ -251,7 +253,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 14: Day-31 anchor restoration --
 
     def test_day31_anchor_restoration(self):
-        contract = self._activate(start_date=date(2026, 1, 31), end_date=date(2026, 5, 31), rent_amount=900)
+        contract = self._activate(start_date=date(2026, 1, 31), end_date=date(2026, 5, 30), rent_amount=900)
         lines = contract.schedule_line_ids
         self.assertEqual(contract.payment_day, 31)
         self.assertEqual(
@@ -265,7 +267,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     # -- 15: Leap-day anchor, no permanent drift --
 
     def test_leap_day_anchor_no_drift(self):
-        contract = self._activate(start_date=date(2028, 2, 29), end_date=date(2028, 5, 31), rent_amount=900)
+        contract = self._activate(start_date=date(2028, 2, 29), end_date=date(2028, 5, 30), rent_amount=900)
         lines = contract.schedule_line_ids
         self.assertEqual(contract.payment_day, 29)
         self.assertEqual(len(lines), 4)
@@ -282,9 +284,9 @@ class TestEdaraLeaseBilling(TransactionCase):
 
     def test_zero_line_outcome_structurally_impossible(self):
         for start, end in [
-            (date(2026, 9, 1), date(2026, 9, 2)),   # 1 day
-            (date(2026, 9, 30), date(2026, 10, 1)),  # 1 day, month boundary
-            (date(2026, 12, 31), date(2027, 1, 1)),  # 1 day, year boundary
+            (date(2026, 9, 1), date(2026, 9, 1)),   # 1 day (start == end)
+            (date(2026, 9, 30), date(2026, 9, 30)),  # 1 day, month boundary
+            (date(2026, 12, 31), date(2026, 12, 31)),  # 1 day, year boundary
         ]:
             contract = self._activate(start_date=start, end_date=end, rent_amount=900)
             self.assertTrue(contract.schedule_line_ids, "no schedule line for %s -> %s" % (start, end))
@@ -294,6 +296,6 @@ class TestEdaraLeaseBilling(TransactionCase):
             ('yearly', 12000, date(2026, 11, 10)),
         ]:
             contract = self._activate(
-                start_date=start, end_date=start + timedelta(days=1),
+                start_date=start, end_date=start,
                 rent_amount=rent, billing_frequency=frequency)
             self.assertEqual(len(contract.schedule_line_ids), 1, "no schedule line for %s" % frequency)

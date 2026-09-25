@@ -160,7 +160,7 @@ class EdaraUnit(models.Model):
         ]))
 
     def _has_future_active_contract(self):
-        """Whether this unit has an active-state lease contract that has not
+        """Whether this unit has a scheduled lease contract that has not
         started yet (start_date > today) - the "contractually committed for
         future occupancy, but not currently occupied" case (BD-001,
         2026-09-21, resolves MAT-FIND-010): such a unit is RESERVED, not
@@ -169,8 +169,7 @@ class EdaraUnit(models.Model):
         today = fields.Date.context_today(self)
         return bool(self.env['edara.lease.contract'].search_count([
             ('unit_id', '=', self.id),
-            ('state', '=', 'active'),
-            ('start_date', '>', today),
+            ('state', '=', 'scheduled'),
         ]))
 
     def _lease_occupancy_state(self):

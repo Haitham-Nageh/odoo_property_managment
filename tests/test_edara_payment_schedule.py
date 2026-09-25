@@ -46,21 +46,22 @@ class TestEdaraPaymentSchedule(TransactionCase):
         expected_dates = [date(2026, m, 15) for m in range(1, 7)]
         self.assertEqual(contract.schedule_line_ids.mapped('due_date'), expected_dates)
         # First 5 periods reach their own full monthly anchor (15/01..15/06);
-        # the 6th is truncated by end_date (2026-06-20, 5 days short of its
-        # 15/07 anchor) and must be prorated, not billed at the full rate.
+        # the 6th is cut by end_date (2026-06-20 is the LAST occupied day, so the boundary
+        # is 21/06, 24 days short of its 15/07 anchor) and is prorated: 6 of the 30 days
+        # of the anchored month 15/06 - 15/07, not billed at the full rate.
         full_lines = contract.schedule_line_ids[:5]
         last_line = contract.schedule_line_ids[5]
         self.assertTrue(all(line.amount == 1000 and not line.is_prorated for line in full_lines))
         self.assertTrue(last_line.is_prorated)
-        self.assertEqual(last_line.period_end, date(2026, 6, 20))
-        self.assertEqual(last_line.occupied_days, 5)
-        self.assertEqual(last_line.amount, round(1000 * 5 / 30, 2))
+        self.assertEqual(last_line.period_end, date(2026, 6, 21))
+        self.assertEqual(last_line.period_last_day, date(2026, 6, 20))
+        self.assertEqual(last_line.occupied_days, 6)
+        self.assertEqual(last_line.amount, 200.0)
 
     def test_schedule_excludes_line_exactly_on_end_date(self):
-        """MAT-FIND-005 Case 1: end_date is the boundary of the lease term,
-        not itself a billable period - a due date landing exactly on
-        end_date must NOT produce a separate installment."""
-        contract = self._make_contract(start_date=date(2026, 8, 1), end_date=date(2026, 9, 1))
+        """MAT-FIND-005 Case 1: the term boundary (end_date + 1) is not itself a billable
+        period - a due date landing exactly on it must NOT produce a separate installment."""
+        contract = self._make_contract(start_date=date(2026, 8, 1), end_date=date(2026, 8, 31))
         contract.action_activate()
         self.assertEqual(contract.schedule_line_ids.mapped('due_date'), [date(2026, 8, 1)])
         self.assertFalse(contract.schedule_line_ids.is_prorated)
@@ -68,7 +69,7 @@ class TestEdaraPaymentSchedule(TransactionCase):
     def test_schedule_normal_multi_month_excludes_end_date(self):
         """MAT-FIND-005 Case 2: a longer contract must still stop one period
         short of end_date, not include a line exactly on it."""
-        contract = self._make_contract(start_date=date(2026, 8, 1), end_date=date(2026, 11, 1))
+        contract = self._make_contract(start_date=date(2026, 8, 1), end_date=date(2026, 10, 31))
         contract.action_activate()
         self.assertEqual(
             contract.schedule_line_ids.mapped('due_date'),
@@ -80,11 +81,12 @@ class TestEdaraPaymentSchedule(TransactionCase):
         always derived from Start Date, so there is no manual-payment_day
         "shift" scenario anymore - this exercises a period that is truncated
         by end_date but still produces exactly one correct line."""
-        contract = self._make_contract(start_date=date(2026, 8, 7), end_date=date(2026, 9, 6))
+        contract = self._make_contract(start_date=date(2026, 8, 7), end_date=date(2026, 9, 1))
         contract.action_activate()
         self.assertEqual(contract.schedule_line_ids.mapped('due_date'), [date(2026, 8, 7)])
         self.assertTrue(contract.schedule_line_ids[0].due_date < contract.end_date)
-        self.assertEqual(contract.schedule_line_ids[0].occupied_days, 30)
+        self.assertEqual(contract.schedule_line_ids[0].occupied_days, 26)
+        self.assertEqual(contract.schedule_line_ids[0].amount, 838.71)   # 1,000 x 26/31
 
     def test_invoice_blocked_without_income_account(self):
         # Phase 6.4: this shared dev database's real company may already have
@@ -116,7 +118,7 @@ class TestEdaraPaymentSchedule(TransactionCase):
         Odoo invoice - no separate proration logic in _create_invoice()."""
         self.env.company.edara_rental_income_account_id = self.income_account.id
         contract = self._make_contract(
-            start_date=date(2026, 9, 2), end_date=date(2026, 10, 1), rent_amount=1600)
+            start_date=date(2026, 9, 2), end_date=date(2026, 9, 30), rent_amount=1600)
         contract.action_activate()
         line = contract.schedule_line_ids
         self.assertTrue(line.is_prorated)

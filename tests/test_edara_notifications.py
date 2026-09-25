@@ -1,5 +1,7 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, new_test_user, tagged
 
@@ -88,9 +90,10 @@ class TestEdaraLeaseExpiryReminders(TestEdaraNotificationsBase):
         contract = self._make_contract(end_date=_today() + timedelta(days=25))
         self.env['edara.lease.contract']._cron_send_expiry_reminders()
         self.assertEqual(contract.last_expiry_reminder_days, 30)
-        # Simulate the calendar advancing to within the urgent (7-day) window.
-        contract.end_date = _today() + timedelta(days=5)
-        sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        # Simulate the calendar advancing 20 days, into the urgent (7-day) window.
+        later = _today() + timedelta(days=20)
+        with patch.object(fields.Date, 'context_today', staticmethod(lambda record, timestamp=None: later)):
+            sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
         self.assertEqual(sent, 1)
         self.assertEqual(contract.last_expiry_reminder_days, 7)
         activities = contract.activity_ids.filtered(lambda a: a.activity_type_id == self.lease_expiry_type)

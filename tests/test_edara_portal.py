@@ -259,7 +259,7 @@ class TestEdaraPortal(HttpCase):
     def test_renewal_approval_notifies_tenant(self):
         renewal = self.env['edara.renewal.request'].create({
             'contract_id': self.contract_a.id,
-            'requested_start_date': self.contract_a.end_date,
+            'requested_start_date': self.contract_a._term_boundary(),
             'requested_end_date': date(2027, 12, 31),
             'requested_rent_amount': 1100,
         })
@@ -271,7 +271,7 @@ class TestEdaraPortal(HttpCase):
     def test_renewal_rejection_notifies_tenant(self):
         renewal = self.env['edara.renewal.request'].create({
             'contract_id': self.contract_a.id,
-            'requested_start_date': self.contract_a.end_date,
+            'requested_start_date': self.contract_a._term_boundary(),
             'requested_end_date': date(2027, 12, 31),
             'requested_rent_amount': 1100,
         })

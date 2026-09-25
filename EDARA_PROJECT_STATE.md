@@ -2458,3 +2458,43 @@ New deposits collect 1000 / deduct 200 / refund 800: ILS - liability amount_curr
 
 ### Next recommended phase
 Decide FX policy for held deposits (revaluation vs accept), and the still-open occupancy decision for renewed-but-in-term contracts (Phase 7). Optional: extend the Phase 7 system-field guard to other lifecycle `state` fields.
+
+
+
+## Phase 10.1 - Lease Dates & Payment Schedule Engine (2026-09-25)
+
+**Status: Implemented, tested (red/green proven), verified on a throwaway DB and on the live dev DB. 461/461 automated tests, 0 failed, 0 errors (413 previous + 48 new), on both a fresh install and the upgrade path.**
+
+Developer reference: `docs/LEASE_DATE_AND_PRORATION_ENGINE.md`. Decisions implemented: OD-N1 (`docs/PRORATION_POLICY_DECISION.md`), OD-B3/B5/B6/B9 and section 5 of `docs/LEASE_LIFECYCLE_DECISIONS.md`. Research/decision docs of Phases 9-9.3 are committed with this phase.
+
+**SUPERSEDES** the "standardized 30-day reference month" recorded as finalized on 2026-09-17 (MAT-FIND-011/013, MAT-030) and the exclusive `end_date` of MAT-FIND-005/012. Kept from those findings: one line per billing period, start-day anchor computed fresh from `start_date`, a full period bills exactly `rent_amount`, at least one line for any valid lease.
+
+### Canonical date convention
+`end_date` = LAST occupied day (inclusive). One derived boundary `contract._term_boundary()` = `end_date + 1 day` (`edara_proration.term_boundary`); every interval is `[start_date, boundary)`. `start_date == end_date` is a valid one-day lease. Schedule line: `period_start`, `period_end` (exclusive boundary, unchanged meaning), new computed `period_last_day` (= `period_end - 1`). Overlap check is inclusive (`s1 <= e2 and s2 <= e1`); a successor starts the day after the predecessor's `end_date`.
+
+### Canonical proration (Period-Relative Actual/Actual, cumulative rounding)
+Full billing period = exactly `rent_amount`. Part of a period = `round(F(b)) - round(F(a))`, `F(x)` = exact accrual at `rent/n` per anchored month (n = 1/3/12; the exact rent/n, never the rounded stored `monthly_equivalent_rent`, which is report-only), part-month = occupied days / real days of that anchored month. One HALF-UP rounding step per cumulative value, currency rounding (ILS/USD 0.01, JOD 0.001). Amounts that changed vs the 30-day rule: yearly 3 months 3,033.33 -> 3,000.00; yearly 6 months 6,033.33 -> 6,000.00; yearly 15 days 500.00 -> 483.87; quarterly 15/01-31/03 2,533.33 -> 2,548.39; quarterly remainder 566.67 -> 548.39; quarterly 2 months 2,033.33 -> 2,000.00; yearly 15/09-30/11 2,566.67 -> 2,533.33; yearly 6.5 months 6,500 -> 6,451.61.
+
+### Schedule integrity
+`_generate_schedule_lines()` generates by COVERAGE: keeps invoiced lines and uninvoiced full-period lines, drops only uninvoiced prorated lines (re-cut), creates lines from the last covered boundary; an invoiced partial tail is completed by a stub line (612.90 + 387.10 = 1,000.00). Idempotent. `write(end_date)` on a confirmed lease: only later dates (shortening raises; use Terminate) and triggers the same generator = the extension path. New constraint `edara.payment.schedule.line._check_periods_disjoint`: periods of one unit are pairwise disjoint across contracts, whatever the invoice state.
+
+### Lifecycle
+New states `scheduled` (confirmed, start in the future; unit reserved; never invoiced) and `cancelled` (`action_cancel`, scheduled only). `action_activate` confirms: `scheduled` if `start_date > today` else `active`, and creates the schedule. Renewal creates the successor `scheduled` and leaves the current contract ACTIVE (unit stays `rented`); requires `start >= _term_boundary()` and no live successor; no overlapping renewals (Phase 7 line-dropping removed). Daily job `_cron_expire_contracts`: (1) scheduled -> active when start arrives (a lease that cannot start stays scheduled + one to-do), (2) active with `end_date < today` -> `renewed` if a live successor exists else `expired`, (3) occupancy recompute. Terminating the current lease cancels its scheduled successor (OD-B9). Confirm / activation / invoicing are independent (invoicing never creates lines; activation never regenerates the schedule; scheduled contracts are never invoiced). Portal renewal default start = `_term_boundary()`; renewal-request validation allows a one-day term.
+Migration `migrations/19.0.1.1.0/post-migration.py` (state values only, idempotent): `active` with future start -> `scheduled`; `renewed` still inside its term -> `active`. Manifest 19.0.1.1.0.
+
+### Tests
+`tests/test_edara_phase10_lease_engine.py`: 48 new (TestProrationMath 16 pure-maths incl. exhaustive split invariant >3,000 splits over 28/29/30/31-day months, day-31/leap-day anchors, all frequencies, ILS/USD/JOD, cumulative rounding vs Odoo `float_round`; TestLeaseDateAndScheduleEngine 32: inclusive end date, boundaries, quarterly/yearly, currencies, duplicate prevention, extension with/without invoiced tail, renewal, scheduled successor, back-dated successor rejected, daily job, occupancy, activation/invoicing separation, migration). 41 existing tests pinned the old conventions and were updated (billing 19, lease contract 9, payment schedule 5, Phase 7 3, dashboard/deposit/notifications/portal/rent-roll 1 each): end dates moved to the last occupied day, amounts to the new policy, `active`-with-future-start to `scheduled`, renewal-at-click to renewal-at-boundary; each change is a convention change, none was weakened to make it pass. Baseline 413/413 -> 461/461.
+RED/GREEN: with the old behaviour isolated inside the helper (exclusive end + fixed 30-day month on the rounded monthly equivalent) 49 of 70 targeted tests failed (19 billing, 15 maths, 15 engine + 3 errors); with the final code all pass. The shim was removed (file restored byte-identical).
+
+### Verification
+* Throwaway DB `edara_p101_base` (posted invoices, native payments, cron, extension, renewal, USD/JOD): 21/21 (whole year invoiced then extended by 3 months: 15 invoices, one per period, no duplicate; invoiced partial tail + stub = 1,000.00; renewal at the boundary: successor active, predecessor renewed, unit rented; USD 612.90 / JOD 612.903 invoices in contract currency; overlapping period refused). Fresh install DB `edara_p101_fresh` and upgrade path both 461/461.
+* Live dev DB `odoo19_enterprise_dev`: upgraded (`-u property_managment`), migration ran: contract states active 8 / renewed 1 -> active 7 / scheduled 2 (LC/2026/0013, LC/2026/0015); schedule lines 109, invoiced 17, rent invoices 17 posted / 54,500.00 - identical before and after; unit occupancy identical. Rolled-back scenarios (13/13; counts contracts 12 / lines 109 / moves 54 / units 8 identical after rollback). The rolled-back runs consumed contract sequence numbers (LC/2026/0020-0031 are unused: a numbering gap, no records; next number LC/2026/0032).
+
+### Known limitations / boundaries (not decided here)
+1. **Legacy dev data uses the old exclusive style**: LC/2026/0015 (start 31/12/2026) is the successor of LC/2026/0012 (end 31/12/2026) - under the inclusive convention both occupy 31/12. No dates were changed (decision 3.7: classification first, correction by person). Effect: the daily job cannot start LC/2026/0015 on 01/01/2027 until LC/2026/0012 is closed - it stays scheduled with a to-do, then self-heals the next run. 5 contracts are anniversary-style (end = start + N months) and would need `end_date - 1 day` to match the new convention; LC/2026/0013, /0015 (scheduled) and /0006, /0007, /0008 (active). Their generated schedules already used the exclusive boundary, so billing is unaffected; correcting is a data decision.
+2. One pre-existing overlapping pair of schedule periods on unit id 5 (lines 44 and 121, from the old early-renewal semantics) - the new constraint only fires when those lines are written; left as is.
+3. Already-generated/invoiced periods keep their old-rule amounts (RULE-17); no corrective entries.
+4. The disjointness rule is a Python constraint, not a database exclusion constraint (needs `btree_gist`); two concurrent transactions could in theory both insert an overlapping line.
+5. Extension is the `end_date` write path (no dedicated Extend button/log, OD-B1); rent/frequency edits on a confirmed lease still apply only to newly generated lines.
+6. Not implemented (other Phase 9 decisions): late renewal window (OD-B2), deposit carry-over (OD-B8), holdover policy (OD-B10), alternative-currency deposits, reminder wording for invoices.
+7. Owner/accountant sign-off recorded as still needed by `PRORATION_POLICY_DECISION.md` (supersession of the 2026-09-17 rule; IFRS 16 para 81 basis; cumulative rounding) - implemented per the user's instruction to make it canonical.

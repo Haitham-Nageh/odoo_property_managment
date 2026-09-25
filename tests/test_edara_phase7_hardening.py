@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, timedelta
 
 from odoo import Command
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, new_test_user, tagged
 
 
@@ -70,14 +70,18 @@ class TestEdaraPhase7Hardening(TransactionCase):
         self.assertEqual(self.env['edara.lease.contract'].browse(contract.id).state, 'draft')
 
     def test_contract_lifecycle_still_works_for_branch_manager(self):
-        contract = self._contract().with_user(self.manager)
+        today = date.today()
+        contract = self._contract(
+            start_date=today - timedelta(days=100), end_date=today + timedelta(days=30)).with_user(self.manager)
         contract.action_activate()
         self.assertEqual(contract.state, 'active')
-        renewed = contract.action_renew(date(2026, 7, 1), date(2027, 7, 1), 1100)
-        self.assertEqual(contract.state, 'renewed')
-        self.assertEqual(renewed.state, 'active')
-        renewed.action_terminate(reason='test')
-        self.assertEqual(renewed.state, 'terminated')
+        successor = contract.action_renew(today + timedelta(days=31), today + timedelta(days=395), 1100)
+        self.assertEqual(contract.state, 'active')       # renewed only by the daily job at its boundary
+        self.assertEqual(successor.state, 'scheduled')
+        successor.action_cancel()
+        self.assertEqual(successor.state, 'cancelled')
+        contract.action_terminate(reason='test')
+        self.assertEqual(contract.state, 'terminated')
 
     def test_viewer_cannot_drive_lifecycle_even_though_it_uses_sudo(self):
         contract = self._contract()
@@ -88,7 +92,7 @@ class TestEdaraPhase7Hardening(TransactionCase):
         with self.assertRaises(AccessError):
             contract.with_user(self.viewer).action_terminate()
         with self.assertRaises(AccessError):
-            contract.with_user(self.viewer).action_renew(date(2026, 7, 1), date(2027, 7, 1), 1)
+            contract.with_user(self.viewer).action_renew(date(2026, 7, 2), date(2027, 7, 1), 1)
 
     def test_schedule_line_amount_frozen_once_invoiced_invoice_id_always_protected(self):
         contract = self._contract()
@@ -176,27 +180,30 @@ class TestEdaraPhase7Hardening(TransactionCase):
 
     def test_renewed_contract_remaining_periods_are_still_billed(self):
         today = date.today()
-        contract = self._contract(start_date=date(today.year - 1, 1, 1), end_date=date(today.year + 1, 1, 1))
+        contract = self._contract(start_date=today - timedelta(days=400), end_date=today - timedelta(days=1))
         contract.action_activate()
-        contract.action_renew(date(today.year + 1, 1, 1), date(today.year + 2, 1, 1), 1100)  # successor starts at old end
+        contract.action_renew(today, today + timedelta(days=365), 1100)  # successor starts the day after the last day
+        self.env['edara.lease.contract']._cron_expire_contracts()        # the daily job closes the old term
         self.assertEqual(contract.state, 'renewed')
+        lines_before = len(contract.schedule_line_ids)
         due = contract.schedule_line_ids.filtered(lambda l: l.due_date <= today and not l.invoice_id)
         self.assertTrue(due)
         created, skipped, errors = due._process_due_invoices()
         self.assertEqual((created, errors), (len(due), 0))
         # no revenue gap and no duplicate: no line of the old contract was dropped, none invoiced twice
-        self.assertEqual(len(contract.schedule_line_ids), 24)
+        self.assertEqual(len(contract.schedule_line_ids), lines_before)
         self.assertEqual(len(contract.schedule_line_ids.invoice_id), len(due))
 
-    def test_overlapping_renewal_drops_only_periods_successor_covers(self):
-        contract = self._contract(start_date=date(2026, 1, 1), end_date=date(2027, 1, 1))
+    def test_renewal_overlapping_the_current_term_is_rejected(self):
+        # Phase 10.1 (OD-B6): a renewal starts when the current term ends - it never truncates or
+        # drops any period of the current contract.
+        contract = self._contract(start_date=date(2026, 1, 1), end_date=date(2026, 12, 31))
         contract.action_activate()
         self.assertEqual(len(contract.schedule_line_ids), 12)
-        successor = contract.action_renew(date(2026, 7, 1), date(2027, 7, 1), 1100)
-        remaining = contract.schedule_line_ids
-        self.assertEqual(len(remaining), 6)  # Jan..Jun stay billable to the old contract
-        self.assertEqual(max(remaining.mapped('period_end')), date(2026, 7, 1))
-        self.assertEqual(min(successor.schedule_line_ids.mapped('period_start')), date(2026, 7, 1))
+        with self.assertRaises(UserError):
+            contract.action_renew(date(2026, 7, 1), date(2027, 7, 1), 1100)
+        self.assertEqual(len(contract.schedule_line_ids), 12)
+        self.assertFalse(contract.successor_contract_id)
 
     def test_terminated_and_expired_contracts_still_not_invoiced(self):
         contract = self._contract(start_date=date(2025, 1, 1), end_date=date(2026, 1, 1))

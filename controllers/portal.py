@@ -105,7 +105,7 @@ class EdaraPortal(CustomerPortal):
             rent_amount = contract_sudo.rent_amount
         request.env['edara.renewal.request'].create({
             'contract_id': contract_sudo.id,
-            'requested_start_date': post.get('requested_start_date') or contract_sudo.end_date,
+            'requested_start_date': post.get('requested_start_date') or contract_sudo._term_boundary(),
             'requested_end_date': post.get('requested_end_date'),
             'requested_rent_amount': rent_amount,
             'note': post.get('note'),
