@@ -51,6 +51,15 @@ class EdaraRenewalRequest(models.Model):
                 raise ValidationError(_(
                     "%(contract)s already has an open renewal request.", contract=request.contract_id.display_name))
 
+    @api.constrains('contract_id', 'requested_start_date', 'state')
+    def _check_start_after_current_term(self):
+        for request in self:
+            boundary = request.contract_id._term_boundary()
+            if request.state == 'submitted' and request.requested_start_date < boundary:
+                raise ValidationError(_(
+                    "A renewal must start on or after %(date)s, the day after the current lease's "
+                    "last day.", date=boundary))
+
     @api.constrains('requested_start_date', 'requested_end_date')
     def _check_dates(self):
         for request in self:

@@ -204,12 +204,9 @@ class EdaraLeaseContract(models.Model):
         self.ensure_one()
         self.schedule_line_ids.filtered(lambda l: not l.invoice_id and l.is_prorated).unlink()
         covered_to = max([d for d in self.schedule_line_ids.mapped('period_end') if d] or [self.start_date])
-        rent = Fraction(str(self.rent_amount))
-        rounding = Fraction(str(self.currency_id.rounding))
         sequence = max(self.schedule_line_ids.mapped('sequence') or [0]) + 10
         vals_list = []
-        for period_start, period_end, is_prorated, amount in proration.piece_lines(
-                self.start_date, PERIOD_MONTHS[self.billing_frequency], rent, rounding,
+        for period_start, period_end, is_prorated, amount in self._proration_lines(
                 covered_to, self._term_boundary()):
             occupied_days = (period_end - period_start).days
             vals_list.append((0, 0, {
@@ -224,6 +221,15 @@ class EdaraLeaseContract(models.Model):
             }))
             sequence += 10
         self.schedule_line_ids = vals_list
+
+    def _proration_lines(self, covered_to, boundary):
+        """The canonical engine (edara_proration) applied to this contract: (period_start,
+        period_end, is_prorated, amount) tuples covering [covered_to, boundary). Single entry
+        point for schedule generation and termination truncation."""
+        self.ensure_one()
+        return proration.piece_lines(
+            self.start_date, PERIOD_MONTHS[self.billing_frequency], Fraction(str(self.rent_amount)),
+            Fraction(str(self.currency_id.rounding)), covered_to, boundary)
 
     def _schedule_line_description(self, period_start, period_end, is_prorated):
         """Invoice-line text: business-facing (last occupied day, not the exclusive boundary)."""
@@ -372,6 +378,45 @@ class EdaraLeaseContract(models.Model):
             lambda l: not l.invoice_id and l.due_date >= today
         ).unlink()
 
+    def _truncate_schedule_at(self, boundary):
+        """Termination: rent is earned through the last occupied day (boundary - 1 day), and no
+        uninvoiced coverage may remain after it (it would block re-letting the unit).
+        * uninvoiced line ending on/before the boundary: untouched (earned, incl. overdue ones -
+          MAT-FIND-006), so a termination exactly on a period boundary leaves no stub;
+        * uninvoiced line crossing the boundary: cut to it and re-priced by the canonical engine;
+        * uninvoiced line starting on/after the boundary: removed;
+        * invoiced line: never touched; if it extends past the boundary it is reported on the
+          contract chatter (accounting review), not rewritten.
+        Lines without period data (manual lines) keep the previous rule: removed if not yet due.
+        Idempotent."""
+        self.ensure_one()
+        beyond = self.env['edara.payment.schedule.line']
+        for line in self.schedule_line_ids:
+            if not line.period_start or not line.period_end:
+                if not line.invoice_id and line.due_date >= boundary - relativedelta(days=1):
+                    line.unlink()
+            elif line.period_end <= boundary:
+                continue
+            elif line.invoice_id:
+                beyond |= line
+            elif line.period_start >= boundary:
+                line.unlink()
+            else:
+                ((period_start, period_end, is_prorated, amount),) = self._proration_lines(
+                    line.period_start, boundary)
+                line.write({
+                    'period_end': period_end,
+                    'occupied_days': (period_end - period_start).days,
+                    'is_prorated': is_prorated,
+                    'amount': self.currency_id.round(amount),
+                    'description': self._schedule_line_description(period_start, period_end, is_prorated),
+                })
+        if beyond:
+            self.message_post(body=_(
+                "Invoiced period(s) extend past the termination date and were NOT modified - "
+                "accounting review needed: %(periods)s.",
+                periods=", ".join("%s - %s" % (l.period_start, l.period_last_day) for l in beyond)))
+
     def action_terminate(self, reason=None):
         self.check_access('write')
         for contract in self:
@@ -389,9 +434,9 @@ class EdaraLeaseContract(models.Model):
                 contract.message_post(body=_("Scheduled renewal %(name)s was cancelled.", name=successor.name))
             # Only frees the unit if no OTHER live contract remains on it (MAT-020).
             contract.unit_id._sync_occupancy_from_contracts()
-            # Defense-in-depth #1: drop not-yet-due, uninvoiced future obligations now.
-            # Defense #2 is the invoicing cron re-checking state == 'active'.
-            contract._unlink_future_uninvoiced_schedule_lines()
+            # Defense-in-depth #1: cut the schedule at the last occupied day (the termination
+            # date is inclusive). Defense #2 is the invoicing cron re-checking the state.
+            contract._truncate_schedule_at(contract.termination_date + relativedelta(days=1))
 
     def action_cancel(self):
         """Withdraw a scheduled lease before it starts: no invoice can exist yet, so the schedule
@@ -434,8 +479,10 @@ class EdaraLeaseContract(models.Model):
             'billing_frequency': self.billing_frequency,
             'deposit_required': self.deposit_required,
             'deposit_amount': self.deposit_amount,
-            'predecessor_contract_id': self.id,
         })
+        # system-managed lifecycle links (edara.system.field.guard): set only here, after the
+        # caller's own write access was verified above.
+        new_contract.sudo().predecessor_contract_id = self.id
         self.sudo().successor_contract_id = new_contract.id
         new_contract.action_activate()
         return new_contract

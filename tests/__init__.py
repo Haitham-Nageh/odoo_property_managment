@@ -21,3 +21,4 @@ from . import test_edara_maintenance_phase2
 from . import test_edara_phase7_hardening
 from . import test_edara_phase8_currency
 from . import test_edara_phase10_lease_engine
+from . import test_edara_phase1011_fixes

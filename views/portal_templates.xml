@@ -99,12 +99,13 @@
 
                     <t t-if="contract.state == 'active' and not open_renewal">
                         <h4 class="mt-4">Request a Renewal</h4>
+                        <div t-if="renewal_error" class="alert alert-danger" role="alert" t-out="renewal_error"/>
                         <form t-attf-action="/my/leases/#{contract.id}/renew" method="post" class="row g-3">
                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                             <div class="col-md-4">
                                 <label class="form-label">New Start Date</label>
                                 <input type="date" name="requested_start_date" class="form-control"
-                                       t-att-value="contract.end_date"/>
+                                       t-att-value="renewal_min_start" t-att-min="renewal_min_start"/>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">New End Date</label>

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from dateutil.relativedelta import relativedelta
 from lxml import etree
@@ -157,16 +157,17 @@ class TestEdaraPaymentSchedule(TransactionCase):
         contract = self._make_contract(start_date=start_date, end_date=today + relativedelta(years=1))
         contract.action_activate()
 
-        # MAT-FIND-006: only strictly-overdue (due_date < today) uninvoiced lines
-        # survive termination - a line due today or later is not yet overdue
-        # (edara.payment.schedule.line._compute_state() computes it as 'draft',
-        # not 'overdue') and is removed as a not-yet-due future obligation.
-        overdue_count = len(contract.schedule_line_ids.filtered(lambda l: l.due_date < today))
+        # MAT-FIND-006 + Phase 10.1.1: the termination date (today) is the last occupied day, so
+        # rent is earned through it. Strictly-overdue uninvoiced lines survive untouched; the line
+        # covering today is kept but cut to that one day; everything after it is removed.
         contract.action_terminate('Tenant moved out')
 
-        self.assertEqual(len(contract.schedule_line_ids), overdue_count)
-        self.assertTrue(all(line.due_date < today for line in contract.schedule_line_ids))
-        self.assertTrue(all(line.state == 'overdue' for line in contract.schedule_line_ids))
+        lines = contract.schedule_line_ids
+        last = lines[-1]
+        self.assertTrue(all(line.due_date <= today for line in lines))            # nothing after today remains
+        self.assertEqual(last.period_end, today + timedelta(days=1))              # cut at the last occupied day
+        self.assertTrue(all(line.period_end <= last.period_start for line in lines[:-1]))
+        self.assertTrue(all(line.state == 'overdue' for line in lines if line.due_date < today))
 
         self.env['edara.payment.schedule.line']._cron_generate_due_invoices()
         self.assertFalse(any(line.invoice_id for line in contract.schedule_line_ids))

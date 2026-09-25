@@ -2,6 +2,7 @@ import base64
 import re
 from datetime import date
 
+from odoo.exceptions import ValidationError
 from odoo.tests import HttpCase, tagged
 
 
@@ -114,6 +115,54 @@ class TestEdaraPortal(HttpCase):
             'requested_rent_amount': '1100', 'csrf_token': csrf_token,
         })
         self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', self.contract_b.id)]))
+
+    # ================= Phase 10.1.1 (Y1): renewal start date = day after the last occupied day =================
+
+    def test_renewal_form_default_start_is_the_day_after_the_last_day(self):
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        page = self.url_open('/my/leases/%d' % self.contract_a.id).text
+        field = re.search(r'<input[^>]*name="requested_start_date"[^>]*>', page)
+        self.assertTrue(field, "renewal start date input not found")
+        self.assertIn('value="2027-01-01"', field.group(0))      # contract ends 2026-12-31 (last occupied day)
+        self.assertIn('min="2027-01-01"', field.group(0))
+
+    def test_renewal_request_at_the_boundary_is_accepted(self):
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % self.contract_a.id).text)
+        response = self.url_open('/my/leases/%d/renew' % self.contract_a.id, data={
+            'requested_start_date': '2027-01-01', 'requested_end_date': '2027-12-31',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 200)
+        renewal = self.env['edara.renewal.request'].search([('contract_id', '=', self.contract_a.id)])
+        self.assertEqual((renewal.state, renewal.requested_start_date), ('submitted', date(2027, 1, 1)))
+
+    def test_renewal_request_one_day_before_the_boundary_is_rejected_at_submission(self):
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % self.contract_a.id).text)
+        response = self.url_open('/my/leases/%d/renew' % self.contract_a.id, data={
+            'requested_start_date': '2026-12-31', 'requested_end_date': '2027-12-31',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('2027-01-01', response.text)                 # the earliest valid date is explained
+        self.assertIn('alert-danger', response.text)
+        self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', self.contract_a.id)]))
+
+    def test_renewal_request_model_rejects_an_early_start_for_a_portal_user(self):
+        Request = self.env['edara.renewal.request'].with_user(self.user_a)
+        with self.assertRaises(ValidationError):
+            Request.create({'contract_id': self.contract_a.id, 'requested_start_date': date(2026, 12, 31),
+                            'requested_end_date': date(2027, 12, 31), 'requested_rent_amount': 1100})
+        ok = Request.create({'contract_id': self.contract_a.id, 'requested_start_date': date(2027, 1, 1),
+                             'requested_end_date': date(2027, 12, 31), 'requested_rent_amount': 1100})
+        self.assertEqual(ok.state, 'submitted')
+
+    def test_manager_approval_of_a_boundary_request_creates_a_scheduled_successor(self):
+        renewal = self.env['edara.renewal.request'].create({
+            'contract_id': self.contract_a.id, 'requested_start_date': date(2027, 1, 1),
+            'requested_end_date': date(2027, 12, 31), 'requested_rent_amount': 1100})
+        renewal.action_approve()
+        self.assertEqual((renewal.state, renewal.new_contract_id.state, self.contract_a.state), ('approved', 'scheduled', 'active'))
+        self.assertEqual(renewal.new_contract_id.predecessor_contract_id, self.contract_a)
 
     # ================= Phase 3: Tenant Portal Expansion =================
 

@@ -66,7 +66,7 @@ for _model, _fields in (
     ('edara.building', ()),
     ('edara.property', ()),
     ('edara.ownership', ()),
-    ('edara.lease.contract', ('state',)),
+    ('edara.lease.contract', ('state', 'successor_contract_id', 'predecessor_contract_id')),
     ('edara.payment.schedule.line', ('invoice_id',)),
     ('edara.deposit', ()),
     ('edara.deposit.transaction', ()),

@@ -1,4 +1,4 @@
-from odoo import _
+from odoo import _, fields
 from odoo.exceptions import AccessError, UserError
 from odoo.http import request, route
 
@@ -79,6 +79,9 @@ class EdaraPortal(CustomerPortal):
     @route(['/my/leases/<int:contract_id>'], type='http', auth='user', website=True)
     def portal_lease_detail(self, contract_id, **kw):
         contract_sudo = self._document_check_access('edara.lease.contract', contract_id)
+        return self._render_lease_detail(contract_sudo)
+
+    def _render_lease_detail(self, contract_sudo, renewal_error=None, status=200):
         open_renewal = contract_sudo.renewal_request_ids.filtered(lambda r: r.state == 'submitted')
         # Renewal Requests (spec §40 item): decided requests, most recent
         # first (model default order is already 'id desc') - the tenant's
@@ -91,8 +94,13 @@ class EdaraPortal(CustomerPortal):
             'contract': contract_sudo,
             'open_renewal': open_renewal[:1],
             'renewal_history': renewal_history,
+            # earliest valid renewal start, computed by the model (never re-derived in the template)
+            'renewal_min_start': contract_sudo._term_boundary(),
+            'renewal_error': renewal_error,
         })
-        return request.render('property_managment.portal_lease_detail', values)
+        response = request.render('property_managment.portal_lease_detail', values)
+        response.status_code = status
+        return response
 
     @route(['/my/leases/<int:contract_id>/renew'], type='http', auth='user', website=True, methods=['POST'])
     def portal_lease_request_renewal(self, contract_id, **post):
@@ -103,9 +111,20 @@ class EdaraPortal(CustomerPortal):
             rent_amount = float(post.get('requested_rent_amount') or contract_sudo.rent_amount)
         except ValueError:
             rent_amount = contract_sudo.rent_amount
+        # Validate BEFORE touching the database: catching the constraint error after the INSERT
+        # would leave the invalid request in the transaction that the response commits.
+        boundary = contract_sudo._term_boundary()
+        try:
+            start = fields.Date.to_date(post.get('requested_start_date')) or boundary
+        except (ValueError, TypeError):
+            start = None
+        if start is None or start < boundary:
+            return self._render_lease_detail(contract_sudo, renewal_error=_(
+                "A renewal must start on or after %(date)s, the day after your current lease's last day.",
+                date=boundary), status=400)
         request.env['edara.renewal.request'].create({
             'contract_id': contract_sudo.id,
-            'requested_start_date': post.get('requested_start_date') or contract_sudo._term_boundary(),
+            'requested_start_date': start,
             'requested_end_date': post.get('requested_end_date'),
             'requested_rent_amount': rent_amount,
             'note': post.get('note'),

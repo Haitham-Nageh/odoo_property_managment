@@ -74,7 +74,7 @@ Example: `01/01/2026 -> 31/12/2026` extended to `31/03/2027`: 12 existing lines 
 | Invoicing (cron / manual) | invoices due lines of `active`/`renewed` contracts | create lines; touch `scheduled` contracts |
 | Renewal (`action_renew`) | creates the successor (`scheduled`), links it; requires `start >= _term_boundary()` and no live successor | change the current lease |
 | Term end (daily job) | `end_date < today`: `renewed` if a `scheduled`/`active` successor exists, else `expired` | |
-| Terminate | current lease ends; a `scheduled` successor is cancelled in the same transaction | |
+| Terminate | `termination_date` (today) is the last occupied day; the schedule is cut at `termination_date + 1` (see below); a `scheduled` successor is cancelled in the same transaction | rewrite an invoiced line |
 | Cancel (`action_cancel`) | `scheduled -> cancelled`, uninvoiced lines removed, reservation released | |
 
 Daily job order (`_cron_expire_contracts`): activate due scheduled leases, then close finished ones, then
@@ -85,6 +85,11 @@ gets one to-do for the branch manager.
 Occupancy: `rented` while an `active` lease covers today (also while a successor is scheduled);
 `reserved` only if just a `scheduled` lease exists; otherwise `available`. `under_maintenance` rules
 are unchanged.
+
+### Termination (Phase 10.1.1)
+
+Rent is earned through the termination date and nothing after it stays scheduled, so the unit can be re-let from `termination_date + 1`.
+`_truncate_schedule_at(boundary)`, per uninvoiced line: ends on/before the boundary -> untouched (earned, including overdue lines; a termination exactly on a period boundary leaves no stub); crosses the boundary -> cut to it and re-priced with the canonical engine (`_proration_lines`; 1,000 monthly terminated on the 20th of a 30-day month = 666.67; quarterly 3,000 terminated 10/02 = 1,357.14); starts on/after it -> removed. An **invoiced** line is never touched; if it extends past the termination date a chatter note asks for accounting review (it still blocks re-letting inside that period - unresolved by design). Manual lines without period data keep the old "remove if not yet due" rule. Idempotent.
 
 ## 6. Immutability
 
@@ -97,3 +102,10 @@ lines generated after the release; nothing already generated or posted is recalc
 Holdover after the end date, late renewal window (OD-B2), deposit carry-over (OD-B8), alternative-currency
 payments, a separate Extend action/log (OD-B1), calendar-aligned billing. A renewal whose start is after the
 boundary is allowed (a gap); nothing is billed for the gap.
+
+## 8. Guards and migrations (Phase 10.1.1)
+
+* `successor_contract_id` and `predecessor_contract_id` are system-managed (`edara.system.field.guard`, same mechanism as `state`): a direct `write`, `web_save` or forged `su` context by a non-superuser is rejected; `action_renew` / `action_cancel` set them through a scoped `sudo()` after `check_access('write')`. Client-supplied values are dropped on create.
+* Once a schedule line is invoiced, `due_date`, `period_start`, `period_end`, `period_last_day`, `occupied_days`, `is_prorated` and `amount` are frozen for non-superusers (`INVOICED_FROZEN_FIELDS`). Uninvoiced lines stay editable.
+* A renewal request is validated at submission (`start >= contract._term_boundary()`); the portal form pre-fills and constrains that date and rejects an earlier one with HTTP 400 and the earliest valid date, before anything is stored.
+* Migration `19.0.1.2.0` recomputes stored occupancy of lease-managed units from their leases (writes only where different; idempotent). `19.0.1.1.0` (states) is unchanged.

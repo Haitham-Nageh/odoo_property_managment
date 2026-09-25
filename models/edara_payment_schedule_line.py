@@ -26,6 +26,12 @@ INVOICE_PAYMENT_STATE_TO_LINE_STATE = {
 }
 
 
+# Phase 10.1.1: once a line is invoiced its billing coverage is the frozen basis of that invoice
+# (schedule generation and the no-overlap rule rely on it); due_date equals period_start.
+INVOICED_FROZEN_FIELDS = frozenset(
+    ('due_date', 'period_start', 'period_end', 'period_last_day', 'occupied_days', 'is_prorated'))
+
+
 class EdaraPaymentScheduleLine(models.Model):
     _name = 'edara.payment.schedule.line'
     _description = 'EDARA Payment Schedule Line'
@@ -96,8 +102,14 @@ class EdaraPaymentScheduleLine(models.Model):
     def write(self, vals):
         # Phase 7: once invoiced, the line's amount is the frozen basis of that invoice.
         # (Uninvoiced lines stay editable - the list/form views intentionally allow it.)
-        if 'amount' in vals and not self.env.su and any(line.invoice_id for line in self):
-            raise AccessError(_("The amount of an invoiced payment schedule line cannot be modified."))
+        if not self.env.su and any(line.invoice_id for line in self):
+            if 'amount' in vals:
+                raise AccessError(_("The amount of an invoiced payment schedule line cannot be modified."))
+            frozen = INVOICED_FROZEN_FIELDS.intersection(vals)
+            if frozen:
+                raise AccessError(_(
+                    "The billing period of an invoiced payment schedule line cannot be modified "
+                    "(%(fields)s).", fields=', '.join(sorted(frozen))))
         return super().write(vals)
 
     def unlink(self):
