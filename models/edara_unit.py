@@ -198,11 +198,25 @@ class EdaraUnit(models.Model):
         owner_occupied/sold - those are administrative states outside the
         lease lifecycle. Intentionally NOT the code path action_activate()
         uses - activation unconditionally forces the derived state on every
-        unit regardless of its prior value (see action_activate())."""
+        unit regardless of its prior value (see action_activate()).
+
+        Phase 10.1.2: a unit under maintenance with no current lease derives
+        to 'available', which _check_status_consistency() rejects (Under
+        Maintenance can never be Available) - that combination is legal (a
+        lease just ended/was terminated on a unit that is also mid-repair),
+        so the write is skipped rather than raising and the stale occupancy
+        is left for a human to resolve once maintenance clears. This can
+        only ever suppress a derived 'available' - 'rented'/'reserved' are
+        always legal alongside under_maintenance and are written as before."""
         for unit in self:
             if unit.occupancy_status not in ('available', 'reserved', 'rented'):
                 continue
-            unit.occupancy_status = unit._lease_occupancy_state()
+            derived = unit._lease_occupancy_state()
+            if derived == unit.occupancy_status:
+                continue
+            if derived == 'available' and unit.operational_status == 'under_maintenance':
+                continue
+            unit.occupancy_status = derived
 
     @api.model
     def _cron_sync_reserved_occupancy(self):

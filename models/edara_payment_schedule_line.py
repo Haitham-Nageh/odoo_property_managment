@@ -28,8 +28,12 @@ INVOICE_PAYMENT_STATE_TO_LINE_STATE = {
 
 # Phase 10.1.1: once a line is invoiced its billing coverage is the frozen basis of that invoice
 # (schedule generation and the no-overlap rule rely on it); due_date equals period_start.
+# Phase 10.1.2 (Y4): contract_id joins them - otherwise a restricted user could move an already-
+# invoiced line's coverage onto a different contract (or unit, via the related unit_id) as long as
+# the target period didn't overlap, silently detaching the invoice from the contract it billed.
 INVOICED_FROZEN_FIELDS = frozenset(
-    ('due_date', 'period_start', 'period_end', 'period_last_day', 'occupied_days', 'is_prorated'))
+    ('due_date', 'period_start', 'period_end', 'period_last_day', 'occupied_days', 'is_prorated',
+     'contract_id'))
 
 
 class EdaraPaymentScheduleLine(models.Model):
@@ -108,8 +112,8 @@ class EdaraPaymentScheduleLine(models.Model):
             frozen = INVOICED_FROZEN_FIELDS.intersection(vals)
             if frozen:
                 raise AccessError(_(
-                    "The billing period of an invoiced payment schedule line cannot be modified "
-                    "(%(fields)s).", fields=', '.join(sorted(frozen))))
+                    "The contract and billing period of an invoiced payment schedule line cannot "
+                    "be modified (%(fields)s).", fields=', '.join(sorted(frozen))))
         return super().write(vals)
 
     def unlink(self):
