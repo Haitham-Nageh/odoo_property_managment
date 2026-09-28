@@ -2539,3 +2539,13 @@ Occupancy cases A-G (under maintenance + no lease via both `action_terminate` an
 
 ### Still open (not decided here, per instruction)
 **Invoiced coverage after termination:** unchanged from the Phase 10.1.1 audit - an invoiced schedule line that extends past a termination date is never rewritten (a chatter note asks for accounting review) and, being invoiced, still blocks re-letting inside that period. This remains a business/accounting policy decision, not an implementation defect; Phase 10.1.2 deliberately does not touch the no-overlap constraint, termination behavior, or posted invoices.
+
+
+## Phase 10.1.3 — Occupancy Self-Healing (2026-09-28)
+
+**Status: Implemented, tested, validated. Dedicated tests: 4/4 passed (`TestPhase1013OccupancySelfHealing`). Relevant Phase 10.1.2 hardening tests: 16/16 passed (`TestPhase1012Hardening`). Known pre-existing/environmental failures remain documented. Phase status: CLOSED.**
+
+* **Implementation**: Added a narrow `write()` override to `edara.unit` in `models/edara_unit.py`. When `operational_status` is updated in `vals` away from `'under_maintenance'`, pre-filters units that were under maintenance prior to the write. After parent `super().write(vals)` persists the operational status update, calls `_sync_occupancy_from_contracts()` on affected records to self-heal unit occupancy status.
+* **Scope & Rule Enforcement**: Reuses existing `_sync_occupancy_from_contracts()` mechanism. Supports multi-record writes. Preserves the `under_maintenance + available` status consistency rule. Unrelated writes do not trigger occupancy resync.
+* **Tests**: Dedicated test file `tests/test_edara_phase1013_occupancy_self_healing.py` registered in `tests/__init__.py`. Tests self-healing after maintenance (Test A), no-op when already in sync (Test B), unrelated writes (Test C), and multi-record writes (Test D). All 4 passed cleanly.
+

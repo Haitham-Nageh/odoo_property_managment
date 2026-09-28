@@ -114,6 +114,16 @@ class EdaraUnit(models.Model):
             default['occupancy_status'] = 'available'
         return super().copy(default)
 
+    def write(self, vals):
+        units_clearing_maintenance = self.env['edara.unit']
+        if 'operational_status' in vals and vals.get('operational_status') != 'under_maintenance':
+            units_clearing_maintenance = self.filtered(lambda u: u.operational_status == 'under_maintenance')
+        res = super().write(vals)
+        if units_clearing_maintenance:
+            units_clearing_maintenance._sync_occupancy_from_contracts()
+        return res
+
+
     @api.constrains('occupancy_status', 'operational_status')
     def _check_status_consistency(self):
         for unit in self:
