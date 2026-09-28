@@ -17,8 +17,7 @@
         <field name="model">edara.dashboard</field>
         <field name="arch" type="xml">
             <form string="EDARA Dashboard" create="false" edit="false" delete="false">
-                <sheet>
-                    <div class="o_edara_dashboard">
+                <div class="o_edara_dashboard container-fluid">
                     <div class="oe_title">
                         <h1>EDARA Property Management</h1>
                         <p class="text-muted">Management Command Center - occupancy, leases, collections and maintenance at a glance.</p>
@@ -168,6 +167,13 @@
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="expired_contracts_count"/></span>
                                     <span class="o_stat_text">Expired</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-6">
+                            <button type="object" name="action_view_lease_timeline" class="oe_stat_button" icon="fa-tasks text-primary">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_text">Lease Timeline</span>
                                 </div>
                             </button>
                         </div>
@@ -346,7 +352,6 @@
                         </div>
                     </div>
                     </div>
-                </sheet>
             </form>
         </field>
     </record>

@@ -148,16 +148,34 @@ class TestEdaraLeaseContract(TransactionCase):
         self.assertEqual(new_contract.rent_amount, 1650)
         self.assertEqual(self.unit.occupancy_status, 'rented')
 
-    def test_kanban_and_calendar_views_load(self):
-        """MAT/UI-032 §9: new native Kanban/Calendar views for the Dashboard's
-        Lease Contract quick actions and Kanban/Calendar view mode."""
+    def test_kanban_calendar_and_gantt_views_load(self):
+        """MAT/UI-032 §9 & Phase 11.1: Native Kanban/Calendar/Gantt views for Lease Contracts."""
         action = self.env.ref('property_managment.action_edara_lease_contract')
         self.assertIn('kanban', action.view_mode)
         self.assertIn('calendar', action.view_mode)
+        self.assertIn('gantt', action.view_mode)
         kanban_view = self.env['edara.lease.contract'].get_view(view_type='kanban')
         self.assertTrue(kanban_view.get('arch'))
         calendar_view = self.env['edara.lease.contract'].get_view(view_type='calendar')
         self.assertTrue(calendar_view.get('arch'))
+        gantt_view = self.env['edara.lease.contract'].get_view(view_type='gantt')
+        self.assertTrue(gantt_view.get('arch'))
+
+    def test_lease_timeline_landing_action(self):
+        """Phase 11.1 Follow-up: Dedicated landing action for Lease Timeline (Gantt first)."""
+        timeline_action = self.env.ref('property_managment.action_edara_lease_timeline')
+        self.assertEqual(timeline_action.res_model, 'edara.lease.contract')
+        modes = [m.strip() for m in timeline_action.view_mode.split(',')]
+        self.assertEqual(modes[0], 'gantt')
+        self.assertIn('calendar', modes)
+
+        # Existing contracts action must remain list-first
+        contracts_action = self.env.ref('property_managment.action_edara_lease_contract')
+        contracts_modes = [m.strip() for m in contracts_action.view_mode.split(',')]
+        self.assertEqual(contracts_modes[0], 'list')
+
+
+
 
     def test_cannot_delete_activated_contract(self):
         contract = self._make_contract()

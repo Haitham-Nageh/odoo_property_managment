@@ -20,6 +20,13 @@
     margin-top: 28px;
 }
 
+/* Phase 11.1.1: Neutralize Bootstrap .row negative horizontal margins inside
+   .o_edara_dashboard to prevent +16px overflow scrolling beyond the container. */
+.o_edara_dashboard .row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
 /* Equal-height, equal-width grid: bootstrap's .row is already a flex
    container with align-items: stretch by default, so height: 100% on the
    card is enough to make every card in a row match the tallest one - no

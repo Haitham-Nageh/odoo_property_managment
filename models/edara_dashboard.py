@@ -315,6 +315,16 @@ class EdaraDashboard(models.TransientModel):
         today = fields.Date.context_today(self)
         return self._quick_action('action_edara_lease_contract', _expiring_soon_domain(today))
 
+    def action_view_lease_timeline(self):
+        """Phase 11.1: Native Gantt timeline quick action from Dashboard tile."""
+        action = self._quick_action('action_edara_lease_contract', [])
+        views = action.get('views', [])
+        gantt_entry = next((v for v in views if v[1] == 'gantt'), None)
+        if gantt_entry:
+            action['views'] = [gantt_entry] + [v for v in views if v[1] != 'gantt']
+        return action
+
+
     def action_view_maintenance_new(self):
         return self._quick_action('action_edara_maintenance_request', [('state', '=', 'new')])
 

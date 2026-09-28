@@ -58,6 +58,12 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(action['res_model'], 'edara.dashboard')
         self.assertTrue(action['res_id'])
 
+    def test_dashboard_form_view_contains_container_fluid(self):
+        """Phase 11.1 Follow-up: Dashboard wrapper must contain container-fluid to prevent horizontal overflow."""
+        form_view = self.env['edara.dashboard'].get_view(view_type='form')
+        self.assertIn('container-fluid', form_view['arch'])
+
+
     def test_dashboard_display_name_is_not_raw_model_id(self):
         """Dashboard UX Hardening 6.1 (2026-09-23): a TransientModel with no
         name/_rec_name field defaults display_name to "edara.dashboard,<id>"
@@ -319,6 +325,20 @@ class TestEdaraDashboard(TransactionCase):
             domain_count = self.env['edara.maintenance.request'].search_count(action['domain'])
             self.assertEqual(domain_count, dashboard[kpi_field], method_name)
 
+    def test_action_view_lease_timeline(self):
+        """Phase 11.1: Dashboard quick action for Lease Timeline (Gantt view first)."""
+        dashboard = self.env['edara.dashboard'].create({})
+        action = dashboard.action_view_lease_timeline()
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'edara.lease.contract')
+        self.assertEqual(action['domain'], [])
+        self.assertTrue(action.get('views'))
+        self.assertEqual(action['views'][0][1], 'gantt')
+
+        # Verify underlying contracts action default view mode ordering is unchanged (starts with list)
+        base_action = self.env.ref('property_managment.action_edara_lease_contract')
+        self.assertEqual(base_action.view_mode.split(',')[0], 'list')
+
     def test_new_non_accounting_quick_actions_work_for_viewer(self):
         """A Viewer (no native Accounting group) must be able to invoke every
         non-Collections quick action added by this hardening pass without
@@ -330,9 +350,10 @@ class TestEdaraDashboard(TransactionCase):
         dashboard = self.env['edara.dashboard'].with_user(viewer).create({})
         for method_name in ('action_view_properties', 'action_view_buildings', 'action_view_renewals_pending',
                              'action_view_maintenance_open', 'action_view_maintenance_sla_at_risk',
-                             'action_view_maintenance_sla_breached'):
+                             'action_view_maintenance_sla_breached', 'action_view_lease_timeline'):
             action = getattr(dashboard, method_name)()
             self.assertEqual(action['type'], 'ir.actions.act_window', method_name)
+
 
     def test_schedule_quick_actions_open_correct_view_for_accounting_user(self):
         dashboard = self.env['edara.dashboard'].create({})

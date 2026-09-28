@@ -19,6 +19,7 @@ top of native Odoo Accounting, Portal, Contacts and Security.
         'mail',
         'portal',
         'account',
+        'web_gantt',
     ],
     'data': [
         'security/edara_security.xml',

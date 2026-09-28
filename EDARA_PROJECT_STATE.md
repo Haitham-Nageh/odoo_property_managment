@@ -5,7 +5,9 @@ Module: `property_managment`
 Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 
 ## Current Phase
-None — all 16 phases (0-15) complete. See "Final Validation Status" at the end of this file.
+- Phase 11.1 — Native Lease Timeline: functionally completed
+- Phase 11.1.1 — Dashboard Horizontal Overflow Fix: completed
+- Phase 11.2 — Arabic Localization: PLANNED / NOT IMPLEMENTED (next phase)
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2548,4 +2550,57 @@ Occupancy cases A-G (under maintenance + no lease via both `action_terminate` an
 * **Implementation**: Added a narrow `write()` override to `edara.unit` in `models/edara_unit.py`. When `operational_status` is updated in `vals` away from `'under_maintenance'`, pre-filters units that were under maintenance prior to the write. After parent `super().write(vals)` persists the operational status update, calls `_sync_occupancy_from_contracts()` on affected records to self-heal unit occupancy status.
 * **Scope & Rule Enforcement**: Reuses existing `_sync_occupancy_from_contracts()` mechanism. Supports multi-record writes. Preserves the `under_maintenance + available` status consistency rule. Unrelated writes do not trigger occupancy resync.
 * **Tests**: Dedicated test file `tests/test_edara_phase1013_occupancy_self_healing.py` registered in `tests/__init__.py`. Tests self-healing after maintenance (Test A), no-op when already in sync (Test B), unrelated writes (Test C), and multi-record writes (Test D). All 4 passed cleanly.
+
+
+## Phase 11.1 — Native Lease Timeline (2026-09-28)
+
+**Status: Functionally completed, tested, verified on dev DB `odoo19_enterprise_dev`. 56/56 targeted tests passing.**
+
+* **Enterprise dependency**: Added `web_gantt` to `__manifest__.py` `depends` list.
+* **Lease Contract Gantt & Calendar**: Added native Gantt (`date_start="start_date"`, `date_stop="end_date"`, `default_group_by="unit_id"`, `state="state"`) and Calendar (`date_start="start_date"`, `date_stop="end_date"`, `color="unit_id"`) views in `views/contract_views.xml`.
+* **Timeline Landing Action & Menu**: Added dedicated act_window `action_edara_lease_timeline` defaulting to Gantt (`gantt,calendar,list,form`) and added menu entry under Operations menu.
+* **Dashboard Wrapper**: Updated `<div class="o_edara_dashboard container-fluid">` in `views/dashboard_views.xml`.
+
+
+## Phase 11.1.1 — EDARA Dashboard Layout & Horizontal Overflow Fix (2026-09-28)
+
+**Status: Implemented, tested, verified. 56/56 targeted tests passing. Manually verified in real Odoo UI by user — CONFIRMED FIXED.**
+
+* **Horizontal Overflow Fix**: Added a dashboard-scoped CSS rule in `static/src/css/edara_dashboard.css`:
+  ```css
+  .o_edara_dashboard .row {
+      margin-left: 0;
+      margin-right: 0;
+  }
+  ```
+  to neutralize Bootstrap `.row` negative horizontal margins inside `.o_edara_dashboard`, eliminating the +16px horizontal overflow scrolling without using `overflow-x: hidden` or modifying view XML layout structures.
+* **Form Layout & Vertical Scrollbar Fix**: Removed the `<sheet>` opening and `</sheet>` closing wrapper tags from `views/dashboard_views.xml` surrounding `.o_edara_dashboard`. Odoo 19's form view compiler applies native `o_form_nosheet` full-width rendering, removing the constrained `.o_form_sheet` paper card boundary and moving the vertical scrollbar to the far right edge of `.o_content`.
+* **Verification**: Targeted tests passed cleanly (56/56 post-tests). Manually verified in real Odoo UI by the user (scrollbar position, full width rendering, and horizontal overflow absence confirmed).
+
+
+## Phase 11.2 — Arabic Localization
+
+**Status: PLANNED / NOT IMPLEMENTED**
+
+Requirement: EDARA PMS must support Arabic localization as a first-class Odoo language while preserving English as the source/default language.
+
+Scope recorded for future implementation:
+* Odoo-native Arabic translation support
+* `i18n/ar.po`
+* Menus
+* Actions
+* Views
+* Field labels
+* Selection values
+* Status labels
+* Buttons
+* Dashboard labels
+* Lease Timeline / Gantt / Calendar labels where applicable
+* Python-generated translatable strings
+* Empty-state/help text
+* RTL compatibility
+* Arabic UI verification
+* Ensure English source strings remain intact
+* Do not hardcode Arabic directly into Python/XML when an Odoo translation should be used
+
 

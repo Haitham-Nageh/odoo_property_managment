@@ -67,17 +67,9 @@
     </record>
 
     <!--
-        MAT/UI-032 §9/§10 - Kanban (workflow visualization, same pattern as
-        the existing maintenance_request/renewal_request kanbans) and
-        Calendar (lease start/end timeline - the closest native substitute
-        for a Gantt view). A true Gantt view was investigated and is NOT
-        implemented: the `web_gantt` module (Odoo Enterprise) does not exist
-        anywhere in this Odoo 19 Community installation's addons paths -
-        confirmed by inspecting the addons directories, no `<gantt>` view
-        type is registered at all. Adding a <gantt> view arch without that
-        module would break module installation, not just degrade gracefully.
-        This mirrors the project's existing Phase 12 precedent (2D-only unit
-        kanban, no 3D - "avoid unnecessary third-party dependencies").
+        Kanban (workflow visualization), Calendar (month-view timeline), and
+        Gantt (native Enterprise timeline visualization grouped by unit,
+        powered by web_gantt).
     -->
     <record id="view_edara_lease_contract_kanban" model="ir.ui.view">
         <field name="name">edara.lease.contract.kanban</field>
@@ -107,6 +99,23 @@
                 <field name="tenant_id"/>
                 <field name="state"/>
             </calendar>
+        </field>
+    </record>
+
+    <record id="view_edara_lease_contract_gantt" model="ir.ui.view">
+        <field name="name">edara.lease.contract.gantt</field>
+        <field name="model">edara.lease.contract</field>
+        <field name="arch" type="xml">
+            <gantt string="Lease Contracts Timeline"
+                   date_start="start_date"
+                   date_stop="end_date"
+                   default_group_by="unit_id"
+                   color="state">
+                <field name="name"/>
+                <field name="tenant_id"/>
+                <field name="unit_id"/>
+                <field name="state"/>
+            </gantt>
         </field>
     </record>
 
@@ -188,7 +197,19 @@
     <record id="action_edara_lease_contract" model="ir.actions.act_window">
         <field name="name">Lease Contracts</field>
         <field name="res_model">edara.lease.contract</field>
-        <field name="view_mode">list,kanban,calendar,form</field>
+        <field name="view_mode">list,kanban,calendar,gantt,form</field>
+        <field name="search_view_id" ref="view_edara_lease_contract_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">
+                Create your first lease contract
+            </p>
+        </field>
+    </record>
+
+    <record id="action_edara_lease_timeline" model="ir.actions.act_window">
+        <field name="name">Lease Timeline</field>
+        <field name="res_model">edara.lease.contract</field>
+        <field name="view_mode">gantt,calendar,list,kanban,form</field>
         <field name="search_view_id" ref="view_edara_lease_contract_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">

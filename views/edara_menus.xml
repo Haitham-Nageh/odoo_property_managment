@@ -3,8 +3,11 @@
     <menuitem id="menu_edara_root" name="EDARA Property Management" groups="group_edara_viewer"
               web_icon="property_managment,static/description/icon.png"/>
 
+    <menuitem id="menu_edara_lease_timeline" name="Lease Timeline" parent="menu_edara_root"
+              action="action_edara_lease_timeline" sequence="5"/>
+
     <menuitem id="menu_edara_dashboard" name="Dashboard" parent="menu_edara_root"
-              action="action_edara_dashboard_open" sequence="5"/>
+              action="action_edara_dashboard_open" sequence="6"/>
 
     <menuitem id="menu_edara_property" name="Properties" parent="menu_edara_root"
               action="action_edara_property" sequence="10"/>
