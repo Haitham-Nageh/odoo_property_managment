@@ -7,7 +7,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 ## Current Phase
 - Phase 11.1 — Native Lease Timeline: functionally completed
 - Phase 11.1.1 — Dashboard Horizontal Overflow Fix: completed
-- Phase 11.2 — Arabic Localization: PLANNED / NOT IMPLEMENTED (next phase)
+- Phase 11.2 — Arabic Localization: COMPLETED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2580,27 +2580,26 @@ Occupancy cases A-G (under maintenance + no lease via both `action_terminate` an
 
 ## Phase 11.2 — Arabic Localization
 
-**Status: PLANNED / NOT IMPLEMENTED**
+**Status: COMPLETED**
 
-Requirement: EDARA PMS must support Arabic localization as a first-class Odoo language while preserving English as the source/default language.
-
-Scope recorded for future implementation:
-* Odoo-native Arabic translation support
-* `i18n/ar.po`
-* Menus
-* Actions
-* Views
-* Field labels
-* Selection values
-* Status labels
-* Buttons
-* Dashboard labels
-* Lease Timeline / Gantt / Calendar labels where applicable
-* Python-generated translatable strings
-* Empty-state/help text
-* RTL compatibility
-* Arabic UI verification
-* Ensure English source strings remain intact
-* Do not hardcode Arabic directly into Python/XML when an Odoo translation should be used
+- Odoo Arabic language: `ar_001`
+- ISO/base language: `ar`
+- Direction: RTL
+- Translation file: `property_managment/i18n/ar.po`
+- Catalog entries: 734
+- Arabic translations: 731
+- Intentionally preserved technical terms:
+  - HVAC
+  - SLA
+  - sqm
+- Portal Selection rendering corrected using `t-field` (5 instances in `views/portal_templates.xml`)
+- Arabic runtime loading verified
+- Unit Number corrected from `الوحدة Number` to `رقم الوحدة`
+- English regression: none
+- Localization tests: 483 passed
+- Translation QA:
+  - Critical: 0
+  - Major: 0
+  - Minor: 0
 
 

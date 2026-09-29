@@ -76,7 +76,7 @@
                         <td><span t-field="contract.start_date"/></td>
                         <td><span t-field="contract.end_date"/></td>
                         <td><span t-field="contract.rent_amount" t-options="{'widget': 'monetary', 'display_currency': contract.currency_id}"/></td>
-                        <td><span t-out="contract.state"/></td>
+                        <td><span t-field="contract.state"/></td>
                     </tr>
                 </tbody>
             </t>
@@ -94,7 +94,7 @@
                         <tr><td>Start Date</td><td><span t-field="contract.start_date"/></td></tr>
                         <tr><td>End Date</td><td><span t-field="contract.end_date"/></td></tr>
                         <tr><td>Rent</td><td><span t-field="contract.rent_amount" t-options="{'widget': 'monetary', 'display_currency': contract.currency_id}"/></td></tr>
-                        <tr><td>Status</td><td><t t-out="contract.state"/></td></tr>
+                        <tr><td>Status</td><td><t t-field="contract.state"/></td></tr>
                     </table>
 
                     <t t-if="contract.state == 'active' and not open_renewal">
@@ -147,7 +147,7 @@
                                     <td><span t-field="renewal.create_date"/></td>
                                     <td><span t-field="renewal.requested_end_date"/></td>
                                     <td><span t-field="renewal.requested_rent_amount" t-options="{'widget': 'monetary', 'display_currency': renewal.currency_id}"/></td>
-                                    <td><t t-out="renewal.state"/></td>
+                                    <td><t t-field="renewal.state"/></td>
                                 </tr>
                             </tbody>
                         </t>
@@ -181,7 +181,7 @@
                         <td><t t-out="maintenance_request.title"/></td>
                         <td><t t-out="maintenance_request.unit_id.display_name"/></td>
                         <td><t t-out="maintenance_request.priority"/></td>
-                        <td><t t-out="maintenance_request.state"/></td>
+                        <td><t t-field="maintenance_request.state"/></td>
                     </tr>
                 </tbody>
             </t>
@@ -232,7 +232,7 @@
             <table class="table table-sm">
                 <tr><td>Unit</td><td><t t-out="maintenance_request.unit_id.display_name"/></td></tr>
                 <tr><td>Priority</td><td><t t-out="maintenance_request.priority"/></td></tr>
-                <tr><td>Status</td><td><t t-out="maintenance_request.state"/></td></tr>
+                <tr><td>Status</td><td><t t-field="maintenance_request.state"/></td></tr>
                 <tr><td>Requested On</td><td><span t-field="maintenance_request.requested_date"/></td></tr>
                 <tr t-if="maintenance_request.completed_date">
                     <td>Completed On</td><td><span t-field="maintenance_request.completed_date"/></td>

@@ -344,3 +344,21 @@ class TestEdaraPortal(HttpCase):
         self.authenticate('edara_tenant_a', 'edara_tenant_a')
         response = self.url_open('/my/units/%d' % unit_company_b.id)
         self.assertNotIn(unit_company_b.name, response.text)
+
+    # ---- Localization / Selection Rendering Regression Test ----
+
+    def test_portal_selection_rendering_uses_t_field(self):
+        """Verify that portal templates use t-field instead of raw t-out for selection fields."""
+        templates = [
+            'property_managment.portal_my_leases',
+            'property_managment.portal_lease_detail',
+            'property_managment.portal_my_maintenance',
+            'property_managment.portal_maintenance_detail',
+        ]
+        for template_xml_id in templates:
+            view = self.env.ref(template_xml_id)
+            arch = view.arch
+            self.assertNotIn('t-out="contract.state"', arch)
+            self.assertNotIn('t-out="renewal.state"', arch)
+            self.assertNotIn('t-out="maintenance_request.state"', arch)
+
