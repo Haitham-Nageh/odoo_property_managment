@@ -1,6 +1,6 @@
 from datetime import date
 
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -81,6 +81,54 @@ class TestEdaraRenewalRequest(TransactionCase):
         request.action_approve()
         self.assertEqual(request.state, 'approved')
         self.assertTrue(request.new_contract_id)
+
+    # ===================== Renewal Requested Rent Positivity (Phase 12.3) =====================
+
+    def test_zero_requested_rent_rejected(self):
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id, 'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract.action_activate()
+        with self.assertRaises(ValidationError):
+            self.env['edara.renewal.request'].create({
+                'contract_id': contract.id,
+                'requested_start_date': date(2027, 1, 1),
+                'requested_end_date': date(2027, 12, 31),
+                'requested_rent_amount': 0,
+            })
+
+    def test_negative_requested_rent_rejected(self):
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id, 'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract.action_activate()
+        with self.assertRaises(ValidationError):
+            self.env['edara.renewal.request'].create({
+                'contract_id': contract.id,
+                'requested_start_date': date(2027, 1, 1),
+                'requested_end_date': date(2027, 12, 31),
+                'requested_rent_amount': -100,
+            })
+
+    def test_valid_requested_rent_succeeds(self):
+        request = self._make_submitted_request()
+        self.assertEqual(request.requested_rent_amount, 1050)
+
+    def test_existing_action_renew_zero_or_negative_rent_rejected(self):
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id, 'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract.action_activate()
+        with self.assertRaises(ValidationError):
+            contract.action_renew(date(2027, 1, 1), date(2027, 12, 31), 0)
+        with self.assertRaises(ValidationError):
+            contract.action_renew(date(2027, 1, 1), date(2027, 12, 31), -100)
 
 
 @tagged('post_install', '-at_install')

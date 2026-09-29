@@ -66,6 +66,12 @@ class EdaraRenewalRequest(models.Model):
             if request.requested_end_date < request.requested_start_date:
                 raise ValidationError(_("The requested end date cannot be before the requested start date."))
 
+    @api.constrains('requested_rent_amount')
+    def _check_requested_rent_amount(self):
+        for request in self:
+            if request.requested_rent_amount <= 0:
+                raise ValidationError(_("The requested rent must be a positive amount."))
+
     def action_approve(self):
         for request in self:
             if request.state != 'submitted':
