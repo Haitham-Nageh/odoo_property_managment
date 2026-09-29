@@ -154,6 +154,13 @@ class EdaraUnit(models.Model):
                     "reserved for a future start date - use Reserved instead.",
                     unit=unit.display_name,
                 ))
+            if unit.occupancy_status in ('sold', 'owner_occupied') and unit._has_current_active_contract():
+                raise ValidationError(self.env._(
+                    "%(unit)s cannot be marked %(status)s while it still has a currently active "
+                    "lease contract covering today. Terminate or end the lease first.",
+                    unit=unit.display_name,
+                    status=dict(OCCUPANCY_STATUSES)[unit.occupancy_status],
+                ))
 
     def _has_current_active_contract(self):
         """Whether this unit has an active-state lease contract whose date range

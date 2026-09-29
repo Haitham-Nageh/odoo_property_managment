@@ -8,6 +8,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 11.1 — Native Lease Timeline: functionally completed
 - Phase 11.1.1 — Dashboard Horizontal Overflow Fix: completed
 - Phase 11.2 — Arabic Localization: COMPLETED
+- Phase 12.1 — Unit Occupancy / Lifecycle Integrity: COMPLETED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2603,3 +2604,29 @@ Occupancy cases A-G (under maintenance + no lease via both `action_terminate` an
   - Minor: 0
 
 
+## Phase 12.1 — Unit Occupancy / Lifecycle Integrity
+
+Status:
+COMPLETED
+
+Problem:
+Units with a currently active lease could previously be manually changed to `sold` or `owner_occupied`, creating a contradiction between the lease lifecycle and unit occupancy state.
+
+Implemented:
+- Added reverse-direction occupancy validation.
+- `sold` and `owner_occupied` are now blocked when a current active lease covers today.
+- Future/scheduled leases do not block these administrative occupancy states.
+- Existing `rented` / `available` / maintenance / occupancy-sync behavior remains unchanged.
+
+Files:
+- `models/edara_unit.py`
+- `tests/test_edara_phase10_lease_engine.py`
+
+Verification:
+- Targeted + broader automated tests: 145 passed, 0 failed, 0 errors.
+- Live Odoo verification: PASSED.
+- Current active lease → SOLD blocked.
+- Current active lease → OWNER_OCCUPIED blocked.
+- No current active lease → both allowed.
+- Future scheduled lease → both allowed.
+- Temporary live verification records rolled back successfully.

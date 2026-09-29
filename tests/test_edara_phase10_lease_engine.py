@@ -518,6 +518,30 @@ class TestLeaseDateAndScheduleEngine(TransactionCase):
         with self.assertRaises(UserError):
             self._live(self.today, self.today + timedelta(days=30), unit=unit)
 
+    def test_active_lease_blocks_setting_unit_to_sold_or_owner_occupied(self):
+        unit = self._unit()
+        self._live(self.today - timedelta(days=10), self.today + timedelta(days=100), unit=unit)
+        with self.assertRaises(ValidationError):
+            unit.occupancy_status = 'sold'
+        with self.assertRaises(ValidationError):
+            unit.occupancy_status = 'owner_occupied'
+
+    def test_no_active_lease_allows_setting_unit_to_sold_or_owner_occupied(self):
+        unit = self._unit()
+        unit.occupancy_status = 'sold'
+        self.assertEqual(unit.occupancy_status, 'sold')
+        unit.occupancy_status = 'owner_occupied'
+        self.assertEqual(unit.occupancy_status, 'owner_occupied')
+
+    def test_future_scheduled_lease_allows_setting_unit_to_sold_or_owner_occupied(self):
+        unit = self._unit()
+        future = self._live(self.today + timedelta(days=10), self.today + timedelta(days=100), unit=unit)
+        self.assertEqual(future.state, 'scheduled')
+        unit.occupancy_status = 'sold'
+        self.assertEqual(unit.occupancy_status, 'sold')
+        unit.occupancy_status = 'owner_occupied'
+        self.assertEqual(unit.occupancy_status, 'owner_occupied')
+
     # ---------------- migration ----------------
 
     def test_state_migration_is_idempotent_and_touches_states_only(self):
