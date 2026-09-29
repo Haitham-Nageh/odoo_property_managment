@@ -129,6 +129,16 @@ msgstr "لا يمكن أن تكون الوحدة %(unit)s 'متاحة' طالم�
 #. odoo-python
 #: code:addons/property_managment/models/edara_unit.py:0
 msgid ""
+"%(unit)s cannot be marked %(status)s while it still has a currently active "
+"lease contract covering today. Terminate or end the lease first."
+msgstr ""
+"لا يمكن تعيين الوحدة %(unit)s بالحالة %(status)s ما دام لديها عقد إيجار "
+"نشط حاليًا يشمل تاريخ اليوم. يجب إنهاء عقد الإيجار أو إنهاؤه أولًا."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_unit.py:0
+msgid ""
 "%(unit)s cannot be marked Available while it has an active lease contract "
 "reserved for a future start date - use Reserved instead."
 msgstr ""
@@ -1068,6 +1078,16 @@ msgstr "الرمز"
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_deposit_form
 msgid "Collect Deposit"
 msgstr "تحصيل مبلغ التأمين"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_deposit.py:0
+msgid ""
+"Collecting %(amount)s would bring the total collected to %(total)s, "
+"exceeding the configured deposit amount of %(configured)s for this lease."
+msgstr ""
+"لا يمكن تحصيل %(amount)s لأن إجمالي المبلغ المحصل سيصبح %(total)s، متجاوزًا "
+"مبلغ التأمين المحدد وقدره %(configured)s لهذا العقد."
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
