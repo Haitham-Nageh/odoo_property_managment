@@ -8,8 +8,9 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 11.1 — Native Lease Timeline: functionally completed
 - Phase 11.1.1 — Dashboard Horizontal Overflow Fix: completed
 - Phase 11.2 — Arabic Localization: COMPLETED
-- Phase 12.1 — Unit Occupancy / Lifecycle Integrity: COMPLETED
-- Phase 12.2 — Financial Lifecycle Integrity: Security Deposits: COMPLETED
+- Phase 12.1 — Unit Occupancy / Lifecycle Integrity: CLOSED
+- Phase 12.2 — Financial Lifecycle Integrity: Security Deposit Collection: CLOSED
+- Phase 12.3 — Renewal Rule Correctness: CLOSED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2607,16 +2608,20 @@ Occupancy cases A-G (under maintenance + no lease via both `action_terminate` an
 
 ## Phase 12.1 — Unit Occupancy / Lifecycle Integrity
 
-Status:
-COMPLETED
+Status: CLOSED
+
+Commit: `28904f8a3b36ceb89a6a47aa9d0c80570d076fdd`
+Message: `[Phase 12.1] Enforce occupancy integrity with active leases`
 
 Problem:
 Units with a currently active lease could previously be manually changed to `sold` or `owner_occupied`, creating a contradiction between the lease lifecycle and unit occupancy state.
 
 Implemented:
 - Added reverse-direction occupancy validation.
-- `sold` and `owner_occupied` are now blocked when a current active lease covers today.
-- Future/scheduled leases do not block these administrative occupancy states.
+- Prevent marking a unit `sold` while it has a currently active lease.
+- Prevent marking a unit `owner_occupied` while it has a currently active lease.
+- Current active lease is the only blocking condition.
+- Future scheduled leases do not block `sold` or `owner_occupied`.
 - Existing `rented` / `available` / maintenance / occupancy-sync behavior remains unchanged.
 
 Files:
@@ -2625,7 +2630,7 @@ Files:
 
 Verification:
 - Targeted + broader automated tests: 145 passed, 0 failed, 0 errors.
-- Live Odoo verification: PASSED.
+- Live Odoo UI smoke verification: PASSED.
 - Current active lease → SOLD blocked.
 - Current active lease → OWNER_OCCUPIED blocked.
 - No current active lease → both allowed.
@@ -2633,18 +2638,21 @@ Verification:
 - Temporary live verification records rolled back successfully.
 
 
-### Phase 12.2 — Financial Lifecycle Integrity: Security Deposits
+## Phase 12.2 — Financial Lifecycle Integrity: Security Deposit Collection
 
-Status: COMPLETED
+Status: CLOSED
+
+Commit: `e604977a32def5ba104a363a396e6d33c8786ce4`
+Message: `[Phase 12.2] Enforce security deposit collection cap`
 
 Problem:
 Security deposit collection did not prevent cumulative collections from exceeding the configured deposit amount.
 
 Implemented:
-- Added cumulative collection cap validation inside `edara.deposit.action_collect()`.
+- Added cumulative collection cap validation inside `edara.deposit.action_collect()` (`amount_held + new_collection <= deposit.amount`).
 - Partial collection remains supported.
 - Exact collection up to the configured deposit amount is allowed.
-- Any collection that would make cumulative `amount_held` exceed `deposit.amount` is blocked.
+- Any collection that would make cumulative `amount_held` exceed `deposit.amount` is blocked before transaction/payment creation.
 - Validation occurs before creation of `edara.deposit.transaction` and native `account.payment`.
 - Existing refund/deduction behavior remains unchanged.
 
@@ -2654,18 +2662,68 @@ Files:
 
 Verification:
 - `TestEdaraDeposit`: 33 passed, 0 failed, 0 errors.
-- Manual UI smoke test passed.
-- Partial collection passed.
-- Over-cap collection blocked.
-- Exact boundary collection passed.
-- Phase 12.1 regression smoke test passed.
-- No persistent test data was intentionally created during verification.
+- Manual UI smoke test passed:
+  - 2,000 / 3,000 collected successfully
+  - 1,001 over-cap blocked
+  - 1,000 remaining collection succeeded
+  - Final amount held = 3,000.
+- Module regression remained clean.
+- No persistent test data was created.
 
 Deferred findings:
 - `edara.deposit.amount` remains editable after collection.
 - Cancelled/reversed native payments may still count toward `amount_held`.
 - Concurrent collection race condition remains a future consideration.
 - Existing historical over-collected data is not retroactively validated.
+(These findings are intentionally OUT OF SCOPE for Phase 12.2).
 
-These findings are intentionally OUT OF SCOPE for Phase 12.2 and must NOT be implemented now.
+
+## Phase 12.3 — Renewal Rule Correctness
+
+Status: CLOSED
+
+Commit: `201b258fd49324394afd28fdf024614235e762c0`
+Message: `[Phase 12.3] Enforce positive renewal rent`
+
+Problem:
+Zero or negative values could previously be stored in `edara.renewal.request.requested_rent_amount`.
+
+Implemented:
+- Added model-level `@api.constrains('requested_rent_amount')` validation on `edara.renewal.request`.
+- Renewal request rent must be strictly positive (`requested_rent_amount > 0`).
+- Zero and negative requested renewal rent are rejected with a `ValidationError`.
+- Valid positive renewal rent remains supported.
+- Existing `action_renew()` validation remains unchanged.
+- No changes to wizard, portal, views, accounting, or renewal workflow.
+
+Files:
+- `models/edara_renewal_request.py`
+- `tests/test_edara_renewal_request.py`
+
+Verification:
+- Focused renewal request tests: 14 passed, 0 failed, 0 errors.
+- Module regression suite: 498 post-install tests, 0 failures/errors.
+
+
+### Arabic Runtime Translation Follow-up
+
+Status: CLOSED
+
+Commit: `ca8c021a2ca248f037d7887fc98b10ecdba2b9f6`
+Message: `[Localization] Add Arabic runtime translations for Phase 12.1-12.2`
+
+Implemented:
+- Added missing Arabic runtime translations for new user-facing messages from Phase 12.1 and Phase 12.2:
+  1. Security deposit over-collection message (Phase 12.2).
+  2. Unit occupancy integrity message (Phase 12.1).
+
+Files:
+- `i18n/ar.po` (1 file changed, 20 insertions)
+
+Verification:
+- Exact msgids.
+- Exact placeholders preserved (`%(amount)s`, `%(total)s`, `%(configured)s`, `%(unit)s`, `%(status)s`).
+- Valid PO structure (0 fuzzy/obsolete entries).
+- No unrelated translations modified.
+
 
