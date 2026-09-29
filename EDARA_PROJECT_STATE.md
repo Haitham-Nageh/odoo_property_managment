@@ -9,6 +9,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 11.1.1 — Dashboard Horizontal Overflow Fix: completed
 - Phase 11.2 — Arabic Localization: COMPLETED
 - Phase 12.1 — Unit Occupancy / Lifecycle Integrity: COMPLETED
+- Phase 12.2 — Financial Lifecycle Integrity: Security Deposits: COMPLETED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2630,3 +2631,41 @@ Verification:
 - No current active lease → both allowed.
 - Future scheduled lease → both allowed.
 - Temporary live verification records rolled back successfully.
+
+
+### Phase 12.2 — Financial Lifecycle Integrity: Security Deposits
+
+Status: COMPLETED
+
+Problem:
+Security deposit collection did not prevent cumulative collections from exceeding the configured deposit amount.
+
+Implemented:
+- Added cumulative collection cap validation inside `edara.deposit.action_collect()`.
+- Partial collection remains supported.
+- Exact collection up to the configured deposit amount is allowed.
+- Any collection that would make cumulative `amount_held` exceed `deposit.amount` is blocked.
+- Validation occurs before creation of `edara.deposit.transaction` and native `account.payment`.
+- Existing refund/deduction behavior remains unchanged.
+
+Files:
+- `models/edara_deposit.py`
+- `tests/test_edara_deposit.py`
+
+Verification:
+- `TestEdaraDeposit`: 33 passed, 0 failed, 0 errors.
+- Manual UI smoke test passed.
+- Partial collection passed.
+- Over-cap collection blocked.
+- Exact boundary collection passed.
+- Phase 12.1 regression smoke test passed.
+- No persistent test data was intentionally created during verification.
+
+Deferred findings:
+- `edara.deposit.amount` remains editable after collection.
+- Cancelled/reversed native payments may still count toward `amount_held`.
+- Concurrent collection race condition remains a future consideration.
+- Existing historical over-collected data is not retroactively validated.
+
+These findings are intentionally OUT OF SCOPE for Phase 12.2 and must NOT be implemented now.
+

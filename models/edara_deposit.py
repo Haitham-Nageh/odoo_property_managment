@@ -89,6 +89,14 @@ class EdaraDeposit(models.Model):
         amount = self._default_transaction_amount('held') if amount is None else amount
         if amount <= 0:
             raise UserError(_("There is nothing left to collect for this deposit."))
+        if self.amount_held + amount > self.amount:
+            raise UserError(_(
+                "Collecting %(amount)s would bring the total collected to %(total)s, exceeding "
+                "the configured deposit amount of %(configured)s for this lease.",
+                amount=amount,
+                total=self.amount_held + amount,
+                configured=self.amount,
+            ))
         transaction = self.env['edara.deposit.transaction'].create({
             'deposit_id': self.id,
             'transaction_type': 'held',

@@ -198,6 +198,75 @@ class TestEdaraDeposit(TransactionCase):
         self.assertEqual(deposit.balance, 1500)
         self.assertEqual(deposit.state, 'held')
 
+    # ===================== Cumulative Collection Cap (Phase 12.2) =====================
+
+    def test_partial_collection_succeeds(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 300)
+        self.assertEqual(deposit.amount_held, 300)
+        self.assertEqual(deposit.balance, 300)
+
+    def test_exact_full_collection_succeeds(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 500)
+        self.assertEqual(deposit.amount_held, 500)
+        self.assertEqual(deposit.balance, 500)
+
+    def test_single_over_collection_blocked(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        payments_before = self.env['account.payment'].search_count([])
+        with self.assertRaises(UserError):
+            deposit.action_collect(self.cash_journal.id, 600)
+        self.assertEqual(len(deposit.transaction_ids), 0)
+        self.assertEqual(self.env['account.payment'].search_count([]), payments_before)
+        self.assertEqual(deposit.amount_held, 0)
+
+    def test_multiple_collections_reaching_exact_cap(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 300)
+        deposit.action_collect(self.cash_journal.id, 200)
+        self.assertEqual(deposit.amount_held, 500)
+        self.assertEqual(deposit.balance, 500)
+
+    def test_multiple_collections_exceeding_cap_blocked(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 300)
+        with self.assertRaises(UserError):
+            deposit.action_collect(self.cash_journal.id, 300)
+        self.assertEqual(len(deposit.transaction_ids), 1)
+        self.assertEqual(deposit.amount_held, 300)
+
+    def test_collection_after_reaching_cap_blocked(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 500)
+        with self.assertRaises(UserError):
+            deposit.action_collect(self.cash_journal.id, 1)
+        self.assertEqual(deposit.amount_held, 500)
+
+    def test_zero_or_negative_collection_amount_blocked(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        with self.assertRaises(UserError):
+            deposit.action_collect(self.cash_journal.id, 0)
+        with self.assertRaises(UserError):
+            deposit.action_collect(self.cash_journal.id, -50)
+
+    def test_refund_does_not_reopen_collection_capacity(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 500)
+        deposit.action_refund(self.cash_journal.id, 500)
+        self.assertEqual(deposit.balance, 0)
+        with self.assertRaises(UserError):
+            deposit.action_collect(self.cash_journal.id, 1)
+        self.assertEqual(deposit.amount_held, 500)
+
     # ===================== Chatter (Product Readiness Review, 2026-09-22) =====================
     # Spec §43 names Deposit alongside Property/Unit/Lease Contract/Maintenance
     # Request as a record that should carry chatter - it was the one business
