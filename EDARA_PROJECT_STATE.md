@@ -19,7 +19,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.8 — Unit UX and Default Lease Rent: CLOSED
 - Phase 12.9 — Service Charge Area Validation: CLOSED
 - Phase 12.10 — Mixed-Currency Overdue UX & Security Deposit Mutability: CLOSED
-- Phase 12 Audit Stream: 10/10 findings addressed; remaining open environment item: wkhtmltopdf configuration
+- Phase 12 Audit Stream: CLOSED (all findings addressed; wkhtmltopdf environment configuration RESOLVED & verified)
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -3118,14 +3118,26 @@ Closure:
 
 ### Deferred Finding C — wkhtmltopdf Development Environment
 - **Classification**: Development Environment Setup / Configuration (EDARA bug: No).
-- **Status**: OPEN.
+- **Status**: RESOLVED (Environment Configuration & Live Verification).
 - **Observed Behavior**: Warning message `تعذّر إيجاد Wkhtmltopdf في نظامك. لا يمكن إنشاء ملف PDF.` on PDF export attempts in local environment.
-- **Known Facts**:
-  - Odoo 19 uses wkhtmltopdf for PDF report generation in this environment.
-  - `wkhtmltopdf.exe` exists on the machine (`version 0.12.6 (with patched qt)`).
-  - Odoo currently cannot discover it through the active development configuration (`D:\Odoo\Projects\Odoo 19.0e.20260801\config\odoo-enterprise-dev.conf`).
-  - Next step is an environment/configuration fix so Odoo can locate wkhtmltopdf, followed by UI/portal verification of actual PDF generation.
-  - This is an environment/configuration issue, not an EDARA business-model/code defect.
+- **Root Cause & Technical Details**:
+  - Odoo 19 uses `wkhtmltopdf` for PDF report generation in this environment.
+  - `wkhtmltopdf.exe` existed on the workstation at `C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe` (`version 0.12.6 (with patched qt)`), but was not on the system PATH.
+  - Odoo's binary discovery chain (`get_wkhtmltopdf_state()` → `_wkhtml()` → `find_in_path('wkhtmltopdf')`) checks `config['bin_path']`.
+  - In Odoo, `bin_path` must point to the **containing directory**, NOT the `.exe` file path itself.
+- **Resolution**:
+  - Added the directory path to the active development configuration (`D:\Odoo\Projects\Odoo 19.0e.20260801\config\odoo-enterprise-dev.conf`):
+    ```ini
+    bin_path = C:\Program Files\wkhtmltopdf\bin
+    ```
+  - Zero EDARA module code, views, or Odoo core files were modified.
+- **Verification Results**:
+  - **Odoo Detection State**: `ok` (confirmed via `env['ir.actions.report'].get_wkhtmltopdf_state()`). Odoo startup log confirmed:
+    - `Will use the Wkhtmltopdf binary at c:\program files\wkhtmltopdf\bin\wkhtmltopdf.exe`
+    - `Will use the Wkhtmltoimage binary at c:\program files\wkhtmltopdf\bin\wkhtmltoimage.exe`
+  - **Real PDF Generation**: Tested report `account.account_invoices` on posted invoice `INV/2026/00027` (ID: 72). Generated a valid, non-empty `%PDF-1.4` stream of 26,011 bytes with correct layout and extracted text confirming invoice number, tenant `Layla Saleh`, rent line description, and total amount `₪ 1,000.00`.
+  - **Tenant Portal Invoice PDF**: Tested `/my/invoices/72?report_type=pdf&download=true`. Returned HTTP `200 OK`, `Content-Type: application/pdf`, 26,011 bytes. Portal UI invoice detail page loaded cleanly with the "Download" / "Print" PDF action active on the sidebar below "Pay Now"; the original `تعذّر إيجاد Wkhtmltopdf في نظامك` warning error was completely gone.
+  - **Cleanup**: Odoo stopped, 0 background Python/Odoo processes remain, port 8070 verified free.
 
 ### Deferred Finding D — Native Mixed-Currency Overdue Page vs Normal Invoice List
 - **Classification**: Documentation / UX distinction.
