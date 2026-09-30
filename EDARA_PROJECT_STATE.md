@@ -17,6 +17,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.6 — Portal Tenant Group Provisioning / Portal User Lifecycle: CLOSED
 - Phase 12.7 — Billing Integrity: CLOSED
 - Phase 12.8 — Unit UX and Default Lease Rent: CLOSED
+- Phase 12.9 — Service Charge Area Validation: CLOSED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2995,6 +2996,54 @@ Closure:
 - Working tree: clean
 
 
+## Phase 12.9 — Service Charge Area Validation
+
+Status: CLOSED
+
+Implementation Commit:
+`b74c9d7a5e8dfc0afc08a8fd278535e78dd65081` (`[Phase 12.9] Validate service charge area allocation`)
+
+Push:
+`origin/main` (commit `b74c9d7`)
+
+Approved Business Rule:
+- `EQUAL` does not require Unit Area (area is irrelevant).
+- `FIXED_PER_UNIT` does not require Unit Area (area is irrelevant).
+- `PROPORTIONAL` requires every eligible/tenanted Unit to have `area > 0`.
+- `PER_SQM` requires every eligible/tenanted Unit to have `area > 0`.
+- If any eligible Unit has `area <= 0`, allocation is blocked with a clear `UserError`.
+- The affected Unit names are explicitly included in the validation message so administrators know which Unit records require area configuration.
+- Vacant/ineligible Units are excluded from this validation because they are already excluded from allocation.
+- No global `edara.unit.area` constraint was introduced (area remains optional for units not subject to area-based service charges).
+
+Implementation Scope:
+- Production: `models/edara_service_charge.py` (only `_compute_allocation()` was modified).
+- Tests: `tests/test_edara_service_charge.py` (added 6 focused regression tests).
+- Zero modifications to views, wizards, accounting, billing, security, or Odoo core.
+
+Verification Results:
+- **Automated Tests**:
+  - Phase 12.9 focused tests: 6/6 PASS (`test_proportional_allocation_all_zero_area_blocked`, `test_proportional_allocation_mixed_zero_area_blocked_and_identifies_unit`, `test_per_sqm_allocation_all_zero_area_blocked`, `test_per_sqm_allocation_mixed_zero_area_blocked_and_identifies_unit`, `test_area_validation_ignores_vacant_ineligible_units_with_zero_area`, `test_equal_and_fixed_allocation_allow_zero_area_units`).
+  - Full `TestEdaraServiceCharge` suite: 17/17 PASS.
+  - Failures: 0, Errors: 0.
+  - `git diff --check`: clean.
+- **Manual Odoo UI Smoke Test**:
+  - All four required scenarios passed in Odoo 19:
+    1. PROPORTIONAL + all-zero area: Blocked with `UserError` (*"Set an area (sqm) on this building's units before using proportional allocation."*). Zero lines generated.
+    2. PROPORTIONAL + mixed zero/non-zero area: Blocked with `UserError` (*"The following units have no valid area (sqm) configured: Unit-ZeroArea. Every eligible unit must have an area greater than zero for proportional allocation."*), correctly identifying the zero-area unit. Zero lines generated.
+    3. PER_SQM + zero area: Blocked with `UserError` (*"The following units have no valid area (sqm) configured: U-ZERO. Every eligible unit must have an area greater than zero for per square meter allocation."*), identifying the affected unit. Zero lines generated.
+    4. Valid positive-area PROPORTIONAL / PER_SQM allocations: Succeeded with exact mathematical shares:
+       - PROPORTIONAL: Unit-A (50 sqm) and Unit-B (100 sqm) with Total 300 → Allocated 100 / 200 (Total = 300).
+       - PER_SQM: Unit-A (50 sqm) and Unit-B (100 sqm) at Rate 4/sqm → Allocated 200 / 400.
+  - No temporary invoices/payments were created during smoke testing; all temporary records were rolled back; port 8070 remained free; no background Python/Odoo processes remained.
+
+Closure:
+- Status: CLOSED
+- Implementation commit: `b74c9d7`
+- Branch: `main`
+- Working tree: clean
+
+
 ## Deferred Findings / Future Work
 
 ### Deferred Finding A — Native Odoo Mixed-Currency Overdue Aggregation
@@ -3016,6 +3065,11 @@ Closure:
 ### Deferred Finding D — Native Mixed-Currency Overdue Page vs Normal Invoice List
 - **Classification**: Documentation / UX distinction.
 - **Observed Behavior**: `/my/invoices` works completely normally because invoices are listed individually. The multi-currency limitation is strictly isolated to the native aggregate overdue payment action on `/my/invoices/overdue`.
+
+### Deferred Finding E — Service Charge Area Validation
+- **Classification**: Business Logic / Allocation Integrity.
+- **Status**: RESOLVED — Phase 12.9 (Commit `b74c9d7`).
+- **Resolution**: Eliminated the silent $0 allocation risk for eligible zero-area units under `PROPORTIONAL` and `PER_SQM` methods via fail-closed validation in `_compute_allocation()`. Any eligible unit with `area <= 0` now blocks allocation with a clear `UserError` naming the affected unit(s). `EQUAL` and `FIXED_PER_UNIT` continue to allow zero area, and vacant/ineligible units remain excluded.
 
 ### Preserved Deferred Findings
 - **Security Deposit**:
