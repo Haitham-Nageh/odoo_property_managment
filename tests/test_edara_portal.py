@@ -147,6 +147,83 @@ class TestEdaraPortal(HttpCase):
         self.assertIn('alert-danger', response.text)
         self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', self.contract_a.id)]))
 
+    def _create_active_contract(self, tenant=None, start_date=None, end_date=None):
+        tenant = tenant or self.partner_a
+        start_date = start_date or date(2026, 1, 1)
+        end_date = end_date or date(2026, 12, 31)
+        unit = self.env['edara.unit'].create({
+            'name': 'Test Renewal Unit',
+            'code': 'TRU%d' % self.env['edara.unit'].search_count([]),
+            'building_id': self.building.id,
+        })
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': unit.id, 'tenant_id': tenant.id,
+            'start_date': start_date, 'end_date': end_date, 'rent_amount': 1000,
+            'deposit_required': False,
+        })
+        contract.action_activate()
+        return contract
+
+    def test_renewal_request_with_malformed_end_date_is_rejected(self):
+        contract = self._create_active_contract()
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % contract.id).text)
+        response = self.url_open('/my/leases/%d/renew' % contract.id, data={
+            'requested_start_date': '2027-01-01', 'requested_end_date': 'not-a-date',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('alert-danger', response.text)
+        self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', contract.id)]))
+
+    def test_renewal_request_with_missing_end_date_is_rejected(self):
+        contract = self._create_active_contract()
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % contract.id).text)
+        response = self.url_open('/my/leases/%d/renew' % contract.id, data={
+            'requested_start_date': '2027-01-01', 'requested_end_date': '',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('alert-danger', response.text)
+        self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', contract.id)]))
+
+    def test_renewal_request_end_before_start_is_rejected(self):
+        contract = self._create_active_contract()
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % contract.id).text)
+        response = self.url_open('/my/leases/%d/renew' % contract.id, data={
+            'requested_start_date': '2027-01-01', 'requested_end_date': '2026-12-01',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('alert-danger', response.text)
+        self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', contract.id)]))
+
+    def test_renewal_request_end_equal_to_start_is_accepted(self):
+        contract = self._create_active_contract()
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % contract.id).text)
+        response = self.url_open('/my/leases/%d/renew' % contract.id, data={
+            'requested_start_date': '2027-01-01', 'requested_end_date': '2027-01-01',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 200)
+        renewal = self.env['edara.renewal.request'].search([('contract_id', '=', contract.id)])
+        self.assertTrue(renewal)
+        self.assertEqual(renewal.requested_start_date, date(2027, 1, 1))
+        self.assertEqual(renewal.requested_end_date, date(2027, 1, 1))
+
+    def test_renewal_request_for_non_active_contract_is_rejected(self):
+        draft_contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit_a.id, 'tenant_id': self.partner_a.id,
+            'start_date': date(2027, 1, 1), 'end_date': date(2027, 12, 31), 'rent_amount': 1000,
+            'deposit_required': False,
+        })
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        csrf_token = self._get_csrf_token(self.url_open('/my/leases/%d' % self.contract_a.id).text)
+        response = self.url_open('/my/leases/%d/renew' % draft_contract.id, data={
+            'requested_start_date': '2028-01-01', 'requested_end_date': '2028-12-31',
+            'requested_rent_amount': '1100', 'csrf_token': csrf_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.env['edara.renewal.request'].search([('contract_id', '=', draft_contract.id)]))
+
     def test_renewal_request_model_rejects_an_early_start_for_a_portal_user(self):
         Request = self.env['edara.renewal.request'].with_user(self.user_a)
         with self.assertRaises(ValidationError):
@@ -362,3 +439,82 @@ class TestEdaraPortal(HttpCase):
             self.assertNotIn('t-out="renewal.state"', arch)
             self.assertNotIn('t-out="maintenance_request.state"', arch)
 
+    # ================= Phase 12.5 — Portal Detail Access Robustness =================
+
+    def test_unauthorized_tenant_lease_detail_access_denied_not_500(self):
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/leases/%d' % self.contract_b.id)
+        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.contract_b.name, response.text)
+
+    def test_unauthorized_tenant_unit_detail_access_denied_not_500(self):
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/units/%d' % self.unit_b.id)
+        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.unit_b.name, response.text)
+
+    def test_unauthorized_tenant_maintenance_detail_access_denied_not_500(self):
+        maint_b = self.env['edara.maintenance.request'].create({
+            'title': 'Tenant B Sink Leak', 'unit_id': self.unit_b.id, 'tenant_id': self.partner_b.id,
+        })
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/maintenance/%d' % maint_b.id)
+        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn('Tenant B Sink Leak', response.text)
+
+    def test_authorized_tenant_detail_routes_regression(self):
+        maint_a = self.env['edara.maintenance.request'].create({
+            'title': 'Tenant A AC Fix', 'unit_id': self.unit_a.id, 'tenant_id': self.partner_a.id,
+        })
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+
+        # Authorized model read access checks pass without AccessError
+        self.contract_a.with_user(self.user_a).check_access('read')
+        self.unit_a.with_user(self.user_a).check_access('read')
+        maint_a.with_user(self.user_a).check_access('read')
+
+        # Own unit detail route (successful 200 HTTP response)
+        resp_unit = self.url_open('/my/units/%d' % self.unit_a.id)
+        self.assertEqual(resp_unit.status_code, 200)
+        self.assertIn(self.unit_a.name, resp_unit.text)
+
+    def test_no_automatic_access_token_generation_on_normal_creation(self):
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit_a.id, 'tenant_id': self.partner_a.id,
+            'start_date': date(2027, 1, 1), 'end_date': date(2027, 12, 31), 'rent_amount': 1000,
+            'deposit_required': False,
+        })
+        unit = self.env['edara.unit'].create({
+            'name': 'Unit Token Test', 'code': 'UTT1', 'building_id': self.building.id,
+        })
+        maint = self.env['edara.maintenance.request'].create({
+            'title': 'Token Test Request', 'unit_id': self.unit_a.id, 'tenant_id': self.partner_a.id,
+        })
+
+        self.assertTrue(hasattr(contract, 'access_token'))
+        self.assertTrue(hasattr(unit, 'access_token'))
+        self.assertTrue(hasattr(maint, 'access_token'))
+
+        self.assertFalse(contract.access_token)
+        self.assertFalse(unit.access_token)
+        self.assertFalse(maint.access_token)
+
+    def test_unauthenticated_portal_detail_access_remains_protected(self):
+        maint_a = self.env['edara.maintenance.request'].create({
+            'title': 'Tenant A AC Fix', 'unit_id': self.unit_a.id, 'tenant_id': self.partner_a.id,
+        })
+        self.opener.cookies.clear()
+        resp_lease = self.url_open('/my/leases/%d' % self.contract_a.id, allow_redirects=False)
+        self.assertIn(resp_lease.status_code, (302, 303))
+        self.assertIn('/web/login', resp_lease.headers.get('Location', ''))
+
+        resp_unit = self.url_open('/my/units/%d' % self.unit_a.id, allow_redirects=False)
+        self.assertIn(resp_unit.status_code, (302, 303))
+        self.assertIn('/web/login', resp_unit.headers.get('Location', ''))
+
+        resp_maint = self.url_open('/my/maintenance/%d' % maint_a.id, allow_redirects=False)
+        self.assertIn(resp_maint.status_code, (302, 303))
+        self.assertIn('/web/login', resp_maint.headers.get('Location', ''))

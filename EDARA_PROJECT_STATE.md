@@ -2727,3 +2727,113 @@ Verification:
 - No unrelated translations modified.
 
 
+## Phase 12.4 — Portal Robustness: Renewal Date Validation
+
+Status: CLOSED
+
+Purpose:
+Prevent raw unhandled exceptions and invalid input when tenants submit renewal requests via the portal.
+
+Implementation Summary:
+- Defensive `requested_end_date` parsing in `controllers/portal.py`.
+- Returns HTTP 400 for missing, empty, or malformed renewal end dates.
+- ORM validation errors (e.g., requested end date before start date, end date earlier than current lease term, early start dates) are handled gracefully using a database savepoint (`with env.cr.savepoint():`), returning HTTP 400 with a localized error message without bubbling up as HTTP 500 server errors.
+- The model remains the single source of truth for business rules (no duplicated validation logic in the controller).
+
+Files Changed:
+- `controllers/portal.py`
+- `tests/test_edara_portal.py`
+
+Verification:
+- `TestEdaraPortal`: 34 tests passed.
+- `TestEdaraRenewalRequest`: 11 tests passed.
+- Full regression suite clean (0 failures, 0 errors).
+- `git diff --check`: clean.
+
+
+## Phase 12.5 — Portal Detail Access Robustness
+
+Status: CLOSED
+
+Purpose:
+Ensure portal detail pages return a proper HTTP 403 Access Denied response instead of failing with an HTTP 500 server error when accessed by unauthorized tenants or users lacking read access.
+
+Implementation Summary:
+- Added native `portal.mixin` inheritance to EDARA models:
+  - `edara.lease.contract`
+  - `edara.unit`
+  - `edara.maintenance.request`
+- Enables full compatibility with native Odoo `_document_check_access()` mechanism.
+- Unauthorized access attempts trigger a clean HTTP 403 / Access Denied page without triggering `AttributeError: ... access_token` exceptions.
+- No automatic access tokens are generated on normal record creation (`access_token` remains unset until explicit share link generation).
+- Underlying record rules remain strictly enforced.
+- Authorized tenant portal access remains fully functional.
+
+Files Changed:
+- `models/edara_lease_contract.py`
+- `models/edara_unit.py`
+- `models/edara_maintenance_request.py`
+- `tests/test_edara_portal.py`
+
+Verification:
+- `TestEdaraPortal`: verified 403 responses for unauthorized lease, unit, and maintenance detail routes.
+- Full regression suite clean (0 failures, 0 errors).
+
+
+## Phase 12.5.1 — Portal QWeb Rendering Fix
+
+Status: CLOSED
+
+QWeb Root Cause:
+Odoo 19 QWeb compiler explicitly rejects `t-field` on `<t>` tags (`assert tagName != 't', "t-field can not be used on a t element, provide an actual HTML node"`), which caused HTTP 500 rendering failures on authorized detail views.
+
+Implementation Summary:
+Replaced exactly four invalid `<t t-field="...">` usages with `<span t-field="...">` in `views/portal_templates.xml`:
+1. `portal_lease_detail`: `<t t-field="contract.state"/>` → `<span t-field="contract.state"/>`
+2. `portal_lease_detail` (renewal history): `<t t-field="renewal.state"/>` → `<span t-field="renewal.state"/>`
+3. `portal_my_maintenance`: `<t t-field="maintenance_request.state"/>` → `<span t-field="maintenance_request.state"/>`
+4. `portal_maintenance_detail`: `<t t-field="maintenance_request.state"/>` → `<span t-field="maintenance_request.state"/>`
+
+Files Changed:
+- `views/portal_templates.xml`
+
+Verification:
+- `TestEdaraPortal`: 40 executed, 0 failed, 0 errors.
+- Broader relevant test suite (`TestEdaraUnit`, `TestEdaraLeaseContract`, `TestEdaraMaintenanceRequest`, `TestEdaraRenewalRequest`): 61 executed, 0 failed, 0 errors.
+- Manual Runtime Verification:
+  - `/ar/my/leases/<own_id>` → HTTP 200 (renders status)
+  - `/ar/my/maintenance` → HTTP 200 (renders list & status)
+  - `/ar/my/maintenance/<own_id>` → HTTP 200 (renders detail & status)
+  - `/ar/my/leases/<foreign_id>` → HTTP 403 Access Denied (non-500)
+
+
+## Deferred Findings / Future Work
+
+### Deferred Finding A — Native Odoo Mixed-Currency Overdue Aggregation
+- **Classification**: Native Odoo / Portal UX limitation (EDARA bug: No, Priority: Deferred).
+- **Observed Behavior**: Navigating to `/my/invoices/overdue` raises `Overdue invoices should share the same currency.` (Arabic: `يجب أن تكون للفواتير المتأخرة نفس العملة.`) when a portal partner has overdue invoices in multiple currencies (e.g., JOD 1,000 and ILS 1,000).
+- **Root Cause**: Native Odoo Enterprise `account_payment` portal logic treats overdue invoices as a single aggregate payment batch and requires same partner, same company, and same currency.
+- **Decision**: Do NOT modify native Odoo source or override the native controller at this stage. Deferred for future UX evaluation (e.g., suppressing the aggregate button or grouping overdue payments by currency EDARA-side).
+
+### Deferred Finding B — Portal Tenant Group Provisioning
+- **Classification**: EDARA provisioning/lifecycle gap (Priority: Future Phase).
+- **Observed Behavior**: Standard Odoo portal user creation (`base.group_portal`) does not automatically assign the custom `EDARA Portal Tenant` group (`group_edara_portal_tenant`).
+- **Design Note**: A future phase should define lifecycle-based provisioning (e.g., when a lease becomes active or upon tenant user linkage) rather than hooking blindly into single events, since portal users may be created before or after lease activation.
+
+### Deferred Finding C — wkhtmltopdf Development Environment
+- **Classification**: Development Environment Setup (EDARA bug: No).
+- **Observed Behavior**: Warning message `تعذّر إيجاد Wkhtmltopdf في نظامك. لا يمكن إنشاء ملف PDF.` on PDF export attempts in local environment.
+- **Root Cause**: Local development environment lacks installed/configured `wkhtmltopdf` binary. Production server setup dependency only; customer browsers handle PDF rendering independently.
+
+### Deferred Finding D — Native Mixed-Currency Overdue Page vs Normal Invoice List
+- **Classification**: Documentation / UX distinction.
+- **Observed Behavior**: `/my/invoices` works completely normally because invoices are listed individually. The multi-currency limitation is strictly isolated to the native aggregate overdue payment action on `/my/invoices/overdue`.
+
+### Preserved Deferred Findings
+- **Security Deposit**:
+  - `edara.deposit.amount` remains editable after collection.
+  - Cancelled/reversed native payments still count toward `amount_held`.
+  - Concurrent collection race conditions remain possible.
+  - Historical over-collected data prior to Phase 12.2 is not retroactively validated.
+- **Lease Sequence**:
+  - Non-contiguous Lease Contract sequence numbering observation remains deferred (e.g., `LC/2026/0002`, `LC/2026/0003`, ..., `LC/2026/0105`, `LC/2026/0108`).

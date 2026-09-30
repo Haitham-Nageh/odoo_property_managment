@@ -41,7 +41,7 @@ LIVE_STATES = ['scheduled', 'active']
 class EdaraLeaseContract(models.Model):
     _name = 'edara.lease.contract'
     _description = 'EDARA Lease Contract'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread', 'mail.activity.mixin', 'portal.mixin']
     _order = 'start_date desc, id desc'
 
     name = fields.Char(required=True, copy=False, readonly=True, default=lambda self: _('New'))

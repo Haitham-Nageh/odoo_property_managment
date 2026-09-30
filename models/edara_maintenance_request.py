@@ -51,7 +51,7 @@ SLA_AT_RISK_THRESHOLD = 0.8
 class EdaraMaintenanceRequest(models.Model):
     _name = 'edara.maintenance.request'
     _description = 'EDARA Maintenance Request'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread', 'mail.activity.mixin', 'portal.mixin']
     _order = 'requested_date desc, id desc'
 
     name = fields.Char(string='Reference', required=True, copy=False, readonly=True,

@@ -1,5 +1,5 @@
 from odoo import _, fields
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request, route
 
 from odoo.addons.portal.controllers.portal import CustomerPortal
@@ -122,13 +122,24 @@ class EdaraPortal(CustomerPortal):
             return self._render_lease_detail(contract_sudo, renewal_error=_(
                 "A renewal must start on or after %(date)s, the day after your current lease's last day.",
                 date=boundary), status=400)
-        request.env['edara.renewal.request'].create({
-            'contract_id': contract_sudo.id,
-            'requested_start_date': start,
-            'requested_end_date': post.get('requested_end_date'),
-            'requested_rent_amount': rent_amount,
-            'note': post.get('note'),
-        })
+        try:
+            end = fields.Date.to_date(post.get('requested_end_date'))
+        except (ValueError, TypeError):
+            end = None
+        if not end:
+            return self._render_lease_detail(contract_sudo, renewal_error=_(
+                "Please provide a valid requested end date."), status=400)
+        try:
+            with request.env.cr.savepoint():
+                request.env['edara.renewal.request'].create({
+                    'contract_id': contract_sudo.id,
+                    'requested_start_date': start,
+                    'requested_end_date': end,
+                    'requested_rent_amount': rent_amount,
+                    'note': post.get('note'),
+                })
+        except (ValidationError, UserError) as e:
+            return self._render_lease_detail(contract_sudo, renewal_error=str(e), status=400)
         return request.redirect('/my/leases/%d' % contract_id)
 
     # ------------------------------------------------------------

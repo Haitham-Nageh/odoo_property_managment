@@ -29,7 +29,7 @@ OPERATIONAL_STATUSES = [
 class EdaraUnit(models.Model):
     _name = 'edara.unit'
     _description = 'EDARA Unit'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'portal.mixin']
     _order = 'building_id, floor, name'
 
     name = fields.Char(required=True, tracking=True, help="e.g. A-101, Shop-01.")
