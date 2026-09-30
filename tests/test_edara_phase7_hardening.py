@@ -205,9 +205,82 @@ class TestEdaraPhase7Hardening(TransactionCase):
         self.assertEqual(len(contract.schedule_line_ids), 12)
         self.assertFalse(contract.successor_contract_id)
 
-    def test_terminated_and_expired_contracts_still_not_invoiced(self):
-        contract = self._contract(start_date=date(2025, 1, 1), end_date=date(2026, 1, 1))
+    # ============ Track A: Billing Integrity for Expired / Terminated Leases ============
+
+    def test_expired_contract_remaining_due_periods_are_billed(self):
+        """Test A & E: an expired contract's surviving due/overdue schedule lines must
+        remain billable, while future uninvoiced lines were unlinked by the expiry cron."""
+        today = date.today()
+        contract = self._contract(start_date=today - timedelta(days=180), end_date=today - timedelta(days=1))
         contract.action_activate()
-        contract.state = 'terminated'
-        created, skipped, errors = contract.schedule_line_ids._process_due_invoices()
-        self.assertEqual((created, errors), (0, 0))
+        lines_before = len(contract.schedule_line_ids)
+        self.assertTrue(lines_before > 0)
+
+        # Real expiry lifecycle:
+        self.env['edara.lease.contract']._cron_expire_contracts()
+        self.assertEqual(contract.state, 'expired')
+
+        # Surviving lines are all past-due / overdue
+        due = contract.schedule_line_ids.filtered(lambda l: l.due_date <= today and not l.invoice_id)
+        self.assertTrue(due)
+        self.assertEqual(len(due), lines_before)
+
+        created, skipped, errors = due._process_due_invoices()
+        self.assertEqual((created, errors), (len(due), 0))
+        self.assertEqual(skipped, 0)
+        self.assertTrue(all(l.invoice_id for l in due))
+
+    def test_terminated_contract_overdue_periods_are_billed_and_future_truncated(self):
+        """Test B & E: terminating a lease truncates future uninvoiced lines, but surviving
+        overdue/owed lines remain billable and receive invoices."""
+        today = date.today()
+        # 6-month contract: started 60 days ago, ends 120 days in the future
+        contract = self._contract(start_date=today - timedelta(days=60), end_date=today + timedelta(days=120))
+        contract.action_activate()
+
+        past_due_lines = contract.schedule_line_ids.filtered(lambda l: l.due_date <= today)
+        future_lines = contract.schedule_line_ids.filtered(lambda l: l.due_date > today)
+        self.assertTrue(len(past_due_lines) > 0)
+        self.assertTrue(len(future_lines) > 0)
+
+        # Real termination lifecycle:
+        contract.action_terminate(reason='Track A Termination Test')
+        self.assertEqual(contract.state, 'terminated')
+
+        # Future uninvoiced lines are unlinked by action_terminate()
+        surviving = contract.schedule_line_ids.filtered(lambda l: not l.invoice_id)
+        self.assertEqual(surviving, past_due_lines)
+        for fl in future_lines:
+            self.assertFalse(fl.exists())
+
+        # Invoice generation on surviving lines creates invoices
+        created, skipped, errors = surviving._process_due_invoices()
+        self.assertEqual((created, errors), (len(surviving), 0))
+        self.assertEqual(skipped, 0)
+        self.assertTrue(all(l.invoice_id for l in surviving))
+
+    def test_cancelled_contract_schedule_lines_are_not_invoiced(self):
+        """Test C: cancelled contracts never generate invoices. Uninvoiced schedule
+        lines are unlinked upon cancellation, and any lines passed to _process_due_invoices
+        with state='cancelled' are skipped."""
+        today = date.today()
+        # Scheduled contract: starts in the future
+        contract = self._contract(start_date=today + timedelta(days=30), end_date=today + timedelta(days=210))
+        contract.action_activate()
+        self.assertEqual(contract.state, 'scheduled')
+        self.assertTrue(len(contract.schedule_line_ids) > 0)
+
+        # Real cancellation lifecycle:
+        contract.action_cancel()
+        self.assertEqual(contract.state, 'cancelled')
+        self.assertFalse(contract.schedule_line_ids)
+
+        # Directly testing that a line with contract.state == 'cancelled' is skipped:
+        line = self.env['edara.payment.schedule.line'].create({
+            'contract_id': contract.id,
+            'due_date': today,
+            'amount': 1000.0,
+        })
+        created, skipped, errors = line._process_due_invoices()
+        self.assertEqual((created, skipped, errors), (0, 1, 0))
+        self.assertFalse(line.invoice_id)

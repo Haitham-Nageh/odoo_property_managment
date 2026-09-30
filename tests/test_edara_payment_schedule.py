@@ -168,9 +168,10 @@ class TestEdaraPaymentSchedule(TransactionCase):
         self.assertEqual(last.period_end, today + timedelta(days=1))              # cut at the last occupied day
         self.assertTrue(all(line.period_end <= last.period_start for line in lines[:-1]))
         self.assertTrue(all(line.state == 'overdue' for line in lines if line.due_date < today))
-
+        # Track A: cron invoices surviving owed lines; future lines were unlinked and cannot be invoiced.
         self.env['edara.payment.schedule.line']._cron_generate_due_invoices()
-        self.assertFalse(any(line.invoice_id for line in contract.schedule_line_ids))
+        self.assertTrue(lines)
+        self.assertTrue(all(line.invoice_id for line in lines))
 
     def test_invoiced_line_cannot_be_deleted(self):
         self.env.company.edara_rental_income_account_id = self.income_account.id

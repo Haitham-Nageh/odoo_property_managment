@@ -270,9 +270,14 @@ class EdaraPaymentScheduleLine(models.Model):
         created = skipped = errors = 0
         for line in self:
             try:
-                # 'renewed' stays billable: the daily job moves a finished lease to 'renewed'
-                # while its last periods may still be unpaid/uninvoiced. 'scheduled' never bills.
-                if line.invoice_id or line.contract_id.state not in ('active', 'renewed'):
+                # 'renewed', 'expired', and 'terminated' stay billable for surviving owed periods.
+                # 'scheduled' and 'cancelled' never bill.
+                if line.invoice_id or line.contract_id.state not in (
+                    'active',
+                    'renewed',
+                    'expired',
+                    'terminated',
+                ):
                     skipped += 1
                     continue
                 line._create_invoice()
