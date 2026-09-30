@@ -11,6 +11,10 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.1 — Unit Occupancy / Lifecycle Integrity: CLOSED
 - Phase 12.2 — Financial Lifecycle Integrity: Security Deposit Collection: CLOSED
 - Phase 12.3 — Renewal Rule Correctness: CLOSED
+- Phase 12.4 — Renewal Date Validation: CLOSED
+- Phase 12.5 — Portal Detail Access Robustness: CLOSED
+- Phase 12.5.1 — Portal QWeb Rendering Fix: CLOSED
+- Phase 12.6 — Portal Tenant Group Provisioning / Portal User Lifecycle: CLOSED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2807,6 +2811,57 @@ Verification:
   - `/ar/my/leases/<foreign_id>` → HTTP 403 Access Denied (non-500)
 
 
+## Phase 12.6 — Portal Tenant Group Provisioning / Portal User Lifecycle
+
+Status: CLOSED
+
+Implementation Commit:
+`0a07d34` (`[Phase 12.6] Automate tenant portal user lifecycle`)
+
+Verification:
+- Focused provisioning suite (`TestEdaraPortalProvisioning`): 16 tests passed.
+- Portal regression suite (`TestEdaraPortal`): 7 tests passed.
+- Lease contract regression suite (`TestEdaraLeaseContract`): 55 tests passed.
+- Total verification: 78 tests passed (0 failures, 0 errors).
+
+Architectural Review:
+`APPROVED — safe to keep as-is`
+
+Required Changes After Audit:
+`NONE`
+
+Implementation Summary:
+- **Automatic Portal Provisioning (Scenario A)**:
+  - When a lease contract transitions into a live state (`scheduled` or `active`), `contract.tenant_id._provision_edara_portal_tenant()` automatically provisions a portal user if none exists.
+  - Grants native `base.group_portal` and EDARA-specific `property_managment.group_edara_portal_tenant`.
+  - Driven by lifecycle methods (`action_activate()`, `_activate_scheduled()`) and guarded model hooks on `create()` and `write()`.
+- **Portal Group Synchronization (Scenario B)**:
+  - When a native portal user is created or granted `base.group_portal` via `res.users.create()` or `write()`, `_sync_edara_portal_tenant_group()` checks if the linked partner has any live EDARA lease (`scheduled` or `active`) and automatically grants `property_managment.group_edara_portal_tenant`.
+  - Guarded against performance overhead: internal users (`base.group_user`) and users already in the group bypass database searches in Python memory.
+  - Recursion bounded to depth 1.
+- **30-Day Retention & Archival**:
+  - `PORTAL_RETENTION_DAYS = 30` is centralized on `res.partner`.
+  - Lease termination or expiration does NOT immediately disable portal access.
+  - Daily scheduled action `ir_cron_edara_cleanup_expired_portal_tenants` inspects portal tenant users. If no live lease exists and the latest valid contract `end_date` is strictly older than 30 days (`today > latest_end_date + 30 days`), the user is archived (`active = False`).
+- **No User Deletion**:
+  - Users are never deleted (`unlink()` is never called). `active = False` is used as Odoo's native authentication cutoff, fully preserving auditability, message history, and relational integrity.
+- **Reactivation & Idempotency**:
+  - If a tenant with an archived portal user acquires a new live lease later, `_provision_edara_portal_tenant()` reactivates the existing `res.users` record (`active = True`) and restores necessary groups without creating duplicate user accounts.
+- **Multiple Leases & Renewals**:
+  - Retention calculation evaluates all contracts belonging to the tenant partner. Any concurrent live lease (`scheduled` or `active`) keeps the user active.
+  - Contract renewals transition seamlessly without user archival or churn.
+  - Draft and cancelled contracts do not affect retention or provisioning.
+- **Multi-User Determinism**:
+  - Multiple portal users linked to the same tenant partner are handled consistently and evaluated against the same partner contract portfolio.
+- **Security & Architectural Preservation**:
+  - Zero modifications to native Odoo source code (`odoo/addons/*`).
+  - Zero modifications to EDARA ACLs (`ir.model.access.csv`) or record rules (`edara_record_rules.xml`).
+  - Portal tenant data isolation continues to rely strictly on existing EDARA record rules and server-side relational fields (`contract.tenant_id`, `user.partner_id`).
+  - Privileged operations (`sudo()`) are strictly scoped to internal `res.users` writes and group assignments.
+- **No Mass Backfill**:
+  - Existing database users were NOT mass-backfilled in this phase.
+
+
 ## Deferred Findings / Future Work
 
 ### Deferred Finding A — Native Odoo Mixed-Currency Overdue Aggregation
@@ -2816,9 +2871,9 @@ Verification:
 - **Decision**: Do NOT modify native Odoo source or override the native controller at this stage. Deferred for future UX evaluation (e.g., suppressing the aggregate button or grouping overdue payments by currency EDARA-side).
 
 ### Deferred Finding B — Portal Tenant Group Provisioning
-- **Classification**: EDARA provisioning/lifecycle gap (Priority: Future Phase).
-- **Observed Behavior**: Standard Odoo portal user creation (`base.group_portal`) does not automatically assign the custom `EDARA Portal Tenant` group (`group_edara_portal_tenant`).
-- **Design Note**: A future phase should define lifecycle-based provisioning (e.g., when a lease becomes active or upon tenant user linkage) rather than hooking blindly into single events, since portal users may be created before or after lease activation.
+- **Classification**: EDARA provisioning/lifecycle gap.
+- **Status**: CLOSED & RESOLVED in Phase 12.6 (Commit `0a07d34`).
+- **Resolution**: Fully implemented via bidirectional model hooks on `edara.lease.contract` and `res.users`, granting `property_managment.group_edara_portal_tenant` whenever a live lease exists, retaining access for 30 days post-lease, and archiving via scheduled action.
 
 ### Deferred Finding C — wkhtmltopdf Development Environment
 - **Classification**: Development Environment Setup (EDARA bug: No).
