@@ -143,8 +143,8 @@
                         </group>
                         <group>
                             <field name="area"/>
-                            <field name="bedrooms"/>
-                            <field name="bathrooms"/>
+                            <field name="bedrooms" invisible="unit_type not in ('apartment', 'villa')"/>
+                            <field name="bathrooms" invisible="unit_type not in ('apartment', 'villa')"/>
                             <field name="rent_amount_default"/>
                             <field name="currency_id" groups="base.group_multi_currency"/>
                         </group>

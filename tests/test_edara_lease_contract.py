@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests import TransactionCase, tagged
+from odoo.tests import Form, TransactionCase, tagged
 
 
 @tagged('post_install', '-at_install')
@@ -476,3 +476,90 @@ class TestEdaraLeaseContract(TransactionCase):
         """Product Readiness Review (2026-09-22): state is the Dashboard's/
         crons'/quick-actions' most-filtered column on this model."""
         self.assertTrue(self.env['edara.lease.contract']._fields['state'].index)
+
+    # ============ Track B: Unit Default Rent -> New Lease ============
+
+    def test_onchange_unit_id_applies_default_rent(self):
+        """Test 1: Selecting a unit with rent_amount_default populates rent_amount."""
+        unit_with_rent = self.env['edara.unit'].create({
+            'name': 'B-201',
+            'code': 'B201',
+            'building_id': self.building.id,
+            'rent_amount_default': 2500.0,
+        })
+        contract_form = Form(self.env['edara.lease.contract'])
+        contract_form.unit_id = unit_with_rent
+        self.assertEqual(contract_form.rent_amount, 2500.0)
+
+        # Also verify via direct model onchange call
+        contract = self.env['edara.lease.contract'].new({'unit_id': unit_with_rent.id})
+        contract._onchange_unit_id_rent_amount()
+        self.assertEqual(contract.rent_amount, 2500.0)
+
+    def test_onchange_unit_id_zero_default_rent_does_not_override(self):
+        """Test 2: A unit with 0/unset default rent does not force rent_amount to 0,
+        and existing rent validation remains intact."""
+        unit_zero_rent = self.env['edara.unit'].create({
+            'name': 'B-202',
+            'code': 'B202',
+            'building_id': self.building.id,
+            'rent_amount_default': 0.0,
+        })
+        contract = self.env['edara.lease.contract'].new({
+            'unit_id': unit_zero_rent.id,
+            'rent_amount': 1800.0,
+        })
+        contract._onchange_unit_id_rent_amount()
+        self.assertEqual(contract.rent_amount, 1800.0)
+
+        # Confirm positive rent validation still rejects 0 rent
+        with self.assertRaises(ValidationError):
+            self._make_contract(unit_id=unit_zero_rent.id, rent_amount=0)
+
+    def test_no_permanent_synchronization_between_unit_and_lease_rent(self):
+        """Test 3: Changing a unit's rent_amount_default after lease creation
+        must NOT modify the existing lease's rent_amount."""
+        unit = self.env['edara.unit'].create({
+            'name': 'B-203',
+            'code': 'B203',
+            'building_id': self.building.id,
+            'rent_amount_default': 3000.0,
+        })
+        contract_form = Form(self.env['edara.lease.contract'])
+        contract_form.unit_id = unit
+        contract_form.tenant_id = self.tenant
+        contract_form.start_date = date(2026, 1, 1)
+        contract_form.end_date = date(2026, 12, 31)
+        contract_form.deposit_required = False
+        contract = contract_form.save()
+        self.assertEqual(contract.rent_amount, 3000.0)
+
+        # Modify unit's default rent
+        unit.rent_amount_default = 4500.0
+
+        # Existing contract rent remains unchanged
+        contract.invalidate_recordset(['rent_amount'])
+        self.assertEqual(contract.rent_amount, 3000.0)
+
+    def test_manual_rent_override_persists(self):
+        """Test 4: Manually setting a different rent_amount overrides the default rent,
+        and the manual value persists on the saved contract."""
+        unit = self.env['edara.unit'].create({
+            'name': 'B-204',
+            'code': 'B204',
+            'building_id': self.building.id,
+            'rent_amount_default': 3000.0,
+        })
+        contract_form = Form(self.env['edara.lease.contract'])
+        contract_form.unit_id = unit
+        self.assertEqual(contract_form.rent_amount, 3000.0)
+
+        # Manually override rent
+        contract_form.rent_amount = 3200.0
+        contract_form.tenant_id = self.tenant
+        contract_form.start_date = date(2026, 1, 1)
+        contract_form.end_date = date(2026, 12, 31)
+        contract_form.deposit_required = False
+        contract = contract_form.save()
+
+        self.assertEqual(contract.rent_amount, 3200.0)

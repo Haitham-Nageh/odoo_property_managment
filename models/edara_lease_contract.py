@@ -93,6 +93,11 @@ class EdaraLeaseContract(models.Model):
                 contract.rent_amount / PERIOD_MONTHS[contract.billing_frequency] if contract.billing_frequency
                 else 0.0)
 
+    @api.onchange('unit_id')
+    def _onchange_unit_id_rent_amount(self):
+        if self.unit_id.rent_amount_default:
+            self.rent_amount = self.unit_id.rent_amount_default
+
     deposit_required = fields.Boolean(default=True)
     deposit_amount = fields.Monetary(currency_field='currency_id')
 
