@@ -16,6 +16,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.5.1 — Portal QWeb Rendering Fix: CLOSED
 - Phase 12.6 — Portal Tenant Group Provisioning / Portal User Lifecycle: CLOSED
 - Phase 12.7 — Billing Integrity: CLOSED
+- Phase 12.8 — Unit UX and Default Lease Rent: CLOSED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2929,6 +2930,71 @@ Closure:
 - Working tree: clean
 
 
+## Phase 12.8 — Unit UX and Default Lease Rent (Track B)
+
+Status: CLOSED
+
+Implementation Commit:
+`8d9e8b54249d80149b9159deabef0fa4f326a5ae` (`[Phase 12.8] Improve unit UX and default lease rent`)
+
+Push:
+`origin/main` (commit `8d9e8b5`)
+
+Scope Implemented:
+- Exactly three files modified:
+  1. `models/edara_lease_contract.py`
+  2. `views/unit_views.xml`
+  3. `tests/test_edara_lease_contract.py`
+
+Functional Changes:
+- **Unit Type Conditional Visibility**:
+  - In `view_edara_unit_form` (`views/unit_views.xml`), `bedrooms` and `bathrooms` are now conditionally visible using direct Odoo 19 expression syntax:
+    ```xml
+    invisible="unit_type not in ('apartment', 'villa')"
+    ```
+  - Visible for: `apartment`, `villa`.
+  - Hidden for: `office`, `shop`, `warehouse`, `parking`, `commercial`, `other`.
+  - `area` remains completely unconditional and visible across every Unit Type (required by `edara.service.charge` allocation).
+  - No new Unit Type-specific business fields were introduced.
+- **Lease Default Rent**:
+  - In `models/edara_lease_contract.py`, added `@api.onchange('unit_id')`:
+    ```python
+    @api.onchange('unit_id')
+    def _onchange_unit_id_rent_amount(self):
+        if self.unit_id.rent_amount_default:
+            self.rent_amount = self.unit_id.rent_amount_default
+    ```
+  - Selecting a Unit with a positive `rent_amount_default` populates `lease.rent_amount`.
+  - When the default is zero or unset, the existing rent value is not overwritten.
+  - The user can manually override the populated rent at any time.
+  - Changing the Unit's default rent later does NOT modify existing leases.
+  - This is an onchange/defaulting behavior only, not a permanent synchronization.
+
+Architectural Preservation:
+- Did NOT introduce new Unit Type-specific business fields or models.
+- No accounting changes.
+- No billing changes.
+- No security changes.
+- No portal changes.
+- No lifecycle changes.
+
+Verification Results:
+- Track B targeted tests: 4/4 passed (`test_onchange_unit_id_applies_default_rent`, `test_onchange_unit_id_zero_default_rent_does_not_override`, `test_no_permanent_synchronization_between_unit_and_lease_rent`, `test_manual_rent_override_persists`).
+- `TestEdaraLeaseContract`: 42/42 passed.
+- `TestEdaraProperty`: 22/22 passed.
+- Total relevant tests: 68/68 passed (0 failures, 0 errors).
+- Diff audit: PASS.
+- `git diff --check`: PASS.
+- Port 8070: FREE.
+- Background Odoo/Python processes: NONE.
+
+Closure:
+- Status: CLOSED
+- Implementation commit: `8d9e8b5`
+- Branch: `main`
+- Working tree: clean
+
+
 ## Deferred Findings / Future Work
 
 ### Deferred Finding A — Native Odoo Mixed-Currency Overdue Aggregation
@@ -2959,3 +3025,7 @@ Closure:
   - Historical over-collected data prior to Phase 12.2 is not retroactively validated.
 - **Lease Sequence**:
   - Non-contiguous Lease Contract sequence numbering observation remains deferred (e.g., `LC/2026/0002`, `LC/2026/0003`, ..., `LC/2026/0105`, `LC/2026/0108`).
+- **Future Capability / Discovery Items (Preserved for Future Evaluation)**:
+  - Owner-facing portal/surface.
+  - Co-tenancy / multiple tenants per lease.
+  - Archived partner with live lease behavior.
