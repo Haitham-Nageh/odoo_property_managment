@@ -15,6 +15,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.5 — Portal Detail Access Robustness: CLOSED
 - Phase 12.5.1 — Portal QWeb Rendering Fix: CLOSED
 - Phase 12.6 — Portal Tenant Group Provisioning / Portal User Lifecycle: CLOSED
+- Phase 12.7 — Billing Integrity: CLOSED
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -2860,6 +2861,72 @@ Implementation Summary:
   - Privileged operations (`sudo()`) are strictly scoped to internal `res.users` writes and group assignments.
 - **No Mass Backfill**:
   - Existing database users were NOT mass-backfilled in this phase.
+
+
+## Phase 12.7 — Billing Integrity (Track A)
+
+Status: CLOSED
+
+Implementation Commit:
+`4cf11f1ea0d61cfb99e478e12d86adced01c8438` (`[Phase 12.7] Restore billing for expired and terminated leases`)
+
+Original Issue:
+- Payment schedule lines can survive lease expiry or termination when they represent genuinely owed due/overdue periods.
+- `_process_due_invoices()` previously allowed only `active` and `renewed` contracts.
+- Therefore, surviving due/overdue lines on `expired` or `terminated` leases could remain permanently uninvoiced.
+
+Approved Business Rule:
+```text
+active      → billable
+renewed     → billable
+expired     → billable
+terminated  → billable
+cancelled   → excluded
+```
+
+Future / Unowed Periods Lifecycle Protection:
+- Expiry removes future uninvoiced schedule lines (`_cron_expire_contracts`).
+- Termination truncates and removes future schedule coverage (`action_terminate`).
+- Cancellation removes all uninvoiced schedule lines (`action_cancel`).
+- Therefore, invoice generation does not need a separate period-reconstruction algorithm; surviving lines are guaranteed by lifecycle methods to be genuinely owed due/overdue periods.
+
+Implementation:
+- `models/edara_payment_schedule_line.py`: In `_process_due_invoices()`, the allowed contract-state gate was extended from `('active', 'renewed')` to `('active', 'renewed', 'expired', 'terminated')`.
+- No changes were made to:
+  - Invoice creation logic (`_create_invoice()`)
+  - Cron candidate query / selection
+  - Manual invoice generation
+  - Schedule generation engine
+  - Accounting integration
+  - Portal
+  - Odoo core
+
+Regression Coverage:
+- Expired contract remaining due periods are billed (`test_expired_contract_remaining_due_periods_are_billed`).
+- Terminated contract overdue periods are billed and future periods are truncated (`test_terminated_contract_overdue_periods_are_billed_and_future_truncated`).
+- Cancelled contract schedule lines remain excluded (`test_cancelled_contract_schedule_lines_are_not_invoiced`).
+- Renewed contract billing remains intact (`test_renewed_contract_remaining_periods_are_still_billed`).
+- Legacy termination billing regression updated to reflect approved rule (`test_termination_removes_future_lines_and_stops_cron_invoicing`).
+
+Verification Results:
+- `TestEdaraPhase7Hardening`: 17/17 passed
+- `TestEdaraLeaseContract`: 38/38 passed
+- `TestLeaseDateAndScheduleEngine`: 35/35 passed
+- Combined relevant suites: 90/90 passed (0 failed, 0 errors)
+- Modified legacy test: 1/1 passed
+
+Unrelated Shared Development Database Environmental Issue:
+- `TestEdaraPaymentSchedule.test_late_fee_blocked_without_amount_configured` fails (`AssertionError: UserError not raised`) because `res.company.edara_late_fee_amount` is already configured in the shared development database (`odoo19_enterprise_dev`). Unrelated to Track A.
+
+Deployment / Operational Note:
+- After deployment, the next cron or manual invoice-generation run can catch up historical due/overdue uninvoiced schedule lines belonging to existing expired/terminated leases.
+- This was intentionally not executed against historical demo/dev data (such as `LC/2026/0011`). No bulk invoice generation was performed during implementation.
+
+Closure:
+- Status: CLOSED
+- Implementation commit: `4cf11f1`
+- Branch: `main`
+- Working tree: clean
 
 
 ## Deferred Findings / Future Work
