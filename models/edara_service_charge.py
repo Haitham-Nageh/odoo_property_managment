@@ -95,10 +95,24 @@ class EdaraServiceCharge(models.Model):
             if total_area <= 0:
                 raise UserError(_(
                     "Set an area (sqm) on this building's units before using proportional allocation."))
+            invalid_units = units.filtered(lambda u: u.area <= 0)
+            if invalid_units:
+                unit_names = ", ".join(invalid_units.mapped('name'))
+                raise UserError(_(
+                    "The following units have no valid area (sqm) configured: %s. "
+                    "Every eligible unit must have an area greater than zero for proportional allocation.",
+                    unit_names))
             return {unit: self.total_amount * (unit.area / total_area) for unit in units}
         if self.allocation_method == 'per_sqm':
             if self.rate_per_sqm <= 0:
                 raise UserError(_("Please set the rate per square meter."))
+            invalid_units = units.filtered(lambda u: u.area <= 0)
+            if invalid_units:
+                unit_names = ", ".join(invalid_units.mapped('name'))
+                raise UserError(_(
+                    "The following units have no valid area (sqm) configured: %s. "
+                    "Every eligible unit must have an area greater than zero for per square meter allocation.",
+                    unit_names))
             return {unit: self.rate_per_sqm * unit.area for unit in units}
         # fixed_per_unit
         if self.fixed_amount_per_unit <= 0:
