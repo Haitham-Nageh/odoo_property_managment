@@ -19,6 +19,7 @@ top of native Odoo Accounting, Portal, Contacts and Security.
         'mail',
         'portal',
         'account',
+        'account_payment',
         'web_gantt',
     ],
     'data': [

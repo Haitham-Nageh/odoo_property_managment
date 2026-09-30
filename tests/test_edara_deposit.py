@@ -379,3 +379,132 @@ class TestEdaraDeposit(TransactionCase):
         wizard_form = Form(self.env['edara.deposit.transaction.wizard'].with_context(
             active_id=deposit.id, default_transaction_type='deduction'))
         self.assertFalse(wizard_form.journal_id)
+
+    # ================= Phase 12.10: Deposit Amount Mutability =================
+
+    def test_deposit_amount_editable_before_collection(self):
+        """Test 1: Deposit amount = 3000, amount_held = 0 -> write amount = 3500 -> success."""
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id,
+            'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1),
+            'end_date': date(2026, 12, 31),
+            'rent_amount': 1000,
+            'deposit_required': True,
+            'deposit_amount': 3000,
+        })
+        deposit = self.env['edara.deposit'].create({
+            'contract_id': contract.id,
+            'amount': 3000,
+        })
+        self.assertEqual(deposit.amount, 3000)
+        self.assertEqual(deposit.amount_held, 0)
+
+        deposit.write({'amount': 3500})
+        self.assertEqual(deposit.amount, 3500)
+
+    def test_deposit_amount_immutable_after_partial_collection(self):
+        """Test 2: Deposit amount = 3000, collect 1000 -> write amount = 3500 -> blocked."""
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id,
+            'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1),
+            'end_date': date(2026, 12, 31),
+            'rent_amount': 1000,
+            'deposit_required': True,
+            'deposit_amount': 3000,
+        })
+        deposit = self.env['edara.deposit'].create({
+            'contract_id': contract.id,
+            'amount': 3000,
+        })
+        deposit.action_collect(self.cash_journal.id, 1000)
+        self.assertEqual(deposit.amount_held, 1000)
+
+        with self.assertRaises(UserError):
+            deposit.write({'amount': 3500})
+        self.assertEqual(deposit.amount, 3000)
+
+    def test_deposit_amount_immutable_after_full_collection(self):
+        """Test 3: Deposit amount = 3000, collect 3000 -> write amount = 3500 -> blocked."""
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id,
+            'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1),
+            'end_date': date(2026, 12, 31),
+            'rent_amount': 1000,
+            'deposit_required': True,
+            'deposit_amount': 3000,
+        })
+        deposit = self.env['edara.deposit'].create({
+            'contract_id': contract.id,
+            'amount': 3000,
+        })
+        deposit.action_collect(self.cash_journal.id, 3000)
+        self.assertEqual(deposit.amount_held, 3000)
+
+        with self.assertRaises(UserError):
+            deposit.write({'amount': 3500})
+        self.assertEqual(deposit.amount, 3000)
+
+    def test_failed_amount_mutation_preserves_deposit_state_and_transactions(self):
+        """Test 4: Verify that failed mutation does NOT alter Deposit.amount, amount_held, or transaction records."""
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id,
+            'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1),
+            'end_date': date(2026, 12, 31),
+            'rent_amount': 1000,
+            'deposit_required': True,
+            'deposit_amount': 3000,
+        })
+        deposit = self.env['edara.deposit'].create({
+            'contract_id': contract.id,
+            'amount': 3000,
+        })
+        deposit.action_collect(self.cash_journal.id, 1000)
+        initial_txn_count = len(deposit.transaction_ids)
+        initial_held = deposit.amount_held
+        initial_balance = deposit.balance
+
+        with self.assertRaises(UserError):
+            deposit.write({'amount': 4000})
+
+        self.assertEqual(deposit.amount, 3000)
+        self.assertEqual(deposit.amount_held, initial_held)
+        self.assertEqual(deposit.balance, initial_balance)
+        self.assertEqual(len(deposit.transaction_ids), initial_txn_count)
+        self.assertEqual(deposit.transaction_ids[0].amount, 1000)
+
+    def test_historical_transaction_amounts_remain_unchanged(self):
+        """Test 5: Verify that historical transaction amounts remain unchanged."""
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        self.env.company.edara_deposit_deduction_income_account_id = self.deduction_income_account.id
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id,
+            'tenant_id': self.tenant.id,
+            'start_date': date(2026, 1, 1),
+            'end_date': date(2026, 12, 31),
+            'rent_amount': 1000,
+            'deposit_required': True,
+            'deposit_amount': 3000,
+        })
+        deposit = self.env['edara.deposit'].create({
+            'contract_id': contract.id,
+            'amount': 3000,
+        })
+        deposit.action_collect(self.cash_journal.id, 1000)
+        deposit.action_collect(self.cash_journal.id, 1000)
+        deposit.action_refund(self.cash_journal.id, 500)
+
+        txns_before = sorted([(t.id, t.transaction_type, t.amount, t.payment_id.id) for t in deposit.transaction_ids])
+
+        with self.assertRaises(UserError):
+            deposit.write({'amount': 5000})
+
+        txns_after = sorted([(t.id, t.transaction_type, t.amount, t.payment_id.id) for t in deposit.transaction_ids])
+        self.assertEqual(txns_before, txns_after)
+        self.assertEqual(sorted([t.amount for t in deposit.transaction_ids]), [500.0, 1000.0, 1000.0])

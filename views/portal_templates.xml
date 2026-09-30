@@ -425,4 +425,18 @@
             </ul>
         </t>
     </template>
+
+    <!-- ================= Phase 12.10: Mixed-Currency Overdue Safeguard ================= -->
+
+    <template id="portal_my_home_overdue_invoice_edara" inherit_id="account_payment.portal_my_home_overdue_invoice">
+        <xpath expr="//a[@href='/my/invoices/overdue']" position="attributes">
+            <attribute name="t-if">page_name == 'invoice' and not invoice and filterby != 'bills' and overdue_invoice_count &gt; 0 and (user_id.partner_id._has_single_overdue_currency() if user_id else True)</attribute>
+        </xpath>
+    </template>
+
+    <template id="portal_docs_entry_edara" inherit_id="account_payment.portal_docs_entry">
+        <xpath expr="//button[contains(@onclick, '/my/invoices/overdue')]" position="attributes">
+            <attribute name="t-if">show_pay_overdue_invoices_button and (user_id.partner_id._has_single_overdue_currency() if user_id else True)</attribute>
+        </xpath>
+    </template>
 </odoo>

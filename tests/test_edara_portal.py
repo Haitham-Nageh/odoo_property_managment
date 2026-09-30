@@ -518,3 +518,116 @@ class TestEdaraPortal(HttpCase):
         resp_maint = self.url_open('/my/maintenance/%d' % maint_a.id, allow_redirects=False)
         self.assertIn(resp_maint.status_code, (302, 303))
         self.assertIn('/web/login', resp_maint.headers.get('Location', ''))
+
+    # ================= Phase 12.10: Mixed-Currency Overdue UX =================
+
+    def _post_overdue_invoice(self, tenant, currency=None, amount=1000.0, ref='Overdue Rent'):
+        currency = currency or self.env.company.currency_id
+        account_code = '408%d%s' % (tenant.id, currency.name[:3])
+        income_account = self.env['account.account'].search([
+            ('code', '=', account_code),
+        ], limit=1)
+        if not income_account:
+            income_account = self.env['account.account'].create({
+                'name': 'Overdue Income %s %d' % (currency.name, tenant.id),
+                'code': account_code,
+                'account_type': 'income',
+            })
+        move = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': tenant.id,
+            'currency_id': currency.id,
+            'invoice_date': date(2025, 1, 1),
+            'invoice_date_due': date(2025, 1, 15),
+            'invoice_line_ids': [(0, 0, {
+                'name': ref,
+                'quantity': 1,
+                'price_unit': amount,
+                'account_id': income_account.id,
+            })],
+        })
+        move.action_post()
+        return move
+
+    def test_overdue_single_currency_pay_all_visible(self):
+        """Case A: Tenant has overdue invoice in a single currency -> Pay overdue button is visible."""
+        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        inv = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0)
+        self.assertTrue(self.partner_a._has_single_overdue_currency())
+
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/invoices')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('/my/invoices/overdue', response.text)
+        self.assertIn(inv.name, response.text)
+
+    def test_overdue_multiple_invoices_same_currency_pay_all_visible(self):
+        """Case A: Multiple overdue invoices in the same currency -> Pay overdue button is visible."""
+        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        inv1 = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='Rent Part 1')
+        inv2 = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=700.0, ref='Rent Part 2')
+        self.assertTrue(self.partner_a._has_single_overdue_currency())
+
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/invoices')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('/my/invoices/overdue', response.text)
+        self.assertIn(inv1.name, response.text)
+        self.assertIn(inv2.name, response.text)
+
+    def test_overdue_mixed_currency_pay_all_hidden_and_individual_invoices_visible(self):
+        """Case B: Multiple overdue currencies (ILS + USD) -> Pay All Overdue action is hidden,
+        while each invoice remains visible in the list."""
+        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_usd = self.env['res.currency'].search([('name', '=', 'USD')], limit=1)
+        self.assertTrue(curr_usd, "USD currency must exist")
+
+        inv_ils = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='ILS Overdue')
+        inv_usd = self._post_overdue_invoice(self.partner_a, currency=curr_usd, amount=200.0, ref='USD Overdue')
+        self.assertFalse(self.partner_a._has_single_overdue_currency())
+
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/invoices')
+        self.assertEqual(response.status_code, 200)
+        # Pay All button is hidden
+        self.assertNotIn('/my/invoices/overdue', response.text)
+        # Both individual invoices are visible in the list
+        self.assertIn(inv_ils.name, response.text)
+        self.assertIn(inv_usd.name, response.text)
+
+    def test_overdue_triple_mixed_currency_pay_all_hidden(self):
+        """Case B: Multiple overdue currencies (ILS + USD + JOD) -> Pay All Overdue action is hidden."""
+        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_usd = self.env['res.currency'].search([('name', '=', 'USD')], limit=1)
+        curr_jod = self.env['res.currency'].search([('name', '=', 'JOD')], limit=1)
+        self.assertTrue(curr_usd and curr_jod, "USD and JOD currencies must exist")
+
+        self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='ILS Overdue')
+        self._post_overdue_invoice(self.partner_a, currency=curr_usd, amount=200.0, ref='USD Overdue')
+        self._post_overdue_invoice(self.partner_a, currency=curr_jod, amount=150.0, ref='JOD Overdue')
+        self.assertFalse(self.partner_a._has_single_overdue_currency())
+
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        response = self.url_open('/my/invoices')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('/my/invoices/overdue', response.text)
+
+    def test_overdue_individual_invoice_payment_accessible_for_mixed_currency(self):
+        """Case B: Individual invoice detail pages and native payment flows remain accessible
+        when multiple overdue currencies exist."""
+        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_usd = self.env['res.currency'].search([('name', '=', 'USD')], limit=1)
+
+        inv_ils = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='ILS Rent')
+        inv_usd = self._post_overdue_invoice(self.partner_a, currency=curr_usd, amount=200.0, ref='USD Rent')
+
+        self.authenticate('edara_tenant_a', 'edara_tenant_a')
+        # Check individual ILS invoice page
+        resp_ils = self.url_open('/my/invoices/%d' % inv_ils.id)
+        self.assertEqual(resp_ils.status_code, 200)
+        self.assertIn(inv_ils.name, resp_ils.text)
+
+        # Check individual USD invoice page
+        resp_usd = self.url_open('/my/invoices/%d' % inv_usd.id)
+        self.assertEqual(resp_usd.status_code, 200)
+        self.assertIn(inv_usd.name, resp_usd.text)

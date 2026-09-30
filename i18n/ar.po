@@ -4897,3 +4897,9 @@ msgstr "مبلغ الإيجار المنسوب لمعدل شهري لكشف ال
 #: model_terms:ir.ui.view,arch_db:property_managment.portal_unit_detail
 msgid "sqm"
 msgstr "sqm"
+
+#. module: property_managment
+#: code:addons/property_managment/models/edara_deposit.py:0
+#, python-format
+msgid "The deposit amount cannot be changed after collection has started."
+msgstr "لا يمكن تعديل مبلغ التأمين بعد بدء التحصيل."

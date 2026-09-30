@@ -47,6 +47,13 @@ class EdaraDeposit(models.Model):
                 raise ValidationError(_(
                     "This contract requires a security deposit; the deposit amount must be positive."))
 
+    def write(self, vals):
+        if 'amount' in vals:
+            for deposit in self:
+                if deposit.amount_held > 0 and deposit.currency_id.compare_amounts(vals['amount'], deposit.amount) != 0:
+                    raise UserError(_("The deposit amount cannot be changed after collection has started."))
+        return super().write(vals)
+
     @api.depends('transaction_ids.transaction_type', 'transaction_ids.amount')
     def _compute_amounts(self):
         for deposit in self:

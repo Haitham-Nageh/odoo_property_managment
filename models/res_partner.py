@@ -189,3 +189,20 @@ class ResPartner(models.Model):
                 archived_count += 1
 
         return archived_count
+
+    def _has_single_overdue_currency(self):
+        """Phase 12.10: Return True if this partner has at most one distinct
+        currency among their overdue invoices, allowing native batch payment.
+        If overdue invoices span multiple currencies, return False so that
+        the batch 'Pay All Overdue' action is hidden in portal views."""
+        if not self:
+            return True
+        partner = self[:1]
+        moves = self.env['account.move'].sudo().search([
+            ('state', 'not in', ('cancel', 'draft')),
+            ('move_type', 'in', ('out_invoice', 'out_receipt')),
+            ('payment_state', 'not in', ('in_payment', 'paid', 'reversed', 'blocked', 'invoicing_legacy')),
+            ('invoice_date_due', '<', fields.Date.today()),
+            ('partner_id', '=', partner.id),
+        ])
+        return len(moves.currency_id) <= 1

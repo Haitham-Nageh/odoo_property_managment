@@ -46,7 +46,7 @@
                         </group>
                         <group>
                             <field name="currency_id" invisible="1"/>
-                            <field name="amount"/>
+                            <field name="amount" readonly="amount_held &gt; 0"/>
                             <field name="amount_held" readonly="1"/>
                             <field name="amount_refunded" readonly="1"/>
                             <field name="amount_deducted" readonly="1"/>
