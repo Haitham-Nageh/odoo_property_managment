@@ -249,7 +249,11 @@ class EdaraLeaseContract(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('edara.lease.contract') or _('New')
-        return super().create(vals_list)
+        contracts = super().create(vals_list)
+        live_contracts = contracts.filtered(lambda c: c.state in LIVE_STATES)
+        if live_contracts:
+            live_contracts.mapped('tenant_id')._provision_edara_portal_tenant()
+        return contracts
 
     @api.constrains('start_date', 'end_date')
     def _check_dates(self):
@@ -295,16 +299,19 @@ class EdaraLeaseContract(models.Model):
     def write(self, vals):
         """The end date of a confirmed lease only ever moves LATER (an extension); shortening is
         Terminate. A later end date creates the missing schedule lines and nothing else."""
-        if 'end_date' not in vals:
-            return super().write(vals)
-        new_end = fields.Date.to_date(vals['end_date'])
-        live = self.filtered(lambda c: c.state in LIVE_STATES)
-        if any(new_end < c.end_date for c in live):
-            raise UserError(_("A confirmed lease's end date can only be moved later. To end it "
-                              "earlier, terminate the contract."))
+        if 'end_date' in vals:
+            new_end = fields.Date.to_date(vals['end_date'])
+            live = self.filtered(lambda c: c.state in LIVE_STATES)
+            if any(new_end < c.end_date for c in live):
+                raise UserError(_("A confirmed lease's end date can only be moved later. To end it "
+                                  "earlier, terminate the contract."))
         res = super().write(vals)
-        for contract in live:
-            contract._generate_schedule_lines()
+        if 'end_date' in vals:
+            live = self.filtered(lambda c: c.state in LIVE_STATES)
+            for contract in live:
+                contract._generate_schedule_lines()
+        if 'state' in vals or 'tenant_id' in vals:
+            self.filtered(lambda c: c.state in LIVE_STATES).mapped('tenant_id')._provision_edara_portal_tenant()
         return res
 
     def action_activate(self):
@@ -326,6 +333,7 @@ class EdaraLeaseContract(models.Model):
             # 'rented' once a lease covers today, 'reserved' while only a scheduled one exists.
             contract.unit_id.occupancy_status = contract.unit_id._lease_occupancy_state()
             contract._generate_schedule_lines()
+            contract.tenant_id._provision_edara_portal_tenant()
 
     def _check_can_start(self):
         self.ensure_one()
@@ -360,6 +368,8 @@ class EdaraLeaseContract(models.Model):
                         date_deadline=fields.Date.context_today(contract))
                 continue
             started |= contract
+        if started:
+            started.mapped('tenant_id')._provision_edara_portal_tenant()
         return started
 
     def _unlink_future_uninvoiced_schedule_lines(self):

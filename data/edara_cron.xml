@@ -91,4 +91,15 @@
         <field name="interval_type">days</field>
         <field name="active" eval="True"/>
     </record>
+
+    <!-- Phase 12.6 — Portal Tenant User Lifecycle Retention & Archiving -->
+    <record id="ir_cron_edara_cleanup_expired_portal_tenants" model="ir.cron">
+        <field name="name">EDARA: Archive portal tenant users past retention period</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_cleanup_expired_portal_tenants()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

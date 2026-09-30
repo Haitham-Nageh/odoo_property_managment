@@ -24,4 +24,5 @@ from . import test_edara_phase10_lease_engine
 from . import test_edara_phase1011_fixes
 from . import test_edara_phase1012_hardening
 from . import test_edara_phase1013_occupancy_self_healing
+from . import test_edara_portal_provisioning
 

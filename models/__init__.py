@@ -13,6 +13,7 @@ from . import edara_maintenance_request
 from . import edara_recurring_maintenance
 from . import edara_renewal_request
 from . import res_partner
+from . import res_users
 from . import res_company
 from . import res_config_settings
 from . import account_move
