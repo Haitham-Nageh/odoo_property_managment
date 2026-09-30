@@ -18,6 +18,8 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.7 — Billing Integrity: CLOSED
 - Phase 12.8 — Unit UX and Default Lease Rent: CLOSED
 - Phase 12.9 — Service Charge Area Validation: CLOSED
+- Phase 12.10 — Mixed-Currency Overdue UX & Security Deposit Mutability: CLOSED
+- Phase 12 Audit Stream: 10/10 findings addressed; remaining open environment item: wkhtmltopdf configuration
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -3044,13 +3046,70 @@ Closure:
 - Working tree: clean
 
 
+## Phase 12.10 — Mixed-Currency Overdue UX & Security Deposit Mutability
+
+Status: CLOSED
+
+Implementation Commit:
+`26978d249fefc5a04bc68ec5d117562f75bc93c0` (`[Phase 12.10] Harden mixed-currency overdue payments and deposit mutability`)
+
+Push:
+`origin/main` (commit `26978d2`)
+
+Approved Business Rules:
+1. **Mixed-Currency Overdue Payment UX**:
+   - Single overdue currency: Keep the native "Pay All Overdue" batch payment action available and visible in the portal.
+   - Multiple overdue currencies: Hide the native "Pay All Overdue" button in portal views (`/my/invoices` breadcrumbs and `/my/home` invoices card).
+   - Individual invoice payment: Overdue invoices across all currencies remain visible in the portal list; each invoice can be opened and paid individually via native Odoo single-invoice payment flow.
+   - Safe presentation safeguard: Does NOT convert currencies, aggregate different currencies, create a new payment engine, modify `account_payment`, modify Odoo core, or alter accounting logic.
+2. **Security Deposit Amount Mutability**:
+   - Before first collection (`amount_held == 0`): Deposit Amount is editable.
+   - Once collection has started (`amount_held > 0`): Deposit Amount becomes immutable.
+   - Enforced at model level via `write()` guard on `edara.deposit`, raising a translatable `UserError(_("The deposit amount cannot be changed after collection has started."))`.
+   - Responsive UI feedback via `readonly="amount_held > 0"` on `amount` in `edara_deposit_view_form`.
+   - Historical transactions, payments, journal entries, deductions, and refunds remain strictly unmodified.
+
+Implementation Scope:
+- `models/res_partner.py`: Added `_has_single_overdue_currency()` helper inspecting posted, unpaid overdue receivable moves and returning `len(moves.currency_id) <= 1`.
+- `views/portal_templates.xml`: Inherited `account_payment.portal_my_home_overdue_invoice` and `account_payment.portal_docs_entry` to guard batch pay buttons with `(user_id.partner_id._has_single_overdue_currency() if user_id else True)`.
+- `__manifest__.py`: Added `'account_payment'` to `depends`.
+- `models/edara_deposit.py`: Implemented model-level `write()` guard on `amount` when `amount_held > 0` using `currency_id.compare_amounts()`.
+- `views/deposit_views.xml`: Added `readonly="amount_held > 0"` on form amount field.
+- `i18n/ar.po`: Added Arabic runtime translation `"لا يمكن تعديل مبلغ التأمين بعد بدء التحصيل."`.
+- `tests/test_edara_deposit.py`: Added 5 focused regression tests.
+- `tests/test_edara_portal.py`: Added 5 focused regression tests.
+
+Verification Results:
+- **Automated Tests**:
+  - Deposit mutability focused tests: 5/5 PASS (`test_deposit_amount_editable_before_collection`, `test_deposit_amount_immutable_after_partial_collection`, `test_deposit_amount_immutable_after_full_collection`, `test_failed_amount_mutation_preserves_deposit_state_and_transactions`, `test_historical_transaction_amounts_remain_unchanged`).
+  - Mixed-currency overdue focused tests: 5/5 PASS (`test_overdue_single_currency_pay_all_visible`, `test_overdue_multiple_invoices_same_currency_pay_all_visible`, `test_overdue_mixed_currency_pay_all_hidden_and_individual_invoices_visible`, `test_overdue_triple_mixed_currency_pay_all_hidden`, `test_overdue_individual_invoice_payment_accessible_for_mixed_currency`).
+  - Full `TestEdaraDeposit` suite: 38/38 PASS.
+  - Full `TestEdaraPortal` suite: 45/45 PASS.
+  - Full `TestEdaraLeaseContract` suite: 42/42 PASS.
+  - Total test suite: 125/125 PASS (0 failures, 0 errors).
+  - `git diff --check`: PASS (0 errors).
+- **Manual Odoo UI Smoke Test**:
+  - Deposit before collection (3,000 → 3,500): ALLOWED.
+  - Deposit after partial collection (collected 1,000, 3,500 → 4,000): BLOCKED with UserError.
+  - Deposit after full collection (collected 2,500, 3,500 → 4,500): BLOCKED with UserError.
+  - Single currency overdue (Nour Hamdan - ILS only): Pay All Overdue button VISIBLE on `/my/invoices` and `/my/home`.
+  - Mixed currencies overdue (Layla Saleh - ILS + JOD): Pay All Overdue button HIDDEN; individual invoices viewable and individually payable.
+  - Mixed currencies overdue (Omar Jaber - ILS + USD): Pay All Overdue button HIDDEN; individual invoices viewable and individually payable.
+  - Zero test data left behind (clean rollback); port 8070 verified free; zero background Python/Odoo processes remaining.
+
+Closure:
+- Status: CLOSED
+- Implementation commit: `26978d2`
+- Branch: `main`
+- Working tree: clean
+
+
 ## Deferred Findings / Future Work
 
 ### Deferred Finding A — Native Odoo Mixed-Currency Overdue Aggregation
-- **Classification**: Native Odoo / Portal UX limitation (EDARA bug: No, Priority: Deferred).
-- **Observed Behavior**: Navigating to `/my/invoices/overdue` raises `Overdue invoices should share the same currency.` (Arabic: `يجب أن تكون للفواتير المتأخرة نفس العملة.`) when a portal partner has overdue invoices in multiple currencies (e.g., JOD 1,000 and ILS 1,000).
-- **Root Cause**: Native Odoo Enterprise `account_payment` portal logic treats overdue invoices as a single aggregate payment batch and requires same partner, same company, and same currency.
-- **Decision**: Do NOT modify native Odoo source or override the native controller at this stage. Deferred for future UX evaluation (e.g., suppressing the aggregate button or grouping overdue payments by currency EDARA-side).
+- **Classification**: Portal UX Safeguard / Native Odoo Compatibility.
+- **Status**: RESOLVED — Phase 12.10 (Commit `26978d2`).
+- **Resolution**: Native Odoo `/my/invoices/overdue` is confirmed single-currency batch-payment behavior rather than an EDARA calculation defect. Implemented a presentation-layer safeguard via inherited QWeb templates (`portal_my_home_overdue_invoice_edara` and `portal_docs_entry_edara`) conditioned on `partner._has_single_overdue_currency()`. When overdue invoices contain multiple currencies, the batch "Pay All Overdue" button is hidden to prevent native single-currency batch crashes, while preserving individual invoice visibility and payment. When all overdue invoices share the same currency, native batch payment remains available. No Odoo core files were modified, and no currency conversion was introduced.
 
 ### Deferred Finding B — Portal Tenant Group Provisioning
 - **Classification**: EDARA provisioning/lifecycle gap.
@@ -3058,13 +3117,20 @@ Closure:
 - **Resolution**: Fully implemented via bidirectional model hooks on `edara.lease.contract` and `res.users`, granting `property_managment.group_edara_portal_tenant` whenever a live lease exists, retaining access for 30 days post-lease, and archiving via scheduled action.
 
 ### Deferred Finding C — wkhtmltopdf Development Environment
-- **Classification**: Development Environment Setup (EDARA bug: No).
+- **Classification**: Development Environment Setup / Configuration (EDARA bug: No).
+- **Status**: OPEN.
 - **Observed Behavior**: Warning message `تعذّر إيجاد Wkhtmltopdf في نظامك. لا يمكن إنشاء ملف PDF.` on PDF export attempts in local environment.
-- **Root Cause**: Local development environment lacks installed/configured `wkhtmltopdf` binary. Production server setup dependency only; customer browsers handle PDF rendering independently.
+- **Known Facts**:
+  - Odoo 19 uses wkhtmltopdf for PDF report generation in this environment.
+  - `wkhtmltopdf.exe` exists on the machine (`version 0.12.6 (with patched qt)`).
+  - Odoo currently cannot discover it through the active development configuration (`D:\Odoo\Projects\Odoo 19.0e.20260801\config\odoo-enterprise-dev.conf`).
+  - Next step is an environment/configuration fix so Odoo can locate wkhtmltopdf, followed by UI/portal verification of actual PDF generation.
+  - This is an environment/configuration issue, not an EDARA business-model/code defect.
 
 ### Deferred Finding D — Native Mixed-Currency Overdue Page vs Normal Invoice List
 - **Classification**: Documentation / UX distinction.
-- **Observed Behavior**: `/my/invoices` works completely normally because invoices are listed individually. The multi-currency limitation is strictly isolated to the native aggregate overdue payment action on `/my/invoices/overdue`.
+- **Status**: RESOLVED — Phase 12.10 (Commit `26978d2`).
+- **Resolution**: Reconciled and resolved alongside Finding A. Normal `/my/invoices` lists invoices individually for payment, while `/my/invoices/overdue` batch payment is now cleanly guarded against mixed-currency selection.
 
 ### Deferred Finding E — Service Charge Area Validation
 - **Classification**: Business Logic / Allocation Integrity.
@@ -3073,12 +3139,13 @@ Closure:
 
 ### Preserved Deferred Findings
 - **Security Deposit**:
-  - `edara.deposit.amount` remains editable after collection.
-  - Cancelled/reversed native payments still count toward `amount_held`.
-  - Concurrent collection race conditions remain possible.
-  - Historical over-collected data prior to Phase 12.2 is not retroactively validated.
+  - `edara.deposit.amount` mutability: RESOLVED — Phase 12.10 (Commit `26978d2`). Deposit Amount is editable before first collection (`amount_held == 0`) and strictly immutable once collection starts (`amount_held > 0`), guarded at the model level and form UI with 5 regression tests.
+  - Cancelled/reversed native payments still count toward `amount_held` (preserved).
+  - Concurrent collection race conditions remain possible (preserved).
+  - Historical over-collected data prior to Phase 12.2 is not retroactively validated (preserved).
 - **Lease Sequence**:
-  - Non-contiguous Lease Contract sequence numbering observation remains deferred (e.g., `LC/2026/0002`, `LC/2026/0003`, ..., `LC/2026/0105`, `LC/2026/0108`).
+  - Status: CLOSED / INVESTIGATED.
+  - Confirmed expected Odoo sequence behavior: one global sequence for `edara.lease.contract`, standard native sequence implementation consumed at record creation. Draft leases may later be deleted and sequence numbers are not reclaimed, allowing gaps (e.g., `0003 → 0105 → 0108`). Unique numbering is satisfied, strict contiguous numbering is not a requirement, and no implementation change is required.
 - **Future Capability / Discovery Items (Preserved for Future Evaluation)**:
   - Owner-facing portal/surface.
   - Co-tenancy / multiple tenants per lease.
