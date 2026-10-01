@@ -16,161 +16,267 @@
         <field name="name">edara.dashboard.form</field>
         <field name="model">edara.dashboard</field>
         <field name="arch" type="xml">
-            <form string="EDARA Dashboard" create="false" edit="false" delete="false">
-                <div class="o_edara_dashboard container-fluid">
-                    <div class="oe_title">
-                        <h1>EDARA Property Management</h1>
-                        <p class="text-muted">Management Command Center - occupancy, leases, collections and maintenance at a glance.</p>
+            <form string="EDARA Dashboard" create="false" delete="false">
+                <div class="o_edara_dashboard container-fluid py-2">
+                    <div class="oe_title mb-3">
+                        <h1 class="mb-1">EDARA Property Management</h1>
+                        <p class="text-muted mb-0">Operational Command Center — occupancy, leases, collections and maintenance at a glance.</p>
                     </div>
                     <field name="currency_id" invisible="1"/>
                     <field name="has_accounting_access" invisible="1"/>
+                    <field name="has_multiple_branches" invisible="1"/>
 
-                    <div class="row mt16">
-                        <div class="col-lg-3 col-md-4 col-6">
+                    <!-- 1. GLOBAL CONTEXT BAR -->
+                    <div class="o_edara_context_bar p-3 mb-4 bg-view border rounded shadow-sm">
+                        <div class="row align-items-center g-3">
+                            <div class="col-lg-3 col-md-6 col-12">
+                                <label for="branch_id" class="fw-bold text-muted small text-uppercase d-block mb-1">Branch</label>
+                                <field name="branch_id" placeholder="All Accessible Branches" readonly="not has_multiple_branches" options="{'no_create': True, 'no_open': True}"/>
+                            </div>
+                            <div class="col-lg-3 col-md-6 col-12">
+                                <label for="period_preset" class="fw-bold text-muted small text-uppercase d-block mb-1">Reporting Period</label>
+                                <field name="period_preset" required="1"/>
+                            </div>
+                            <div class="col-lg-3 col-md-6 col-6">
+                                <label for="date_from" class="fw-bold text-muted small text-uppercase d-block mb-1">Date From</label>
+                                <field name="date_from" readonly="period_preset != 'custom'" required="period_preset == 'custom'"/>
+                            </div>
+                            <div class="col-lg-3 col-md-6 col-6">
+                                <label for="date_to" class="fw-bold text-muted small text-uppercase d-block mb-1">Date To</label>
+                                <field name="date_to" readonly="period_preset != 'custom'" required="period_preset == 'custom'"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. ATTENTION REQUIRED -->
+                    <separator string="Attention Required"/>
+                    <div class="row g-3 mt-1 o_edara_attention_center">
+                        <!-- Card 1: Expiring Leases -->
+                        <div class="col-lg-6 col-12">
+                            <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                    <div class="fw-bold d-flex align-items-center">
+                                        <i class="fa fa-clock-o text-warning me-2 fs-5"/>
+                                        <span>Expiring Leases</span>
+                                    </div>
+                                    <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-outline-warning fw-semibold">
+                                        <field name="expiring_soon_contracts_count" readonly="1"/> Due Soon (30d)
+                                    </button>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                    <field name="expiring_leases_html" widget="html" readonly="1" class="w-100"/>
+                                    <div class="text-end pt-2 border-top mt-2">
+                                        <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-link text-decoration-none p-0">
+                                            View All Expiring Leases &#8594;
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Overdue Payments -->
+                        <div class="col-lg-6 col-12" invisible="not has_accounting_access">
+                            <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                    <div class="fw-bold d-flex align-items-center">
+                                        <i class="fa fa-exclamation-circle text-danger me-2 fs-5"/>
+                                        <span>Overdue Payments</span>
+                                    </div>
+                                    <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-outline-danger fw-semibold">
+                                        <field name="schedule_overdue_count" readonly="1"/> Overdue (<field name="schedule_overdue_amount" widget="monetary" readonly="1"/>)
+                                    </button>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                    <field name="overdue_payments_html" widget="html" readonly="1" class="w-100"/>
+                                    <div class="text-end pt-2 border-top mt-2">
+                                        <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-link text-decoration-none text-danger p-0">
+                                            View All Overdue Payments &#8594;
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Maintenance Attention -->
+                        <div class="col-lg-6 col-12">
+                            <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                    <div class="fw-bold d-flex align-items-center">
+                                        <i class="fa fa-wrench text-danger me-2 fs-5"/>
+                                        <span>Maintenance Attention</span>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-outline-danger fw-semibold">
+                                            <field name="maintenance_urgent_count" readonly="1"/> Urgent
+                                        </button>
+                                        <button type="object" name="action_view_maintenance_sla_breached" class="btn btn-sm btn-outline-danger fw-semibold">
+                                            <field name="maintenance_sla_breached_count" readonly="1"/> Breached
+                                        </button>
+                                        <button type="object" name="action_view_maintenance_sla_at_risk" class="btn btn-sm btn-outline-warning fw-semibold">
+                                            <field name="maintenance_sla_at_risk_count" readonly="1"/> At Risk
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                    <field name="maintenance_attention_html" widget="html" readonly="1" class="w-100"/>
+                                    <div class="text-end pt-2 border-top mt-2">
+                                        <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-link text-decoration-none p-0">
+                                            View Urgent Requests &#8594;
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Pending Renewal Decisions -->
+                        <div class="col-lg-6 col-12">
+                            <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                    <div class="fw-bold d-flex align-items-center">
+                                        <i class="fa fa-refresh text-warning me-2 fs-5"/>
+                                        <span>Pending Renewals</span>
+                                    </div>
+                                    <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-outline-warning fw-semibold">
+                                        <field name="upcoming_renewals_count" readonly="1"/> Awaiting Decision
+                                    </button>
+                                </div>
+                                <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                    <field name="pending_renewals_html" widget="html" readonly="1" class="w-100"/>
+                                    <div class="text-end pt-2 border-top mt-2">
+                                        <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-link text-decoration-none p-0">
+                                            Review Renewal Decisions &#8594;
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. PORTFOLIO & OCCUPANCY -->
+                    <separator string="Portfolio &amp; Occupancy"/>
+                    <!-- Portfolio Summary -->
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_properties" class="oe_stat_button" icon="fa-sitemap text-primary">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="total_properties"/></span>
+                                    <span class="o_stat_value"><field name="total_properties" readonly="1"/></span>
                                     <span class="o_stat_text">Total Properties</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_buildings" class="oe_stat_button" icon="fa-building text-primary">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="total_buildings"/></span>
+                                    <span class="o_stat_value"><field name="total_buildings" readonly="1"/></span>
                                     <span class="o_stat_text">Total Buildings</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
-                            <button type="object" name="action_view_renewals_pending" class="oe_stat_button" icon="fa-refresh text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="upcoming_renewals_count"/></span>
-                                    <span class="o_stat_text">Pending Renewals</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_open" class="oe_stat_button" icon="fa-wrench text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="open_maintenance_count"/></span>
-                                    <span class="o_stat_text">Open Maintenance</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <separator string="Portfolio Overview - Units"/>
-                    <div class="row mt8">
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_units_total" class="oe_stat_button" icon="fa-building-o">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="total_units"/></span>
+                                    <span class="o_stat_value"><field name="total_units" readonly="1"/></span>
                                     <span class="o_stat_text">Total Units</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                    </div>
+
+                    <!-- Occupancy Breakdown -->
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_units_available" class="oe_stat_button" icon="fa-check-circle text-success">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="available_units"/></span>
+                                    <span class="o_stat_value"><field name="available_units" readonly="1"/></span>
                                     <span class="o_stat_text">Available</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
-                            <button type="object" name="action_view_units_reserved" class="oe_stat_button" icon="fa-clock-o text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="reserved_units"/></span>
-                                    <span class="o_stat_text">Reserved</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_units_rented" class="oe_stat_button" icon="fa-key text-primary">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="occupied_units"/></span>
+                                    <span class="o_stat_value"><field name="occupied_units" readonly="1"/></span>
                                     <span class="o_stat_text">Rented</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <button type="object" name="action_view_units_reserved" class="oe_stat_button" icon="fa-clock-o text-warning">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="reserved_units" readonly="1"/></span>
+                                    <span class="o_stat_text">Reserved</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <button type="object" name="action_view_units_under_maintenance" class="oe_stat_button" icon="fa-wrench text-warning">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="under_maintenance_units" readonly="1"/></span>
+                                    <span class="o_stat_text">Under Maintenance</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_units_owner_occupied" class="oe_stat_button" icon="fa-home text-muted">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="owner_occupied_units"/></span>
+                                    <span class="o_stat_value"><field name="owner_occupied_units" readonly="1"/></span>
                                     <span class="o_stat_text">Owner Occupied</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_units_sold" class="oe_stat_button" icon="fa-tag text-muted">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="sold_units"/></span>
+                                    <span class="o_stat_value"><field name="sold_units" readonly="1"/></span>
                                     <span class="o_stat_text">Sold</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-4 col-6">
-                            <button type="object" name="action_view_units_under_maintenance" class="oe_stat_button" icon="fa-wrench text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="under_maintenance_units"/></span>
-                                    <span class="o_stat_text">Under Maintenance</span>
                                 </div>
                             </button>
                         </div>
                     </div>
 
-                    <separator string="Lease Contracts"/>
-                    <div class="row mt8">
-                        <div class="col-lg-3 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_draft" class="oe_stat_button" icon="fa-pencil text-muted">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="draft_contracts_count"/></span>
-                                    <span class="o_stat_text">Draft</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                    <!-- Lease Lifecycle Statuses -->
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_contracts_active" class="oe_stat_button" icon="fa-check-circle text-success">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="active_contracts_count"/></span>
-                                    <span class="o_stat_text">Active</span>
+                                    <span class="o_stat_value"><field name="active_contracts_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Active Leases</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_expiring_soon" class="oe_stat_button" icon="fa-exclamation-triangle text-warning">
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <button type="object" name="action_view_contracts_draft" class="oe_stat_button" icon="fa-pencil text-muted">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="expiring_soon_contracts_count"/></span>
-                                    <span class="o_stat_text">Expiring Soon (30d)</span>
+                                    <span class="o_stat_value"><field name="draft_contracts_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Draft Leases</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_contracts_renewed" class="oe_stat_button" icon="fa-refresh text-primary">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="renewed_contracts_count"/></span>
+                                    <span class="o_stat_value"><field name="renewed_contracts_count" readonly="1"/></span>
                                     <span class="o_stat_text">Renewed</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_contracts_terminated" class="oe_stat_button" icon="fa-ban text-muted">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="terminated_contracts_count"/></span>
+                                    <span class="o_stat_value"><field name="terminated_contracts_count" readonly="1"/></span>
                                     <span class="o_stat_text">Terminated</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_contracts_expired" class="oe_stat_button" icon="fa-hourglass-end text-danger">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="expired_contracts_count"/></span>
+                                    <span class="o_stat_value"><field name="expired_contracts_count" readonly="1"/></span>
                                     <span class="o_stat_text">Expired</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_lease_timeline" class="oe_stat_button" icon="fa-tasks text-primary">
                                 <div class="o_stat_info">
                                     <span class="o_stat_text">Lease Timeline</span>
@@ -179,179 +285,185 @@
                         </div>
                     </div>
 
+                    <!-- 4. FINANCIAL OVERVIEW (Gated behind has_accounting_access) -->
                     <div invisible="not has_accounting_access">
-                        <separator string="Collections"/>
-                        <div class="row mt8">
-                            <div class="col-lg-3 col-md-4 col-6">
+                        <separator string="Financial Overview"/>
+                        <div class="row g-3 mt-1">
+                            <div class="col-lg-3 col-md-6 col-12">
                                 <button type="object" name="action_view_monthly_revenue" class="oe_stat_button" icon="fa-line-chart text-success">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="monthly_revenue" widget="monetary"/></span>
-                                        <span class="o_stat_text">Monthly Revenue</span>
+                                        <span class="o_stat_value"><field name="monthly_revenue" widget="monetary" readonly="1"/></span>
+                                        <span class="o_stat_text">Revenue (Period)</span>
                                     </div>
                                 </button>
                             </div>
-                            <div class="col-lg-3 col-md-4 col-6">
+                            <div class="col-lg-3 col-md-6 col-12">
                                 <button type="object" name="action_view_outstanding_receivables" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="outstanding_receivables" widget="monetary"/></span>
+                                        <span class="o_stat_value"><field name="outstanding_receivables" widget="monetary" readonly="1"/></span>
                                         <span class="o_stat_text">Outstanding Receivables</span>
                                     </div>
                                 </button>
                             </div>
-                            <div class="col-lg-3 col-md-4 col-6">
+                            <div class="col-lg-3 col-md-6 col-12">
                                 <button type="object" name="action_view_payments_this_month" class="oe_stat_button" icon="fa-money text-success">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="recent_payments_count"/></span>
-                                        <span class="o_stat_text">Payments This Month</span>
+                                        <span class="o_stat_value"><field name="recent_payments_count" readonly="1"/></span>
+                                        <span class="o_stat_text">Payments Recorded</span>
                                     </div>
                                 </button>
                             </div>
-                            <div class="col-lg-3 col-md-4 col-6">
+                            <div class="col-lg-3 col-md-6 col-12">
                                 <button type="object" name="action_view_maintenance_cost_this_month" class="oe_stat_button" icon="fa-wrench text-warning">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="maintenance_cost_this_month" widget="monetary"/></span>
-                                        <span class="o_stat_text">Maintenance Cost This Month</span>
+                                        <span class="o_stat_value"><field name="maintenance_cost_this_month" widget="monetary" readonly="1"/></span>
+                                        <span class="o_stat_text">Maintenance Expenses</span>
                                     </div>
                                 </button>
                             </div>
                         </div>
-                        <div class="row mt8">
-                            <div class="col-lg-3 col-md-4 col-6">
-                                <button type="object" name="action_view_schedule_overdue" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_overdue_count"/></span>
-                                        <span class="o_stat_text">Overdue</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-4 col-6">
+
+                        <!-- Schedule & Collections -->
+                        <div class="row g-3 mt-1">
+                            <div class="col-lg-3 col-md-6 col-6">
                                 <button type="object" name="action_view_schedule_due_today" class="oe_stat_button" icon="fa-calendar-o text-warning">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_due_today_count"/></span>
+                                        <span class="o_stat_value"><field name="schedule_due_today_count" readonly="1"/></span>
                                         <span class="o_stat_text">Due Today</span>
                                     </div>
                                 </button>
                             </div>
-                            <div class="col-lg-3 col-md-4 col-6">
+                            <div class="col-lg-3 col-md-6 col-6">
                                 <button type="object" name="action_view_schedule_due_this_month" class="oe_stat_button" icon="fa-calendar text-primary">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_due_this_month_count"/></span>
-                                        <span class="o_stat_text">Due This Month</span>
+                                        <span class="o_stat_value"><field name="schedule_due_this_month_count" readonly="1"/></span>
+                                        <span class="o_stat_text">Due in Period</span>
                                     </div>
                                 </button>
                             </div>
-                            <div class="col-lg-3 col-md-4 col-6">
+                            <div class="col-lg-3 col-md-6 col-6">
                                 <button type="object" name="action_view_schedule_paid" class="oe_stat_button" icon="fa-check-circle text-success">
                                     <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_paid_count"/></span>
+                                        <span class="o_stat_value"><field name="schedule_paid_count" readonly="1"/></span>
                                         <span class="o_stat_text">Paid</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div class="col-lg-3 col-md-6 col-6">
+                                <button type="object" name="action_view_schedule_overdue" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_value"><field name="schedule_overdue_count" readonly="1"/></span>
+                                        <span class="o_stat_text">Overdue</span>
                                     </div>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <separator string="Maintenance"/>
-                    <div class="row mt8">
-                        <div class="col-lg-3 col-md-4 col-6">
+                    <!-- 5. MAINTENANCE OVERVIEW -->
+                    <separator string="Maintenance Overview"/>
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <button type="object" name="action_view_maintenance_open" class="oe_stat_button" icon="fa-wrench text-warning">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="open_maintenance_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Open Requests</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_maintenance_new" class="oe_stat_button" icon="fa-inbox text-primary">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_new_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_new_count" readonly="1"/></span>
                                     <span class="o_stat_text">New</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_maintenance_assigned" class="oe_stat_button" icon="fa-user text-warning">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_assigned_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_assigned_count" readonly="1"/></span>
                                     <span class="o_stat_text">Assigned</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_maintenance_in_progress" class="oe_stat_button" icon="fa-wrench text-warning">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_in_progress_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_in_progress_count" readonly="1"/></span>
                                     <span class="o_stat_text">In Progress</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_maintenance_done" class="oe_stat_button" icon="fa-check-circle text-success">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_done_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_done_count" readonly="1"/></span>
                                     <span class="o_stat_text">Done</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-2 col-md-4 col-6">
                             <button type="object" name="action_view_maintenance_cancelled" class="oe_stat_button" icon="fa-ban text-muted">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_cancelled_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_cancelled_count" readonly="1"/></span>
                                     <span class="o_stat_text">Cancelled</span>
                                 </div>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Maintenance Phase 2 (2026-09-23) -->
-                    <div class="row mt8">
-                        <div class="col-lg-3 col-md-4 col-6">
+                    <!-- SLA & Recurring Status -->
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_maintenance_sla_at_risk" class="oe_stat_button" icon="fa-hourglass-half text-warning">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_sla_at_risk_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_sla_at_risk_count" readonly="1"/></span>
                                     <span class="o_stat_text">SLA At Risk</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_maintenance_sla_breached" class="oe_stat_button" icon="fa-exclamation-triangle text-danger">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_sla_breached_count"/></span>
+                                    <span class="o_stat_value"><field name="maintenance_sla_breached_count" readonly="1"/></span>
                                     <span class="o_stat_text">SLA Breached</span>
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-3 col-md-4 col-6">
+                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_recurring_maintenance_due" class="oe_stat_button" icon="fa-repeat text-primary">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="recurring_maintenance_due_count"/></span>
+                                    <span class="o_stat_value"><field name="recurring_maintenance_due_count" readonly="1"/></span>
                                     <span class="o_stat_text">Recurring Due</span>
                                 </div>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Business-level manual triggers (MAT-FIND-007, 2026-09-22) -->
-                    <separator string="Automation"/>
-                    <div class="row mt8">
-                        <div class="col-lg-4 col-md-6 col-12">
-                            <button type="object" name="action_manual_generate_due_invoices" class="btn-secondary mb-2"
+                    <!-- 6. QUICK ACTIONS & AUTOMATION -->
+                    <separator string="Quick Actions &amp; Automation"/>
+                    <div class="o_edara_quick_actions p-3 mt-2 bg-view border rounded shadow-sm">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="object" name="action_manual_generate_due_invoices" class="btn btn-secondary"
                                     confirm="Generate invoices now for every due, uninvoiced payment schedule line you can access?">
-                                Generate Due Invoices
+                                <i class="fa fa-file-text-o me-1"/> Generate Due Invoices
                             </button>
-                        </div>
-                        <div class="col-lg-4 col-md-6 col-12">
-                            <button type="object" name="action_manual_process_lease_expiry" class="btn-secondary mb-2"
+                            <button type="object" name="action_manual_process_lease_expiry" class="btn btn-secondary"
                                     confirm="Expire every active contract past its end date, among those you can access?">
-                                Process Lease Expiry
+                                <i class="fa fa-clock-o me-1"/> Process Lease Expiry
                             </button>
-                        </div>
-                        <div class="col-lg-4 col-md-6 col-12">
-                            <button type="object" name="action_manual_process_reminders" class="btn-secondary mb-2"
+                            <button type="object" name="action_manual_process_reminders" class="btn btn-secondary"
                                     confirm="Send lease expiry, renewal, overdue payment, maintenance and SLA reminders now, for records you can access?">
-                                Process Reminders
+                                <i class="fa fa-bell-o me-1"/> Process Reminders
                             </button>
-                        </div>
-                        <div class="col-lg-4 col-md-6 col-12">
-                            <button type="object" name="action_manual_generate_recurring_maintenance" class="btn-secondary mb-2"
+                            <button type="object" name="action_manual_generate_recurring_maintenance" class="btn btn-secondary"
                                     confirm="Generate maintenance requests now for every due, active recurring definition you can access?">
-                                Generate Recurring Maintenance
+                                <i class="fa fa-repeat me-1"/> Generate Recurring Maintenance
                             </button>
                         </div>
                     </div>
-                    </div>
+                </div>
             </form>
         </field>
     </record>

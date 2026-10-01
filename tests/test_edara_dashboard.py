@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
 
 
@@ -439,3 +439,438 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(dashboard.recent_payments_count, 0)
         # Non-accounting KPIs must still compute normally for a Viewer.
         self.assertGreaterEqual(dashboard.total_units, 2)
+
+    # -- Phase A: Dashboard Foundation Tests --
+
+    def test_branch_filter_restricts_dashboard_data(self):
+        """Phase A: Selecting a branch restricts dashboard counts and drill-down domains."""
+        branch2 = self.env['edara.branch'].create({
+            'name': 'Branch 2', 'code': 'BR2', 'company_id': self.dash_company.id,
+        })
+        prop2 = self.env['edara.property'].create({
+            'name': 'Property 2', 'code': 'P2', 'branch_id': branch2.id,
+        })
+        bld2 = self.env['edara.building'].create({
+            'name': 'Building 2', 'code': 'B2', 'property_id': prop2.id,
+        })
+        unit2 = self.env['edara.unit'].create({
+            'name': 'Unit 201', 'code': 'U201', 'building_id': bld2.id,
+        })
+
+        # All branches (empty branch_id) sees both branches
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertEqual(dash_all.total_properties, 2)
+        self.assertEqual(dash_all.total_buildings, 2)
+        self.assertEqual(dash_all.total_units, 3)
+
+        # Scoped to branch 1 (self.branch)
+        dash_b1 = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertEqual(dash_b1.total_properties, 1)
+        self.assertEqual(dash_b1.total_buildings, 1)
+        self.assertEqual(dash_b1.total_units, 2)
+        self.assertEqual(dash_b1.occupied_units, 1)
+        self.assertEqual(dash_b1.available_units, 1)
+        action_units = dash_b1.action_view_units_total()
+        self.assertIn(('branch_id', '=', self.branch.id), action_units['domain'])
+
+        # Scoped to branch 2
+        dash_b2 = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch2.id})
+        self.assertEqual(dash_b2.total_properties, 1)
+        self.assertEqual(dash_b2.total_buildings, 1)
+        self.assertEqual(dash_b2.total_units, 1)
+        self.assertEqual(dash_b2.occupied_units, 0)
+        self.assertEqual(dash_b2.available_units, 1)
+        action_units_b2 = dash_b2.action_view_units_total()
+        self.assertIn(('branch_id', '=', branch2.id), action_units_b2['domain'])
+
+    def test_reporting_period_presets_and_date_semantics(self):
+        """Phase A: Presets compute correct date_from and date_to, invalid dates raise
+        ValidationError, and current-state/lookahead widgets are not filtered by financial period."""
+        today = date.today()
+        month_start = today.replace(day=1)
+        next_m_start = month_start.replace(month=month_start.month + 1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1)
+        month_end = next_m_start - timedelta(days=1)
+
+        # 1. This Month preset
+        dash_month = self.env['edara.dashboard'].with_user(self.dash_admin).create({'period_preset': 'this_month'})
+        self.assertEqual(dash_month.date_from, month_start)
+        self.assertEqual(dash_month.date_to, month_end)
+
+        # 2. This Year preset
+        dash_year = self.env['edara.dashboard'].with_user(self.dash_admin).create({'period_preset': 'this_year'})
+        self.assertEqual(dash_year.date_from, date(today.year, 1, 1))
+        self.assertEqual(dash_year.date_to, date(today.year, 12, 31))
+
+        # 3. Custom preset
+        custom_from = date(2025, 1, 1)
+        custom_to = date(2025, 6, 30)
+        dash_custom = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'period_preset': 'custom',
+            'date_from': custom_from,
+            'date_to': custom_to,
+        })
+        self.assertEqual(dash_custom.date_from, custom_from)
+        self.assertEqual(dash_custom.date_to, custom_to)
+
+        # 4. Invalid date range raises ValidationError
+        with self.assertRaises(ValidationError):
+            self.env['edara.dashboard'].with_user(self.dash_admin).create({
+                'period_preset': 'custom',
+                'date_from': date(2026, 12, 31),
+                'date_to': date(2026, 1, 1),
+            })
+
+        # 5. Date semantics: occupancy, maintenance, and lease expiry remain current-state
+        # under custom historical period
+        self.assertEqual(dash_custom.total_units, 2)
+        self.assertEqual(dash_custom.occupied_units, 1)
+        self.assertEqual(dash_custom.available_units, 1)
+        self.assertEqual(dash_custom.maintenance_new_count, 0)
+        self.assertEqual(dash_custom.expiring_soon_contracts_count, 0)
+
+    def test_overdue_schedule_amount_and_branch_security(self):
+        """Phase A: schedule_overdue_amount computes reliably, and Viewer cannot see unauthorized branches."""
+        viewer = new_test_user(
+            self.env, login='dash_viewer_branch_sec@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])])
+        self.branch.user_ids = [(4, viewer.id)]
+        branch_unauth = self.env['edara.branch'].create({
+            'name': 'Unauthorized Branch', 'code': 'UNAUTH', 'company_id': self.dash_company.id,
+        })
+
+        # Viewer can read their own dashboard, branch_id list only contains self.branch
+        viewer_branches = self.env['edara.branch'].with_user(viewer).search([])
+        self.assertIn(self.branch, viewer_branches)
+        self.assertNotIn(branch_unauth, viewer_branches)
+
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertGreaterEqual(dash.schedule_overdue_amount, 0.0)
+
+    # -- Phase B: Attention Center Refinement Tests --
+
+    def test_phase_b_attention_center_empty_states(self):
+        """Phase B: When no records require attention, dashboard produces clear empty states."""
+        empty_branch = self.env['edara.branch'].create({
+            'name': 'Empty Attention Branch', 'code': 'EAB', 'company_id': self.dash_company.id,
+        })
+        dash = self.env['edara.dashboard'].create({'branch_id': empty_branch.id})
+        self.assertIn("No leases expiring soon", dash.expiring_leases_html)
+        self.assertIn("No overdue payments", dash.overdue_payments_html)
+        self.assertIn("No maintenance requiring attention", dash.maintenance_attention_html)
+        self.assertIn("No pending renewal decisions", dash.pending_renewals_html)
+
+    def test_phase_b_expiring_leases_attention(self):
+        """Phase B: Expiring leases section displays actionable context and respects 30-day window."""
+        today = date.today()
+        tenant = self.env['res.partner'].create({'name': 'Expiring Tenant Corp'})
+        unit_exp = self.env['edara.unit'].create({
+            'name': 'D-EXP-1', 'code': 'DEXP1', 'building_id': self.building.id,
+        })
+        unit_far = self.env['edara.unit'].create({
+            'name': 'D-EXP-2', 'code': 'DEXP2', 'building_id': self.building.id,
+        })
+        # 1. Lease expiring in 8 days (inside 30d window)
+        c_expiring = self.env['edara.lease.contract'].create({
+            'name': 'LC-EXP-001',
+            'unit_id': unit_exp.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=300),
+            'end_date': today + timedelta(days=8),
+            'rent_amount': 2000.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+        # 2. Lease expiring in 45 days (outside 30d window)
+        c_far = self.env['edara.lease.contract'].create({
+            'name': 'LC-EXP-FAR',
+            'unit_id': unit_far.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=300),
+            'end_date': today + timedelta(days=45),
+            'rent_amount': 3000.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertEqual(dash.expiring_soon_contracts_count, 1)
+        self.assertIn('Expiring Tenant Corp', dash.expiring_leases_html)
+        self.assertIn('LC-EXP-001', dash.expiring_leases_html)
+        self.assertIn('8 days remaining', dash.expiring_leases_html)
+        self.assertNotIn('LC-EXP-FAR', dash.expiring_leases_html)
+
+        action = dash.action_view_contracts_expiring_soon()
+        self.assertEqual(action['res_model'], 'edara.lease.contract')
+
+    def test_phase_b_overdue_payments_attention(self):
+        """Phase B: Overdue payments card displays record-level amounts with original currency."""
+        today = date.today()
+        tenant = self.env['res.partner'].create({'name': 'Overdue Tenant Ltd'})
+        branch_ovd = self.env['edara.branch'].create({
+            'name': 'Overdue Branch', 'code': 'OVDB', 'company_id': self.dash_company.id,
+        })
+        prop_ovd = self.env['edara.property'].create({
+            'name': 'Overdue Property', 'code': 'OVDP', 'branch_id': branch_ovd.id,
+        })
+        bld_ovd = self.env['edara.building'].create({
+            'name': 'Overdue Building', 'code': 'OVDBL', 'property_id': prop_ovd.id,
+        })
+        unit_overdue = self.env['edara.unit'].create({
+            'name': 'D-OVD-1', 'code': 'DOVD1', 'building_id': bld_ovd.id,
+        })
+        contract = self.env['edara.lease.contract'].create({
+            'name': 'LC-OVERDUE-01',
+            'unit_id': unit_overdue.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=60),
+            'end_date': today + timedelta(days=300),
+            'rent_amount': 1500.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+        schedule_line = self.env['edara.payment.schedule.line'].create({
+            'contract_id': contract.id,
+            'due_date': today - timedelta(days=12),
+            'amount': 1500.0,
+        })
+        self.assertEqual(schedule_line.state, 'overdue')
+
+        dash = self.env['edara.dashboard'].create({'branch_id': branch_ovd.id})
+        self.assertTrue(dash.has_accounting_access)
+        self.assertEqual(dash.schedule_overdue_count, 1)
+        self.assertIn('Overdue Tenant Ltd', dash.overdue_payments_html)
+        self.assertIn('LC-OVERDUE-01', dash.overdue_payments_html)
+        self.assertIn('12d overdue', dash.overdue_payments_html)
+        self.assertIn('1,500.00', dash.overdue_payments_html)
+
+        action = dash.action_view_schedule_overdue()
+        self.assertEqual(action['res_model'], 'edara.payment.schedule.line')
+
+    def test_phase_b_maintenance_attention(self):
+        """Phase B: Maintenance attention distinguishes urgent & SLA breached and excludes unrelated."""
+        admin = self.env.ref('base.user_admin')
+        Maintenance = self.env['edara.maintenance.request']
+
+        # 1. Urgent request (open)
+        urgent_req = Maintenance.create({
+            'title': 'Emergency Water Leak',
+            'unit_id': self.unit_rented.id,
+            'priority': 'urgent',
+            'state': 'new',
+        })
+        # 2. Normal priority request (open)
+        normal_req = Maintenance.create({
+            'title': 'Routine Painting',
+            'unit_id': self.unit_rented.id,
+            'priority': 'normal',
+            'state': 'new',
+        })
+        # 3. Done urgent request (completed)
+        done_urgent = Maintenance.create({
+            'title': 'Past Urgent Fixed',
+            'unit_id': self.unit_rented.id,
+            'priority': 'urgent',
+            'state': 'done',
+        })
+
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertEqual(dash.maintenance_urgent_count, 1)
+        self.assertIn('Emergency Water Leak', dash.maintenance_attention_html)
+        self.assertIn('Urgent', dash.maintenance_attention_html)
+        self.assertNotIn('Past Urgent Fixed', dash.maintenance_attention_html)
+
+        action_urgent = dash.action_view_maintenance_urgent()
+        self.assertEqual(action_urgent['res_model'], 'edara.maintenance.request')
+        self.assertIn(('priority', '=', 'urgent'), action_urgent['domain'])
+        self.assertIn(('branch_id', '=', self.branch.id), action_urgent['domain'])
+
+    def test_phase_b_pending_renewals_attention(self):
+        """Phase B: Pending renewals section shows submitted requests and excludes approved/rejected."""
+        today = date.today()
+        tenant = self.env['res.partner'].create({'name': 'Renewal Candidate'})
+        unit_ren = self.env['edara.unit'].create({
+            'name': 'D-REN-1', 'code': 'DREN1', 'building_id': self.building.id,
+        })
+        contract = self.env['edara.lease.contract'].create({
+            'name': 'LC-REN-01',
+            'unit_id': unit_ren.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=330),
+            'end_date': today + timedelta(days=35),
+            'rent_amount': 5000.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+        renewal_pending = self.env['edara.renewal.request'].create({
+            'contract_id': contract.id,
+            'requested_start_date': today + timedelta(days=36),
+            'requested_end_date': today + timedelta(days=400),
+            'requested_rent_amount': 5500.0,
+            'state': 'submitted',
+        })
+
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertEqual(dash.upcoming_renewals_count, 1)
+        self.assertIn('Renewal Candidate', dash.pending_renewals_html)
+        self.assertIn('LC-REN-01', dash.pending_renewals_html)
+        self.assertIn('5,500.00', dash.pending_renewals_html)
+
+        action = dash.action_view_renewals_pending()
+        self.assertEqual(action['res_model'], 'edara.renewal.request')
+        self.assertIn(('state', '=', 'submitted'), action['domain'])
+        self.assertIn(('branch_id', '=', self.branch.id), action['domain'])
+
+    def test_phase_b_viewer_security_attention_center(self):
+        """Phase B: Viewer cannot see overdue payments HTML and has no accounting leak."""
+        viewer = new_test_user(
+            self.env, login='dash_viewer_phase_b@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])])
+        self.branch.user_ids = [(4, viewer.id)]
+        dash_viewer = self.env['edara.dashboard'].with_user(viewer).create({})
+
+        self.assertFalse(dash_viewer.has_accounting_access)
+        self.assertFalse(dash_viewer.overdue_payments_html)
+        # Non-accounting attention fields remain accessible without AccessError
+        self.assertTrue(dash_viewer.expiring_leases_html)
+        self.assertTrue(dash_viewer.maintenance_attention_html)
+        self.assertTrue(dash_viewer.pending_renewals_html)
+
+    def test_phase_b_branch_filtering_in_attention_center(self):
+        """Phase B: When a branch filter is applied, attention center isolates records to that branch."""
+        today = date.today()
+        branch_b = self.env['edara.branch'].create({
+            'name': 'Attention Branch B', 'code': 'ATB', 'company_id': self.dash_company.id,
+        })
+        prop_b = self.env['edara.property'].create({
+            'name': 'Property B', 'code': 'PRPB', 'branch_id': branch_b.id,
+        })
+        bld_b = self.env['edara.building'].create({
+            'name': 'Building B', 'code': 'BLDB', 'property_id': prop_b.id,
+        })
+        unit_b = self.env['edara.unit'].create({
+            'name': 'Unit B-1', 'code': 'UB1', 'building_id': bld_b.id,
+        })
+        tenant_b = self.env['res.partner'].create({'name': 'Tenant Branch B'})
+
+        # Lease expiring in branch_b
+        self.env['edara.lease.contract'].create({
+            'name': 'LC-BRANCH-B',
+            'unit_id': unit_b.id,
+            'tenant_id': tenant_b.id,
+            'start_date': today - timedelta(days=300),
+            'end_date': today + timedelta(days=5),
+            'rent_amount': 4000.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+
+        # Dashboard filtered to self.branch
+        dash_filtered = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+        })
+        self.assertNotIn('LC-BRANCH-B', dash_filtered.expiring_leases_html)
+        self.assertNotIn('Tenant Branch B', dash_filtered.expiring_leases_html)
+
+    def test_phase_b_row_navigation_actions(self):
+        """Phase B Defect Fix: Attention Center rows have valid native form actions and URLs."""
+        today = date.today()
+        tenant = self.env['res.partner'].create({'name': 'Nav Test Tenant'})
+        branch_nav = self.env['edara.branch'].create({
+            'name': 'Nav Test Branch', 'code': 'NTB', 'company_id': self.dash_company.id,
+        })
+        prop_nav = self.env['edara.property'].create({
+            'name': 'Nav Property', 'code': 'NVP', 'branch_id': branch_nav.id,
+        })
+        bld_nav = self.env['edara.building'].create({
+            'name': 'Nav Building', 'code': 'NVB', 'property_id': prop_nav.id,
+        })
+        unit_nav = self.env['edara.unit'].create({
+            'name': 'D-NAV-1', 'code': 'DNAV1', 'building_id': bld_nav.id,
+        })
+        contract = self.env['edara.lease.contract'].create({
+            'name': 'LC-NAV-01',
+            'unit_id': unit_nav.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=100),
+            'end_date': today + timedelta(days=10),
+            'rent_amount': 2500.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+        schedule_line = self.env['edara.payment.schedule.line'].create({
+            'contract_id': contract.id,
+            'due_date': today - timedelta(days=5),
+            'amount': 2500.0,
+        })
+        maint_req = self.env['edara.maintenance.request'].create({
+            'title': 'Navigation Pipe Repair',
+            'unit_id': unit_nav.id,
+            'priority': 'urgent',
+            'state': 'new',
+        })
+        renewal_req = self.env['edara.renewal.request'].create({
+            'contract_id': contract.id,
+            'requested_start_date': today + timedelta(days=11),
+            'requested_end_date': today + timedelta(days=375),
+            'requested_rent_amount': 2600.0,
+            'state': 'submitted',
+        })
+
+        dash = self.env['edara.dashboard'].create({'branch_id': branch_nav.id})
+
+        # 1. HTML URLs contain native /odoo/action-.../{id} paths
+        self.assertIn(f'/odoo/action-property_managment.action_edara_lease_contract/{contract.id}',
+                      dash.expiring_leases_html)
+        self.assertIn(f'/odoo/action-property_managment.action_edara_payment_schedule_line/{schedule_line.id}',
+                      dash.overdue_payments_html)
+        self.assertIn(f'/odoo/action-property_managment.action_edara_maintenance_request/{maint_req.id}',
+                      dash.maintenance_attention_html)
+        self.assertIn(f'/odoo/action-property_managment.action_edara_renewal_request/{renewal_req.id}',
+                      dash.pending_renewals_html)
+
+        # 2. Native form action for Expiring Lease
+        action_lease = dash.with_context(
+            target_model='edara.lease.contract', target_id=contract.id
+        ).action_open_attention_record()
+        self.assertEqual(action_lease['res_model'], 'edara.lease.contract')
+        self.assertEqual(action_lease['res_id'], contract.id)
+        self.assertEqual(action_lease['view_mode'], 'form')
+
+        # 3. Native form action for Overdue Payment
+        action_ovd = dash.with_context(
+            target_model='edara.payment.schedule.line', target_id=schedule_line.id
+        ).action_open_attention_record()
+        self.assertEqual(action_ovd['res_model'], 'edara.payment.schedule.line')
+        self.assertEqual(action_ovd['res_id'], schedule_line.id)
+        self.assertEqual(action_ovd['view_mode'], 'form')
+
+        # 4. Native form action for Maintenance Request
+        action_maint = dash.with_context(
+            target_model='edara.maintenance.request', target_id=maint_req.id
+        ).action_open_attention_record()
+        self.assertEqual(action_maint['res_model'], 'edara.maintenance.request')
+        self.assertEqual(action_maint['res_id'], maint_req.id)
+        self.assertEqual(action_maint['view_mode'], 'form')
+
+        # 5. Native form action for Pending Renewal
+        action_ren = dash.with_context(
+            target_model='edara.renewal.request', target_id=renewal_req.id
+        ).action_open_attention_record()
+        self.assertEqual(action_ren['res_model'], 'edara.renewal.request')
+        self.assertEqual(action_ren['res_id'], renewal_req.id)
+        self.assertEqual(action_ren['view_mode'], 'form')
+
+        # 6. Security: Viewer cannot open accounting record
+        viewer = new_test_user(
+            self.env, login='dash_nav_viewer@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])])
+        self.branch.user_ids = [(4, viewer.id)]
+        dash_viewer = self.env['edara.dashboard'].with_user(viewer).create({'branch_id': self.branch.id})
+        with self.assertRaises(UserError):
+            dash_viewer.with_context(
+                target_model='edara.payment.schedule.line', target_id=schedule_line.id
+            ).action_open_attention_record()
+
+        # 7. Security: Disallowed model is rejected
+        with self.assertRaises(UserError):
+            dash.with_context(target_model='res.users', target_id=1).action_open_attention_record()

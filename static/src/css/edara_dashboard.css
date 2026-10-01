@@ -120,3 +120,98 @@
 .o_edara_dashboard .oe_stat_button:has(.text-warning) .o_stat_value { border-color: var(--warning, #b8860b); color: var(--warning, #b8860b); }
 .o_edara_dashboard .oe_stat_button:has(.text-success) .o_stat_value { border-color: var(--success, #28a745); color: var(--success, #28a745); }
 .o_edara_dashboard .oe_stat_button:has(.text-primary) .o_stat_value { border-color: var(--primary, #714b67); color: var(--primary, #714b67); }
+
+/* Phase A Foundation: Global Context Bar */
+.o_edara_dashboard .o_edara_context_bar {
+    background-color: var(--EdaraCard-bg, #ffffff);
+    border: 1px solid var(--border-color, #e3e6ea);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+
+.o_edara_dashboard .o_edara_context_bar .o_field_widget {
+    width: 100%;
+}
+
+/* Phase A Foundation: Attention Required cards accent */
+.o_edara_dashboard .o_attention_card {
+    border-top: 3px solid var(--border-color, #d8dce1) !important;
+}
+.o_edara_dashboard .o_attention_card:has(.text-danger) {
+    border-top-color: var(--danger, #dc3545) !important;
+}
+.o_edara_dashboard .o_attention_card:has(.text-warning) {
+    border-top-color: var(--warning, #b8860b) !important;
+}
+.o_edara_dashboard .o_attention_card:has(.text-primary) {
+    border-top-color: var(--primary, #714b67) !important;
+}
+
+/* Phase A Foundation: Quick Actions Bar */
+.o_edara_dashboard .o_edara_quick_actions {
+    background-color: var(--EdaraCard-bg, #fafbfc);
+    border: 1px solid var(--border-color, #e3e6ea);
+    border-radius: 8px;
+}
+
+.o_edara_dashboard .o_edara_quick_actions .btn {
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.15s ease-in-out;
+}
+
+.o_edara_dashboard .o_edara_quick_actions .btn:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .1);
+    transform: translateY(-1px);
+}
+
+/* Phase B: Attention Center Refinement */
+.o_edara_dashboard .o_edara_attention_center .o_attention_box {
+    background-color: var(--EdaraCard-bg, #ffffff);
+    border: 1px solid var(--border-color, #e3e6ea);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.o_edara_dashboard .o_edara_attention_center .o_attention_box:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
+}
+
+.o_edara_dashboard .o_attention_box .card-header {
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    background-color: var(--EdaraHeader-bg, #fbfcfd);
+}
+
+.o_edara_dashboard .o_attention_box .o_field_html {
+    min-height: unset;
+    margin-bottom: 0;
+}
+
+.o_edara_dashboard .o_attention_item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background-color: var(--EdaraItem-bg, #f8fafc);
+    border: 1px solid var(--border-color, #edf0f2);
+    border-radius: 6px;
+    text-decoration: none !important;
+    transition: all 0.15s ease-in-out;
+}
+
+.o_edara_dashboard .o_attention_item:hover {
+    background-color: var(--EdaraItemHover-bg, #f0f4f8);
+    border-color: var(--primary, #714b67);
+    transform: translateY(-1px);
+}
+
+.o_edara_dashboard .o_edara_empty_state {
+    padding: 24px 12px;
+    text-align: center;
+    color: var(--text-muted, #6c757d);
+}
