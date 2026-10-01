@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
@@ -874,3 +874,495 @@ class TestEdaraDashboard(TransactionCase):
         # 7. Security: Disallowed model is rejected
         with self.assertRaises(UserError):
             dash.with_context(target_model='res.users', target_id=1).action_open_attention_record()
+
+    # -- Phase C1: Recent Activity Operational Timeline Tests --
+
+    def _setup_c1_accounting_fixture(self):
+        main_comp = self.env.ref('base.main_company')
+        branch = self.env['edara.branch'].create({
+            'name': 'C1 Accounting Branch',
+            'code': 'C1AB',
+            'company_id': main_comp.id,
+        })
+        prop = self.env['edara.property'].create({'name': 'C1 Property', 'code': 'C1P', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'C1 Building', 'code': 'C1B', 'property_id': prop.id})
+        u1 = self.env['edara.unit'].create({'name': 'C1-U1', 'code': 'C1U1', 'building_id': bld.id})
+        u2 = self.env['edara.unit'].create({'name': 'C1-U2', 'code': 'C1U2', 'building_id': bld.id})
+        tenant = self.env['res.partner'].create({'name': 'C1 Tenant'})
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': u1.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31), 'rent_amount': 1000.0,
+            'deposit_required': False,
+        })
+        contract.action_activate()
+        bank_journal = self.env['account.journal'].search([
+            ('company_id', '=', main_comp.id), ('type', '=', 'bank'),
+        ], limit=1)
+        return {
+            'company': main_comp,
+            'branch': branch,
+            'property': prop,
+            'building': bld,
+            'unit1': u1,
+            'unit2': u2,
+            'tenant': tenant,
+            'contract': contract,
+            'bank_journal': bank_journal,
+        }
+
+    def test_c1_01_empty_state(self):
+        """1. Empty state: clean empty state 'No recent activity' when no events exist."""
+        empty_branch = self.env['edara.branch'].create({
+            'name': 'Empty Activity Branch', 'code': 'EACTB', 'company_id': self.dash_company.id,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': empty_branch.id})
+        self.assertIn('No recent activity', dash.recent_activity_html)
+
+    def test_c1_02_lease_terminated_activity(self):
+        """2. Lease terminated activity renders correctly with state=terminated and termination_date."""
+        today = date.today()
+        self.env['edara.lease.contract'].create({
+            'name': 'LC-TERM-001',
+            'unit_id': self.unit_rented.id,
+            'tenant_id': self.tenant.id,
+            'start_date': today - timedelta(days=60),
+            'end_date': today + timedelta(days=300),
+            'rent_amount': 1200.0,
+            'deposit_required': False,
+            'state': 'terminated',
+            'termination_date': today - timedelta(days=2),
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertIn('Lease Terminated: LC-TERM-001', dash.recent_activity_html)
+        self.assertIn('Terminated', dash.recent_activity_html)
+        self.assertIn((today - timedelta(days=2)).strftime('%Y-%m-%d'), dash.recent_activity_html)
+
+    def test_c1_03_maintenance_completed_activity(self):
+        """3. Maintenance completed activity renders correctly with state=done and resolved_at/completed_date."""
+        resolved_time = datetime.now() - timedelta(hours=5)
+        m_done = self.env['edara.maintenance.request'].create({
+            'title': 'Plumbing Leak Repaired',
+            'unit_id': self.unit_rented.id,
+            'state': 'done',
+            'resolved_at': resolved_time,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertIn('Maintenance Completed: ' + m_done.name, dash.recent_activity_html)
+        self.assertIn('Plumbing Leak Repaired', dash.recent_activity_html)
+        self.assertIn('Completed', dash.recent_activity_html)
+
+    def test_c1_04_renewal_approved_and_rejected(self):
+        """4. Renewal decision: approved and rejected renewals are distinguished visually/textually."""
+        today = date.today()
+        self.env['edara.renewal.request'].create({
+            'contract_id': self.contract.id,
+            'requested_start_date': today + timedelta(days=366),
+            'requested_end_date': today + timedelta(days=730),
+            'requested_rent_amount': 950.0,
+            'state': 'approved',
+        })
+        self.env['edara.renewal.request'].create({
+            'contract_id': self.contract.id,
+            'requested_start_date': today + timedelta(days=366),
+            'requested_end_date': today + timedelta(days=730),
+            'requested_rent_amount': 950.0,
+            'state': 'rejected',
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertIn('Renewal Approved', dash.recent_activity_html)
+        self.assertIn('Renewal Rejected', dash.recent_activity_html)
+        self.assertIn('Approved', dash.recent_activity_html)
+        self.assertIn('Rejected', dash.recent_activity_html)
+
+    def test_c1_05_payment_received(self):
+        """5. Payment received: inbound customer paid payment renders with amount and partner/lease info."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+        inv = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': f['tenant'].id,
+            'invoice_date': today,
+            'edara_contract_id': f['contract'].id,
+            'edara_branch_id': f['branch'].id,
+            'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Monthly Rent', 'quantity': 1, 'price_unit': 900.0})],
+        })
+        inv.action_post()
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=inv.ids
+        ).create({'journal_id': f['bank_journal'].id})._create_payments()
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
+        self.assertIn('Payment Received:', dash.recent_activity_html)
+        self.assertIn(f'for Lease {f["contract"].name}', dash.recent_activity_html)
+        self.assertIn('Paid', dash.recent_activity_html)
+
+    def test_c1_06_mixed_activity_ordering(self):
+        """6. Mixed activity ordering: all 4 sources sort by timestamp descending."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+
+        # Day -4: Terminated lease
+        c_term = self.env['edara.lease.contract'].create({
+            'name': 'LC-ORDER-1', 'unit_id': f['unit1'].id, 'tenant_id': f['tenant'].id,
+            'start_date': today - timedelta(days=100), 'end_date': today + timedelta(days=200),
+            'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+            'termination_date': today - timedelta(days=4),
+        })
+
+        # Day -3: Maintenance completed
+        m_done = self.env['edara.maintenance.request'].create({
+            'title': 'Order Test Maint', 'unit_id': f['unit1'].id, 'state': 'done',
+            'resolved_at': datetime.combine(today - timedelta(days=3), datetime.min.time()),
+        })
+
+        # Day -2: Payment received
+        inv = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today - timedelta(days=2),
+            'edara_contract_id': f['contract'].id, 'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent', 'quantity': 1, 'price_unit': 450.0})],
+        })
+        inv.action_post()
+        p = self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=inv.ids
+        ).create({'journal_id': f['bank_journal'].id, 'payment_date': today - timedelta(days=2)})._create_payments()
+
+        # Day -1 / today: Renewal decision
+        ren = self.env['edara.renewal.request'].create({
+            'contract_id': f['contract'].id, 'requested_start_date': today + timedelta(days=366),
+            'requested_end_date': today + timedelta(days=730), 'requested_rent_amount': 950.0,
+            'state': 'approved',
+        })
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
+        html = dash.recent_activity_html
+
+        idx_ren = html.find(f'action-property_managment.action_edara_renewal_request/{ren.id}')
+        idx_pay = html.find(f'action-account.action_account_payments/{p.id}')
+        idx_maint = html.find(f'action-property_managment.action_edara_maintenance_request/{m_done.id}')
+        idx_term = html.find(f'action-property_managment.action_edara_lease_contract/{c_term.id}')
+
+        self.assertTrue(all(i != -1 for i in (idx_ren, idx_pay, idx_maint, idx_term)))
+        self.assertLess(idx_ren, idx_pay)
+        self.assertLess(idx_pay, idx_maint)
+        self.assertLess(idx_maint, idx_term)
+
+    def test_c1_07_shared_activity_cap(self):
+        """7. Shared activity cap: merged candidate list is capped at exactly 8 items."""
+        today = date.today()
+        for i in range(10):
+            self.env['edara.lease.contract'].create({
+                'name': f'LC-CAP-{i:02d}', 'unit_id': self.unit_rented.id, 'tenant_id': self.tenant.id,
+                'start_date': today - timedelta(days=100), 'end_date': today + timedelta(days=200),
+                'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+                'termination_date': today - timedelta(days=i + 1),
+            })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        count = dash.recent_activity_html.count('class="o_activity_item text-reset"')
+        self.assertEqual(count, 8)
+
+    def test_c1_08_branch_isolation(self):
+        """8. Branch isolation: when branch_id is specified, only that branch's activities appear."""
+        today = date.today()
+        branch_b = self.env['edara.branch'].create({
+            'name': 'Branch B Isolation', 'code': 'BBISO', 'company_id': self.dash_company.id,
+        })
+        prop_b = self.env['edara.property'].create({
+            'name': 'Property B', 'code': 'PBISO', 'branch_id': branch_b.id,
+        })
+        bld_b = self.env['edara.building'].create({
+            'name': 'Building B', 'code': 'BBISO2', 'property_id': prop_b.id,
+        })
+        unit_b = self.env['edara.unit'].create({
+            'name': 'B-101', 'code': 'B101', 'building_id': bld_b.id,
+        })
+        self.env['edara.lease.contract'].create({
+            'name': 'LC-BRANCH-A', 'unit_id': self.unit_rented.id, 'tenant_id': self.tenant.id,
+            'start_date': today - timedelta(days=100), 'end_date': today + timedelta(days=200),
+            'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+            'termination_date': today,
+        })
+        self.env['edara.lease.contract'].create({
+            'name': 'LC-BRANCH-B', 'unit_id': unit_b.id, 'tenant_id': self.tenant.id,
+            'start_date': today - timedelta(days=100), 'end_date': today + timedelta(days=200),
+            'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+            'termination_date': today,
+        })
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertIn('LC-BRANCH-A', dash_a.recent_activity_html)
+        self.assertNotIn('LC-BRANCH-B', dash_a.recent_activity_html)
+
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_b.id})
+        self.assertIn('LC-BRANCH-B', dash_b.recent_activity_html)
+        self.assertNotIn('LC-BRANCH-A', dash_b.recent_activity_html)
+
+    def test_c1_09_accounting_access_gating(self):
+        """9. Accounting access gating: viewer sees non-accounting activities, but payment rows are omitted."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+        self.env['edara.lease.contract'].create({
+            'name': 'LC-GATE-TERM', 'unit_id': f['unit1'].id, 'tenant_id': f['tenant'].id,
+            'start_date': today - timedelta(days=50), 'end_date': today + timedelta(days=100),
+            'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+            'termination_date': today,
+        })
+        inv = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today,
+            'edara_contract_id': f['contract'].id, 'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent', 'quantity': 1, 'price_unit': 450.0})],
+        })
+        inv.action_post()
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=inv.ids
+        ).create({'journal_id': f['bank_journal'].id})._create_payments()
+
+        viewer = new_test_user(
+            self.env, login='dash_viewer_c1_gating@example.com', groups='property_managment.group_edara_viewer',
+            company_id=f['company'].id, company_ids=[(6, 0, [f['company'].id])])
+        f['branch'].user_ids = [(4, viewer.id)]
+
+        dash_viewer = self.env['edara.dashboard'].with_user(viewer).create({'branch_id': f['branch'].id})
+        self.assertFalse(dash_viewer.has_accounting_access)
+        self.assertIn('LC-GATE-TERM', dash_viewer.recent_activity_html)
+        self.assertNotIn('Payment Received', dash_viewer.recent_activity_html)
+        self.assertNotIn('action-account.action_account_payments', dash_viewer.recent_activity_html)
+
+    def test_c1_10_date_filter_independence(self):
+        """10. Date-filter independence: Recent activity does not depend on reporting period or dates."""
+        today = date.today()
+        self.env['edara.lease.contract'].create({
+            'name': 'LC-DATE-INDEP', 'unit_id': self.unit_rented.id, 'tenant_id': self.tenant.id,
+            'start_date': today - timedelta(days=100), 'end_date': today + timedelta(days=200),
+            'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+            'termination_date': today,
+        })
+        dash_future = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'custom',
+            'date_from': date(2030, 1, 1),
+            'date_to': date(2030, 12, 31),
+        })
+        self.assertIn('LC-DATE-INDEP', dash_future.recent_activity_html)
+
+    def test_c1_11_maintenance_missing_date_exclusion(self):
+        """11. Maintenance missing-date exclusion: done maintenance with no resolved_at or completed_date is excluded."""
+        self.env['edara.maintenance.request'].create({
+            'title': 'Undated Done Request',
+            'unit_id': self.unit_rented.id,
+            'state': 'done',
+            'resolved_at': False,
+            'completed_date': False,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertNotIn('Undated Done Request', dash.recent_activity_html)
+
+    def test_c1_12_payment_reconciliation_ambiguity(self):
+        """12. Payment reconciliation ambiguity: 1 lease shows lease ref; 0 or multiple leases shows generic payment."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+
+        contract2 = self.env['edara.lease.contract'].create({
+            'unit_id': f['unit2'].id, 'tenant_id': f['tenant'].id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31), 'rent_amount': 800,
+            'deposit_required': False,
+        })
+
+        # Payment A: exactly 1 contract
+        inv1 = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today,
+            'edara_contract_id': f['contract'].id, 'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent Single', 'quantity': 1, 'price_unit': 300.0})],
+        })
+        inv1.action_post()
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=inv1.ids
+        ).create({'journal_id': f['bank_journal'].id})._create_payments()
+
+        # Payment B: generic invoice without contract
+        inv_gen = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today,
+            'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Service Generic', 'quantity': 1, 'price_unit': 200.0})],
+        })
+        inv_gen.action_post()
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=inv_gen.ids
+        ).create({'journal_id': f['bank_journal'].id})._create_payments()
+
+        # Payment C: reconciled to 2 contracts
+        inv_c1 = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today,
+            'edara_contract_id': f['contract'].id, 'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent C1', 'quantity': 1, 'price_unit': 100.0})],
+        })
+        inv_c1.action_post()
+        inv_c2 = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today,
+            'edara_contract_id': contract2.id, 'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent C2', 'quantity': 1, 'price_unit': 100.0})],
+        })
+        inv_c2.action_post()
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=(inv_c1 | inv_c2).ids
+        ).create({'journal_id': f['bank_journal'].id, 'group_payment': True})._create_payments()
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
+        html = dash.recent_activity_html
+
+        self.assertIn(f'for Lease {f["contract"].name}', html)
+        self.assertIn('Payment Received: 200.00', html)
+        self.assertIn(f'from {f["tenant"].name}', html)
+        self.assertNotIn(f'for Lease {contract2.name}', html)
+
+    def test_c1_13_vendor_outbound_payment_exclusion(self):
+        """13. Vendor/outbound payment exclusion: vendor and outbound payments are not displayed."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+        vendor = self.env['res.partner'].create({'name': 'Vendor Contractor Inc'})
+        bill = self.env['account.move'].create({
+            'move_type': 'in_invoice',
+            'partner_id': vendor.id,
+            'invoice_date': today,
+            'edara_branch_id': f['branch'].id,
+            'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Maintenance Bill', 'quantity': 1, 'price_unit': 600.0})],
+        })
+        bill.action_post()
+        vendor_pay = self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=bill.ids
+        ).create({'journal_id': f['bank_journal'].id})._create_payments()
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
+        self.assertNotIn(f'action-account.action_account_payments/{vendor_pay.id}', dash.recent_activity_html)
+        self.assertNotIn('Vendor Contractor Inc', dash.recent_activity_html)
+
+    def test_c1_14_in_process_payment_exclusion(self):
+        """14. in_process payment exclusion: payments not in state=paid are excluded."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+        pay_in_process = self.env['account.payment'].create({
+            'payment_type': 'inbound',
+            'partner_type': 'customer',
+            'partner_id': f['tenant'].id,
+            'amount': 350.0,
+            'journal_id': f['bank_journal'].id,
+            'company_id': f['company'].id,
+            'date': today,
+        })
+        pay_in_process.action_post()
+        self.assertEqual(pay_in_process.state, 'in_process')
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
+        self.assertNotIn(f'action-account.action_account_payments/{pay_in_process.id}', dash.recent_activity_html)
+
+    def test_c1_15_html_escaping(self):
+        """15. HTML escaping: malicious strings in record names/titles are escaped."""
+        today = date.today()
+        self.env['edara.lease.contract'].create({
+            'name': '<script>alert("xss")</script>',
+            'unit_id': self.unit_rented.id,
+            'tenant_id': self.tenant.id,
+            'start_date': today - timedelta(days=50),
+            'end_date': today + timedelta(days=100),
+            'rent_amount': 500.0,
+            'deposit_required': False,
+            'state': 'terminated',
+            'termination_date': today,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertNotIn('<script>', dash.recent_activity_html)
+        self.assertIn('&lt;script&gt;', dash.recent_activity_html)
+        self.assertIn('xss', dash.recent_activity_html)
+
+    def test_c1_16_correct_native_navigation_urls(self):
+        """16. Correct native navigation URLs: links use real /odoo/action-.../{id} routes."""
+        f = self._setup_c1_accounting_fixture()
+        today = date.today()
+
+        c_term = self.env['edara.lease.contract'].create({
+            'name': 'LC-NAV-TERM', 'unit_id': f['unit1'].id, 'tenant_id': f['tenant'].id,
+            'start_date': today - timedelta(days=50), 'end_date': today + timedelta(days=100),
+            'rent_amount': 500.0, 'deposit_required': False, 'state': 'terminated',
+            'termination_date': today,
+        })
+        m_done = self.env['edara.maintenance.request'].create({
+            'title': 'Nav Maint Done', 'unit_id': f['unit1'].id, 'state': 'done',
+            'resolved_at': datetime.now(),
+        })
+        ren = self.env['edara.renewal.request'].create({
+            'contract_id': f['contract'].id, 'requested_start_date': today + timedelta(days=366),
+            'requested_end_date': today + timedelta(days=730), 'requested_rent_amount': 950.0,
+            'state': 'approved',
+        })
+        inv = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': f['tenant'].id, 'invoice_date': today,
+            'edara_contract_id': f['contract'].id, 'edara_branch_id': f['branch'].id, 'company_id': f['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent', 'quantity': 1, 'price_unit': 450.0})],
+        })
+        inv.action_post()
+        pay = self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=inv.ids
+        ).create({'journal_id': f['bank_journal'].id})._create_payments()
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
+        html = dash.recent_activity_html
+
+        self.assertIn(f'/odoo/action-property_managment.action_edara_lease_contract/{c_term.id}', html)
+        self.assertIn(f'/odoo/action-property_managment.action_edara_maintenance_request/{m_done.id}', html)
+        self.assertIn(f'/odoo/action-property_managment.action_edara_renewal_request/{ren.id}', html)
+        self.assertIn(f'/odoo/action-account.action_account_payments/{pay.id}', html)
+
+        # Also verify action_open_attention_record works for account.payment
+        act_pay = dash.with_context(
+            target_model='account.payment', target_id=pay.id
+        ).action_open_attention_record()
+        self.assertEqual(act_pay['res_model'], 'account.payment')
+        self.assertEqual(act_pay['res_id'], pay.id)
+        self.assertEqual(act_pay['view_mode'], 'form')
+
+    def test_c1_17_maintenance_candidate_ordering_by_completion_timestamp(self):
+        """17. Maintenance candidate ordering: Older records with recent resolved_at rank ahead of newer records with older timestamps."""
+        now = datetime.now()
+        branch_order = self.env['edara.branch'].create({
+            'name': 'Maint Order Branch', 'code': 'MOBR', 'company_id': self.dash_company.id,
+        })
+        prop = self.env['edara.property'].create({
+            'name': 'Maint Prop', 'code': 'MPROP', 'branch_id': branch_order.id,
+        })
+        bld = self.env['edara.building'].create({
+            'name': 'Maint Bld', 'code': 'MBLD', 'property_id': prop.id,
+        })
+        unit = self.env['edara.unit'].create({
+            'name': 'M-Unit', 'code': 'MUNT', 'building_id': bld.id,
+        })
+
+        # 1. Create an older maintenance record (lower ID) with a RECENT resolved_at (e.g. 5 minutes ago)
+        m_old_recent = self.env['edara.maintenance.request'].create({
+            'title': 'Recent Urgent Fix Low ID',
+            'unit_id': unit.id,
+            'state': 'done',
+            'resolved_at': now - timedelta(minutes=5),
+        })
+
+        # 2. Create newer records (higher IDs) with OLDER completion timestamps (e.g. 20-30 days ago)
+        # Create 25 such records to exceed the CANDIDATE_LIMIT * 2 (20) window
+        for i in range(25):
+            self.env['edara.maintenance.request'].create({
+                'title': f'Old Completion High ID {i:02d}',
+                'unit_id': unit.id,
+                'state': 'done',
+                'resolved_at': now - timedelta(days=20 + i),
+            })
+
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_order.id})
+        html = dash.recent_activity_html
+
+        # Verify that m_old_recent was NOT excluded by the candidate limit due to its lower ID
+        self.assertIn('Recent Urgent Fix Low ID', html)
+        self.assertIn(f'action-property_managment.action_edara_maintenance_request/{m_old_recent.id}', html)
+
+        # Verify it ranks first among maintenance activities in the timeline
+        idx_recent = html.find(f'action-property_managment.action_edara_maintenance_request/{m_old_recent.id}')
+        idx_first_maint = html.find('action-property_managment.action_edara_maintenance_request/')
+        self.assertGreater(idx_recent, -1)
+        self.assertEqual(idx_recent, idx_first_maint)

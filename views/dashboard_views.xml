@@ -441,7 +441,13 @@
                         </div>
                     </div>
 
-                    <!-- 6. QUICK ACTIONS & AUTOMATION -->
+                    <!-- 6. RECENT ACTIVITY -->
+                    <separator string="Recent Activity"/>
+                    <div class="o_edara_recent_activity p-3 mt-2 bg-view border rounded shadow-sm">
+                        <field name="recent_activity_html" widget="html" readonly="1" class="w-100"/>
+                    </div>
+
+                    <!-- 7. QUICK ACTIONS & AUTOMATION -->
                     <separator string="Quick Actions &amp; Automation"/>
                     <div class="o_edara_quick_actions p-3 mt-2 bg-view border rounded shadow-sm">
                         <div class="d-flex flex-wrap gap-2">

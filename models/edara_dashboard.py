@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -89,6 +89,7 @@ class EdaraDashboard(models.TransientModel):
     overdue_payments_html = fields.Html(compute='_compute_kpis', sanitize=False)
     maintenance_attention_html = fields.Html(compute='_compute_kpis', sanitize=False)
     pending_renewals_html = fields.Html(compute='_compute_kpis', sanitize=False)
+    recent_activity_html = fields.Html(compute='_compute_kpis', sanitize=False)
 
     currency_id = fields.Many2one('res.currency', compute='_compute_kpis')
     monthly_revenue = fields.Monetary(compute='_compute_kpis', currency_field='currency_id')
@@ -373,6 +374,10 @@ class EdaraDashboard(models.TransientModel):
             upcoming_renewals_count = Renewal.search_count(renewal_domain)
             pending_renewals_html = dashboard._render_pending_renewals_html(pending_renewals, comp)
 
+            recent_activity_html = dashboard._render_recent_activity_html(
+                branch_domain, branch, comp, has_accounting_access,
+            )
+
             dashboard.update({
                 'total_properties': total_properties,
                 'total_buildings': total_buildings,
@@ -407,6 +412,7 @@ class EdaraDashboard(models.TransientModel):
                 'maintenance_cost_this_month': maintenance_cost_this_month,
                 'upcoming_renewals_count': upcoming_renewals_count,
                 'pending_renewals_html': pending_renewals_html,
+                'recent_activity_html': recent_activity_html,
                 'open_maintenance_count': Maintenance.search_count(branch_domain + [('state', 'not in', ('done', 'cancelled'))]),
                 'recent_payments_count': recent_payments_count,
                 'schedule_overdue_count': schedule_overdue_count,
@@ -576,6 +582,207 @@ class EdaraDashboard(models.TransientModel):
             )
         return f'<div class="o_attention_list">{"".join(items)}</div>'
 
+    def _render_recent_activity_html(self, branch_domain, branch, comp, has_accounting_access):
+        """Phase C1: Render a unified, interleaved operational timeline of recent activity.
+        Sources:
+        - Lease Terminated: edara.lease.contract (state='terminated', termination_date!=False)
+        - Maintenance Completed: edara.maintenance.request (state='done', resolved_at or completed_date)
+        - Renewal Decision: edara.renewal.request (state in ('approved', 'rejected'), write_date)
+        - Payment Received: account.payment (gated by has_accounting_access, inbound, customer, paid)
+        Independent candidate queries, merged, sorted descending by timestamp, capped at 8.
+        """
+        CANDIDATE_LIMIT = 10
+        FINAL_CAP = 8
+        activities = []
+
+        Contract = self.env['edara.lease.contract']
+        Maintenance = self.env['edara.maintenance.request']
+        Renewal = self.env['edara.renewal.request']
+
+        # 1. Lease Terminated
+        term_domain = branch_domain + [
+            ('state', '=', 'terminated'),
+            ('termination_date', '!=', False),
+        ]
+        term_contracts = Contract.search(term_domain, order='termination_date desc, id desc', limit=CANDIDATE_LIMIT)
+        for c in term_contracts:
+            t_date = c.termination_date
+            timestamp = datetime.combine(t_date, time.min)
+            unit_str = f" ({c.unit_id.name})" if c.unit_id else ""
+            tenant_name = c.tenant_id.name or _('Unknown Tenant')
+            activities.append({
+                'id': c.id,
+                'action_xml_id': 'property_managment.action_edara_lease_contract',
+                'timestamp': timestamp,
+                'raw_date': t_date,
+                'title': f"Lease Terminated: {c.name}",
+                'subtitle': f"{tenant_name}{unit_str}",
+                'badge_label': 'Terminated',
+                'badge_class': 'bg-danger-subtle text-danger border border-danger-subtle',
+                'icon_class': 'fa fa-ban text-danger',
+                'icon_bg': 'bg-danger-subtle',
+            })
+
+        # 2. Maintenance Completed
+        # Exclude records where both resolved_at and completed_date are missing.
+        maint_domain = branch_domain + [
+            ('state', '=', 'done'),
+            '|', ('resolved_at', '!=', False), ('completed_date', '!=', False),
+        ]
+        maint_candidates = Maintenance.search(
+            maint_domain,
+            order='resolved_at desc nulls last, completed_date desc nulls last, id desc',
+            limit=CANDIDATE_LIMIT * 2,
+        )
+        for m in maint_candidates:
+            raw_dt = m.resolved_at or m.completed_date
+            if not raw_dt:
+                continue
+            if isinstance(raw_dt, datetime):
+                timestamp = raw_dt
+            elif isinstance(raw_dt, date):
+                timestamp = datetime.combine(raw_dt, time.min)
+            else:
+                continue
+
+            unit_str = f" ({m.unit_id.name})" if m.unit_id else ""
+            m_title = f": {m.title}" if m.title else ""
+            activities.append({
+                'id': m.id,
+                'action_xml_id': 'property_managment.action_edara_maintenance_request',
+                'timestamp': timestamp,
+                'raw_date': raw_dt,
+                'title': f"Maintenance Completed: {m.name}{m_title}",
+                'subtitle': unit_str.strip(),
+                'badge_label': 'Completed',
+                'badge_class': 'bg-success-subtle text-success border border-success-subtle',
+                'icon_class': 'fa fa-wrench text-success',
+                'icon_bg': 'bg-success-subtle',
+            })
+
+        # 3. Renewal Decision
+        renewal_domain = branch_domain + [
+            ('state', 'in', ('approved', 'rejected')),
+        ]
+        renewal_candidates = Renewal.search(renewal_domain, order='write_date desc, id desc', limit=CANDIDATE_LIMIT)
+        for ren in renewal_candidates:
+            timestamp = ren.write_date or datetime.min
+            is_approved = (ren.state == 'approved')
+            status_label = 'Approved' if is_approved else 'Rejected'
+            badge_class = (
+                'bg-success-subtle text-success border border-success-subtle'
+                if is_approved
+                else 'bg-danger-subtle text-danger border border-danger-subtle'
+            )
+            icon_class = 'fa fa-check-circle text-success' if is_approved else 'fa fa-times-circle text-danger'
+            icon_bg = 'bg-success-subtle' if is_approved else 'bg-danger-subtle'
+
+            contract_str = ren.contract_id.name or _('Contract')
+            tenant_str = ren.tenant_id.name or ""
+            activities.append({
+                'id': ren.id,
+                'action_xml_id': 'property_managment.action_edara_renewal_request',
+                'timestamp': timestamp,
+                'raw_date': timestamp,
+                'title': f"Renewal {status_label}: Lease {contract_str}",
+                'subtitle': tenant_str,
+                'badge_label': status_label,
+                'badge_class': badge_class,
+                'icon_class': icon_class,
+                'icon_bg': icon_bg,
+            })
+
+        # 4. Payment Received (accounting-gated)
+        if has_accounting_access:
+            Payment = self.env['account.payment']
+            payment_domain = [
+                ('payment_type', '=', 'inbound'),
+                ('partner_type', '=', 'customer'),
+                ('state', '=', 'paid'),
+            ]
+            if branch:
+                branch_invoices = self.env['account.move'].search([('edara_branch_id', '=', branch.id)])
+                payment_domain.append(('reconciled_invoice_ids', 'in', branch_invoices.ids))
+
+            payments = Payment.search(payment_domain, order='date desc, id desc', limit=CANDIDATE_LIMIT)
+            for p in payments:
+                p_date = p.date or date.min
+                timestamp = datetime.combine(p_date, time.min) if isinstance(p_date, date) else p_date
+
+                reconciled_contracts = p.reconciled_invoice_ids.mapped('edara_contract_id').filtered(lambda c: c)
+                curr = p.currency_id or comp.currency_id
+                curr_str = curr.symbol or curr.name or ''
+                amt_str = f"{p.amount:,.2f} {curr_str}".strip()
+                partner_name = p.partner_id.name or _('Customer')
+
+                if len(reconciled_contracts) == 1:
+                    contract_name = reconciled_contracts[0].name
+                    title = f"Payment Received: {amt_str} for Lease {contract_name}"
+                    subtitle = partner_name
+                else:
+                    title = f"Payment Received: {amt_str} from {partner_name}"
+                    subtitle = ""
+
+                activities.append({
+                    'id': p.id,
+                    'action_xml_id': 'account.action_account_payments',
+                    'timestamp': timestamp,
+                    'raw_date': p_date,
+                    'title': title,
+                    'subtitle': subtitle,
+                    'badge_label': 'Paid',
+                    'badge_class': 'bg-primary-subtle text-primary border border-primary-subtle',
+                    'icon_class': 'fa fa-money text-primary',
+                    'icon_bg': 'bg-primary-subtle',
+                })
+
+        if not activities:
+            return (
+                '<div class="o_edara_empty_state text-center text-muted py-3">'
+                '<i class="fa fa-history text-muted fs-5 mb-1 d-block"/>'
+                '<span>No recent activity</span>'
+                '</div>'
+            )
+
+        # Sort descending by timestamp, tie-break by id descending
+        activities.sort(key=lambda a: (a['timestamp'], a['id']), reverse=True)
+        activities = activities[:FINAL_CAP]
+
+        items = []
+        for act in activities:
+            url = f"/odoo/action-{act['action_xml_id']}/{act['id']}"
+            title = html_escape(act['title'])
+            subtitle_val = act['subtitle'].strip() if act['subtitle'] else ""
+            subtitle_html = f'<span class="text-muted small ms-1">• {html_escape(subtitle_val)}</span>' if subtitle_val else ""
+            badge_label = html_escape(act['badge_label'])
+            badge_class = act['badge_class']
+            icon_class = act['icon_class']
+            icon_bg = act['icon_bg']
+
+            raw_dt = act['raw_date']
+            if isinstance(raw_dt, (datetime, date)):
+                date_str = raw_dt.strftime('%Y-%m-%d')
+            else:
+                date_str = html_escape(str(raw_dt or ''))
+
+            items.append(
+                f'<a href="{url}" class="o_activity_item text-reset">'
+                f'<div class="o_activity_icon {icon_bg}">'
+                f'<i class="{icon_class}"/>'
+                f'</div>'
+                f'<div class="o_activity_content me-2 text-truncate">'
+                f'<span class="fw-semibold text-dark">{title}</span>'
+                f'{subtitle_html}'
+                f'</div>'
+                f'<div class="o_activity_meta ms-auto text-end flex-shrink-0">'
+                f'<span class="badge {badge_class} me-2">{badge_label}</span>'
+                f'<span class="o_activity_date text-muted small">{date_str}</span>'
+                f'</div>'
+                f'</a>'
+            )
+
+        return f'<div class="o_activity_timeline">{"".join(items)}</div>'
+
     def action_open_attention_record(self):
         """Native action to open the form view of an individual record from the Attention Center.
         Receives target_model and target_id from context. Enforces access rights and record rules without sudo."""
@@ -587,11 +794,12 @@ class EdaraDashboard(models.TransientModel):
             'edara.payment.schedule.line': 'property_managment.action_edara_payment_schedule_line',
             'edara.maintenance.request': 'property_managment.action_edara_maintenance_request',
             'edara.renewal.request': 'property_managment.action_edara_renewal_request',
+            'account.payment': 'account.action_account_payments',
         }
         if not res_model or res_model not in ALLOWED_MODELS or not res_id:
             raise UserError(_("Invalid or unspecified target record for Attention Center navigation."))
 
-        if res_model == 'edara.payment.schedule.line':
+        if res_model in ('edara.payment.schedule.line', 'account.payment'):
             self._require_accounting_access()
 
         record = self.env[res_model].browse(int(res_id))
