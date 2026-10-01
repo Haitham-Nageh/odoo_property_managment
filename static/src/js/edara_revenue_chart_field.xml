@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="property_managment.EdaraRevenueTrendChartField">
+        <div class="o_edara_revenue_trend_widget w-100">
+            <!-- Header with Title and Currency Indicator -->
+            <div class="o_edara_revenue_trend_header d-flex align-items-center justify-content-between mb-3 pb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa fa-bar-chart text-success fs-5"/>
+                    <span class="fw-bold fs-6 text-dark">Revenue Trend (Trailing 6 Months)</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark border px-2 py-1">
+                        <i class="fa fa-money me-1"/>
+                        <t t-esc="chartData.currency || 'Company Currency'"/>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Zero / Empty State -->
+            <t t-if="isAllZero">
+                <div class="o_edara_chart_empty_state text-center py-4 text-muted">
+                    <i class="fa fa-bar-chart fa-3x mb-2 text-muted opacity-50"/>
+                    <div class="fw-semibold">No revenue in trailing 6 months</div>
+                    <div class="small text-muted">Revenue trend will appear once customer invoices are posted.</div>
+                </div>
+            </t>
+
+            <!-- Chart Canvas -->
+            <t t-else="">
+                <div class="o_edara_revenue_chart_canvas_wrapper position-relative">
+                    <canvas t-ref="canvas"/>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

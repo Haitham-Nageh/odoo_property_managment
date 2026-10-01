@@ -283,6 +283,11 @@
                             </div>
                         </div>
 
+                        <!-- Revenue Trend (Phase C3: 6-Month Bar Chart + Click-to-Filter) -->
+                        <div class="o_edara_revenue_trend_section p-3 mt-2 bg-view border rounded shadow-sm">
+                            <field name="revenue_trend_data" widget="edara_revenue_trend_chart" readonly="1" class="w-100"/>
+                        </div>
+
                         <!-- Schedule & Collections -->
                         <div class="row g-3 mt-1">
                             <div class="col-lg-3 col-md-6 col-6">

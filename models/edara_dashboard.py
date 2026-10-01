@@ -1,9 +1,11 @@
 import json
 from datetime import date, datetime, time, timedelta
+from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import html_escape
+from odoo.tools.misc import format_date
 
 # BD-003 (2026-09-22): ACTIVE contracts whose end_date falls within the next
 # 30 calendar days (today through today+30, inclusive of both boundaries).
@@ -92,6 +94,7 @@ class EdaraDashboard(models.TransientModel):
     pending_renewals_html = fields.Html(compute='_compute_kpis', sanitize=False)
     recent_activity_html = fields.Html(compute='_compute_kpis', sanitize=False)
     occupancy_chart_data = fields.Text(compute='_compute_kpis')
+    revenue_trend_data = fields.Text(compute='_compute_kpis')
 
     currency_id = fields.Many2one('res.currency', compute='_compute_kpis')
     monthly_revenue = fields.Monetary(compute='_compute_kpis', currency_field='currency_id')
@@ -427,6 +430,51 @@ class EdaraDashboard(models.TransientModel):
             }
             occupancy_chart_data = json.dumps(occupancy_data)
 
+            # Phase C3: Trailing 6 calendar months Revenue Trend
+            cur_month_start = today.replace(day=1)
+            window_start = cur_month_start - relativedelta(months=5)
+            window_end = (cur_month_start + relativedelta(months=1)) - timedelta(days=1)
+
+            if has_accounting_access:
+                trend_domain = [
+                    ('state', '=', 'posted'),
+                    ('move_type', 'in', ('out_invoice', 'out_refund')),
+                    ('invoice_date', '>=', window_start),
+                    ('invoice_date', '<=', window_end),
+                ] + move_branch_domain
+                trend_groups = Move._read_group(
+                    trend_domain, ['invoice_date:month'], ['amount_untaxed_signed:sum']
+                )
+                trend_totals = {
+                    (d.year, d.month): round(val or 0.0, 2)
+                    for d, val in trend_groups
+                    if d
+                }
+            else:
+                trend_totals = {}
+
+            trend_months = []
+            total_trend_revenue = 0.0
+            for idx in range(6):
+                months_ago = 5 - idx
+                m_start = cur_month_start - relativedelta(months=months_ago)
+                val = trend_totals.get((m_start.year, m_start.month), 0.0) if has_accounting_access else 0.0
+                total_trend_revenue += val
+                trend_months.append({
+                    'index': idx,
+                    'label': format_date(self.env, m_start, date_format='MMM yyyy'),
+                    'year': m_start.year,
+                    'month': m_start.month,
+                    'value': val,
+                })
+
+            revenue_trend_data = json.dumps({
+                'currency': comp.currency_id.name or '',
+                'currency_symbol': comp.currency_id.symbol or '',
+                'total_revenue': round(total_trend_revenue, 2),
+                'months': trend_months,
+            })
+
             dashboard.update({
                 'total_properties': total_properties,
                 'total_buildings': total_buildings,
@@ -438,6 +486,7 @@ class EdaraDashboard(models.TransientModel):
                 'sold_units': sold_units,
                 'under_maintenance_units': under_maintenance_units,
                 'occupancy_chart_data': occupancy_chart_data,
+                'revenue_trend_data': revenue_trend_data,
                 'draft_contracts_count': contract_counts['draft'],
                 'active_contracts_count': contract_counts['active'],
                 'renewed_contracts_count': contract_counts['renewed'],
@@ -1059,6 +1108,35 @@ class EdaraDashboard(models.TransientModel):
             ('state', '=', 'posted'), ('move_type', 'in', ('out_invoice', 'out_refund')),
             ('invoice_date', '>=', d_from), ('invoice_date', '<=', d_to),
         ])
+
+    def action_view_revenue_trend_month(self, month_index=None):
+        """Phase C3: Opens native Revenue Report filtered to the exact calendar
+        month bucket corresponding to month_index (0..5, where 0 is 5 months ago
+        and 5 is current month). Fully server-validated and branch-aware."""
+        self.ensure_one()
+        self._require_accounting_access()
+        if month_index is None:
+            month_index = self.env.context.get('month_index')
+        try:
+            month_index = int(month_index)
+        except (TypeError, ValueError):
+            raise UserError(_("Invalid month index."))
+        if month_index < 0 or month_index > 5:
+            raise UserError(_("Month index must be between 0 and 5."))
+
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+        months_ago = 5 - month_index
+        m_start = cur_month_start - relativedelta(months=months_ago)
+        m_end = (m_start + relativedelta(months=1)) - timedelta(days=1)
+
+        domain = [
+            ('state', '=', 'posted'),
+            ('move_type', 'in', ('out_invoice', 'out_refund')),
+            ('invoice_date', '>=', m_start),
+            ('invoice_date', '<=', m_end),
+        ]
+        return self._quick_action('action_edara_revenue_report', domain)
 
     def action_view_outstanding_receivables(self):
         """Same domain as the Outstanding Receivables KPI (all-time, not month-bound)."""

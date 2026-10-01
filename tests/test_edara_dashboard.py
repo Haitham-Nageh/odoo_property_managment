@@ -1,6 +1,8 @@
 import json
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
+from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
 
@@ -1549,3 +1551,204 @@ class TestEdaraDashboard(TransactionCase):
             'date_to': date(2040, 12, 31),
         })
         self.assertEqual(dash_current.occupancy_chart_data, dash_future.occupancy_chart_data)
+
+    # -- Phase C3: Revenue Trend Tests --
+
+    def _setup_c3_accounting_fixture(self):
+        main_comp = self.env.ref('base.main_company')
+        branch_a = self.env['edara.branch'].create({
+            'name': 'C3 Branch A', 'code': 'C3BA', 'company_id': main_comp.id,
+        })
+        branch_b = self.env['edara.branch'].create({
+            'name': 'C3 Branch B', 'code': 'C3BB', 'company_id': main_comp.id,
+        })
+        tenant = self.env['res.partner'].create({'name': 'C3 Tenant'})
+        return {
+            'company': main_comp,
+            'branch_a': branch_a,
+            'branch_b': branch_b,
+            'tenant': tenant,
+        }
+
+    def _create_c3_move(self, fixture, branch, move_type, date_val, amount, posted=True):
+        move = self.env['account.move'].create({
+            'move_type': move_type,
+            'partner_id': fixture['tenant'].id,
+            'invoice_date': date_val,
+            'edara_branch_id': branch.id if branch else False,
+            'company_id': fixture['company'].id,
+            'invoice_line_ids': [(0, 0, {'name': 'Test Rent Line', 'quantity': 1, 'price_unit': amount})],
+        })
+        if posted:
+            move.action_post()
+        return move
+
+    def test_c3_01_six_month_buckets(self):
+        """C3-01: Exactly six monthly buckets are present in chronological order with valid labels and structure."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        data = json.loads(dash.revenue_trend_data)
+        self.assertIn('months', data)
+        self.assertEqual(len(data['months']), 6)
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+        for i, m in enumerate(data['months']):
+            self.assertEqual(m['index'], i)
+            expected_date = cur_month_start - relativedelta(months=5 - i)
+            self.assertEqual(m['year'], expected_date.year)
+            self.assertEqual(m['month'], expected_date.month)
+            self.assertTrue(m['label'])
+            self.assertIsInstance(m['value'], (int, float))
+        self.assertTrue(data.get('currency'))
+
+    def test_c3_02_correct_aggregation_invoices_and_refunds(self):
+        """C3-02: Correct aggregation: customer invoices and credit notes signed effect matches amount_untaxed_signed."""
+        f = self._setup_c3_accounting_fixture()
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+        m5_date = cur_month_start
+        m4_date = cur_month_start - relativedelta(months=1)
+
+        # In branch A:
+        # Month 5: invoice 1000, refund 200 => net 800
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', m5_date, 1000.0)
+        self._create_c3_move(f, f['branch_a'], 'out_refund', m5_date, 200.0)
+        # Month 4: invoice 500 => net 500
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', m4_date, 500.0)
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(data['months'][5]['value'], 800.0)
+        self.assertEqual(data['months'][4]['value'], 500.0)
+        self.assertEqual(data['total_revenue'], 1300.0)
+
+    def test_c3_03_draft_and_cancelled_exclusion(self):
+        """C3-03: Non-posted invoices (draft/cancelled) are completely excluded from trend aggregation."""
+        f = self._setup_c3_accounting_fixture()
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', cur_month_start, 1000.0, posted=True)
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', cur_month_start, 2000.0, posted=False)
+        canc_move = self._create_c3_move(f, f['branch_a'], 'out_invoice', cur_month_start, 3000.0, posted=True)
+        canc_move.button_cancel()
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(data['months'][5]['value'], 1000.0)
+
+    def test_c3_04_branch_filtering(self):
+        """C3-04: Branch filtering correctly isolates revenue per branch or shows whole accessible company data."""
+        f = self._setup_c3_accounting_fixture()
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', cur_month_start, 1000.0)
+        self._create_c3_move(f, f['branch_b'], 'out_invoice', cur_month_start, 2500.0)
+
+        dash_a = self.env['edara.dashboard'].create({'branch_id': f['branch_a'].id})
+        data_a = json.loads(dash_a.revenue_trend_data)
+        self.assertEqual(data_a['months'][5]['value'], 1000.0)
+
+        dash_b = self.env['edara.dashboard'].create({'branch_id': f['branch_b'].id})
+        data_b = json.loads(dash_b.revenue_trend_data)
+        self.assertEqual(data_b['months'][5]['value'], 2500.0)
+
+        dash_all = self.env['edara.dashboard'].create({})
+        data_all = json.loads(dash_all.revenue_trend_data)
+        self.assertGreaterEqual(data_all['months'][5]['value'], 3500.0)
+
+    def test_c3_05_empty_months(self):
+        """C3-05: Missing/empty months appear with 0.0 value and maintain all six month slots."""
+        f = self._setup_c3_accounting_fixture()
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+        m2_date = cur_month_start - relativedelta(months=3)
+
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', m2_date, 750.0)
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(len(data['months']), 6)
+        self.assertEqual(data['months'][2]['value'], 750.0)
+        for idx in (0, 1, 3, 4, 5):
+            self.assertEqual(data['months'][idx]['value'], 0.0)
+
+    def test_c3_06_accounting_access(self):
+        """C3-06: User without accounting access receives safe empty/zero payload and no AccessError."""
+        viewer = new_test_user(
+            self.env, login='c3_dash_viewer@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])])
+        dash = self.env['edara.dashboard'].with_user(viewer).create({})
+        self.assertFalse(dash.has_accounting_access)
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(len(data['months']), 6)
+        for m in data['months']:
+            self.assertEqual(m['value'], 0.0)
+        self.assertEqual(data['total_revenue'], 0.0)
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month(0)
+
+    def test_c3_07_global_date_filter_independence(self):
+        """C3-07: revenue_trend_data is independent of period_preset, date_from, and date_to."""
+        dash_month = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'this_month',
+        })
+        dash_year = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'this_year',
+        })
+        dash_custom = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'custom',
+            'date_from': date(2040, 1, 1),
+            'date_to': date(2040, 12, 31),
+        })
+        self.assertEqual(dash_month.revenue_trend_data, dash_year.revenue_trend_data)
+        self.assertEqual(dash_month.revenue_trend_data, dash_custom.revenue_trend_data)
+
+    def test_c3_08_drilldown(self):
+        """C3-08: action_view_revenue_trend_month returns valid act_window on account.move with exact month boundaries."""
+        f = self._setup_c3_accounting_fixture()
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch_a'].id})
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+
+        for idx in range(6):
+            action = dash.action_view_revenue_trend_month(idx)
+            self.assertEqual(action['type'], 'ir.actions.act_window')
+            self.assertEqual(action['res_model'], 'account.move')
+            domain = action['domain']
+            months_ago = 5 - idx
+            expected_start = cur_month_start - relativedelta(months=months_ago)
+            expected_end = (expected_start + relativedelta(months=1)) - timedelta(days=1)
+            self.assertIn(('state', '=', 'posted'), domain)
+            self.assertIn(('move_type', 'in', ('out_invoice', 'out_refund')), domain)
+            self.assertIn(('invoice_date', '>=', expected_start), domain)
+            self.assertIn(('invoice_date', '<=', expected_end), domain)
+            self.assertIn(('edara_branch_id', '=', f['branch_a'].id), domain)
+
+    def test_c3_09_invalid_month_index(self):
+        """C3-09: Invalid month index values (-1, 6, non-int) are safely rejected with UserError."""
+        dash = self.env['edara.dashboard'].create({})
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month(-1)
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month(6)
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month('abc')
+
+    def test_c3_10_existing_revenue_kpi_regression(self):
+        """C3-10: Existing monthly_revenue KPI and action_view_monthly_revenue remain unchanged."""
+        f = self._setup_c3_accounting_fixture()
+        today = fields.Date.context_today(self)
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', today, 1500.0)
+
+        dash = self.env['edara.dashboard'].create({
+            'branch_id': f['branch_a'].id,
+            'period_preset': 'this_month',
+        })
+        self.assertEqual(dash.monthly_revenue, 1500.0)
+        action = dash.action_view_monthly_revenue()
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertIn(('edara_branch_id', '=', f['branch_a'].id), action['domain'])
