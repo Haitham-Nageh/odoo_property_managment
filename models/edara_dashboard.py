@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, time, timedelta
 
 from odoo import _, api, fields, models
@@ -90,6 +91,7 @@ class EdaraDashboard(models.TransientModel):
     maintenance_attention_html = fields.Html(compute='_compute_kpis', sanitize=False)
     pending_renewals_html = fields.Html(compute='_compute_kpis', sanitize=False)
     recent_activity_html = fields.Html(compute='_compute_kpis', sanitize=False)
+    occupancy_chart_data = fields.Text(compute='_compute_kpis')
 
     currency_id = fields.Many2one('res.currency', compute='_compute_kpis')
     monthly_revenue = fields.Monetary(compute='_compute_kpis', currency_field='currency_id')
@@ -378,6 +380,53 @@ class EdaraDashboard(models.TransientModel):
                 branch_domain, branch, comp, has_accounting_access,
             )
 
+            total_occupancy = available_units + reserved_units + occupied_units + owner_occupied_units + sold_units
+            occupancy_data = {
+                'total': total_occupancy,
+                'slices': [
+                    {
+                        'status': 'available',
+                        'label': _('Available'),
+                        'count': available_units,
+                        'action_method': 'action_view_units_available',
+                        'color': '#10B981',
+                    },
+                    {
+                        'status': 'reserved',
+                        'label': _('Reserved'),
+                        'count': reserved_units,
+                        'action_method': 'action_view_units_reserved',
+                        'color': '#F59E0B',
+                    },
+                    {
+                        'status': 'rented',
+                        'label': _('Rented'),
+                        'count': occupied_units,
+                        'action_method': 'action_view_units_rented',
+                        'color': '#3B82F6',
+                    },
+                    {
+                        'status': 'owner_occupied',
+                        'label': _('Owner Occupied'),
+                        'count': owner_occupied_units,
+                        'action_method': 'action_view_units_owner_occupied',
+                        'color': '#8B5CF6',
+                    },
+                    {
+                        'status': 'sold',
+                        'label': _('Sold'),
+                        'count': sold_units,
+                        'action_method': 'action_view_units_sold',
+                        'color': '#64748B',
+                    },
+                ],
+                'under_maintenance': {
+                    'count': under_maintenance_units,
+                    'action_method': 'action_view_units_under_maintenance',
+                },
+            }
+            occupancy_chart_data = json.dumps(occupancy_data)
+
             dashboard.update({
                 'total_properties': total_properties,
                 'total_buildings': total_buildings,
@@ -388,6 +437,7 @@ class EdaraDashboard(models.TransientModel):
                 'owner_occupied_units': owner_occupied_units,
                 'sold_units': sold_units,
                 'under_maintenance_units': under_maintenance_units,
+                'occupancy_chart_data': occupancy_chart_data,
                 'draft_contracts_count': contract_counts['draft'],
                 'active_contracts_count': contract_counts['active'],
                 'renewed_contracts_count': contract_counts['renewed'],

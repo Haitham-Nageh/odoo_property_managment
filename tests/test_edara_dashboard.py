@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, timedelta
 
 from odoo.exceptions import UserError, ValidationError
@@ -1366,3 +1367,185 @@ class TestEdaraDashboard(TransactionCase):
         idx_first_maint = html.find('action-property_managment.action_edara_maintenance_request/')
         self.assertGreater(idx_recent, -1)
         self.assertEqual(idx_recent, idx_first_maint)
+
+    # -- Phase C2: Occupancy Doughnut Chart & Click-to-Filter Tests --
+
+    def test_c2_01_occupancy_chart_data_all_statuses(self):
+        """1. occupancy_chart_data contains correct counts and slices for all five real occupancy statuses,
+        and under_maintenance is separate from the doughnut slices."""
+        branch_c2 = self.env['edara.branch'].create({
+            'name': 'C2 Test Branch', 'code': 'C2BR', 'company_id': self.dash_company.id,
+        })
+        prop = self.env['edara.property'].create({
+            'name': 'C2 Prop', 'code': 'C2P', 'branch_id': branch_c2.id,
+        })
+        bld = self.env['edara.building'].create({
+            'name': 'C2 Bld', 'code': 'C2B', 'property_id': prop.id,
+        })
+        tenant = self.env['res.partner'].create({'name': 'C2 Tenant'})
+        today = date.today()
+
+        # Available unit
+        self.env['edara.unit'].create({
+            'name': 'C2-U-AV', 'code': 'C2UAV', 'building_id': bld.id,
+        })
+        # Rented unit (with active contract)
+        u_rent = self.env['edara.unit'].create({
+            'name': 'C2-U-RENT', 'code': 'C2URENT', 'building_id': bld.id,
+        })
+        c_rent = self.env['edara.lease.contract'].create({
+            'unit_id': u_rent.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=10), 'end_date': today + timedelta(days=200),
+            'rent_amount': 1000.0, 'deposit_required': False,
+        })
+        c_rent.action_activate()
+
+        # Reserved unit (active contract starting in future)
+        u_res = self.env['edara.unit'].create({
+            'name': 'C2-U-RES', 'code': 'C2URES', 'building_id': bld.id,
+        })
+        c_res = self.env['edara.lease.contract'].create({
+            'unit_id': u_res.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=10), 'end_date': today + timedelta(days=200),
+            'rent_amount': 1000.0, 'deposit_required': False,
+        })
+        c_res.action_activate()
+
+        # Owner Occupied unit
+        self.env['edara.unit'].create({
+            'name': 'C2-U-OWN', 'code': 'C2UOWN', 'building_id': bld.id,
+            'occupancy_status': 'owner_occupied',
+        })
+
+        # Sold unit
+        self.env['edara.unit'].create({
+            'name': 'C2-U-SOLD', 'code': 'C2USOLD', 'building_id': bld.id,
+            'occupancy_status': 'sold',
+        })
+
+        # Under Maintenance unit (operational status, rented occupancy)
+        u_maint = self.env['edara.unit'].create({
+            'name': 'C2-U-MAINT', 'code': 'C2UMAINT', 'building_id': bld.id,
+        })
+        c_maint = self.env['edara.lease.contract'].create({
+            'unit_id': u_maint.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=5), 'end_date': today + timedelta(days=200),
+            'rent_amount': 1000.0, 'deposit_required': False,
+        })
+        c_maint.action_activate()
+        u_maint.operational_status = 'under_maintenance'
+
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_c2.id})
+        data = json.loads(dash.occupancy_chart_data)
+
+        # 5 real occupancy statuses sum to total:
+        # Available: 1, Reserved: 1, Rented: 2 (u_rent + u_maint), Owner Occupied: 1, Sold: 1 => Total: 6
+        self.assertEqual(data['total'], 6)
+        slice_map = {s['status']: s for s in data['slices']}
+        self.assertEqual(len(data['slices']), 5)
+        self.assertNotIn('under_maintenance', slice_map)
+
+        self.assertEqual(slice_map['available']['count'], 1)
+        self.assertEqual(slice_map['available']['action_method'], 'action_view_units_available')
+        self.assertEqual(slice_map['reserved']['count'], 1)
+        self.assertEqual(slice_map['reserved']['action_method'], 'action_view_units_reserved')
+        self.assertEqual(slice_map['rented']['count'], 2)
+        self.assertEqual(slice_map['rented']['action_method'], 'action_view_units_rented')
+        self.assertEqual(slice_map['owner_occupied']['count'], 1)
+        self.assertEqual(slice_map['owner_occupied']['action_method'], 'action_view_units_owner_occupied')
+        self.assertEqual(slice_map['sold']['count'], 1)
+        self.assertEqual(slice_map['sold']['action_method'], 'action_view_units_sold')
+
+        # Under maintenance is separate
+        self.assertEqual(data['under_maintenance']['count'], 1)
+        self.assertEqual(data['under_maintenance']['action_method'], 'action_view_units_under_maintenance')
+
+    def test_c2_02_occupancy_chart_data_branch_filtering(self):
+        """2. Branch filtering correctly isolates chart data between branches and aggregates on all-branches."""
+        br_a = self.env['edara.branch'].create({
+            'name': 'C2 Branch A', 'code': 'C2BA', 'company_id': self.dash_company.id,
+        })
+        prop_a = self.env['edara.property'].create({
+            'name': 'Prop A', 'code': 'PA', 'branch_id': br_a.id,
+        })
+        bld_a = self.env['edara.building'].create({
+            'name': 'Bld A', 'code': 'BA', 'property_id': prop_a.id,
+        })
+        self.env['edara.unit'].create({'name': 'U-A1', 'code': 'UA1', 'building_id': bld_a.id})
+        self.env['edara.unit'].create({'name': 'U-A2', 'code': 'UA2', 'building_id': bld_a.id})
+
+        br_b = self.env['edara.branch'].create({
+            'name': 'C2 Branch B', 'code': 'C2BB', 'company_id': self.dash_company.id,
+        })
+        prop_b = self.env['edara.property'].create({
+            'name': 'Prop B', 'code': 'PB', 'branch_id': br_b.id,
+        })
+        bld_b = self.env['edara.building'].create({
+            'name': 'Bld B', 'code': 'BB', 'property_id': prop_b.id,
+        })
+        self.env['edara.unit'].create({'name': 'U-B1', 'code': 'UB1', 'building_id': bld_b.id})
+
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': br_a.id})
+        data_a = json.loads(dash_a.occupancy_chart_data)
+        self.assertEqual(data_a['total'], 2)
+
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': br_b.id})
+        data_b = json.loads(dash_b.occupancy_chart_data)
+        self.assertEqual(data_b['total'], 1)
+
+    def test_c2_03_occupancy_chart_data_empty_portfolio(self):
+        """3. Empty portfolio produces valid zero-state data with total 0 and all slice counts 0."""
+        br_empty = self.env['edara.branch'].create({
+            'name': 'C2 Empty Branch', 'code': 'C2BE', 'company_id': self.dash_company.id,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': br_empty.id})
+        data = json.loads(dash.occupancy_chart_data)
+        self.assertEqual(data['total'], 0)
+        self.assertEqual(len(data['slices']), 5)
+        for s in data['slices']:
+            self.assertEqual(s['count'], 0)
+        self.assertEqual(data['under_maintenance']['count'], 0)
+
+    def test_c2_04_existing_kpi_fields_unchanged(self):
+        """4. Existing KPI fields remain computed and accurate alongside occupancy_chart_data."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        data = json.loads(dash.occupancy_chart_data)
+        slice_map = {s['status']: s['count'] for s in data['slices']}
+
+        self.assertEqual(dash.available_units, slice_map['available'])
+        self.assertEqual(dash.occupied_units, slice_map['rented'])
+        self.assertEqual(dash.reserved_units, slice_map['reserved'])
+        self.assertEqual(dash.owner_occupied_units, slice_map['owner_occupied'])
+        self.assertEqual(dash.sold_units, slice_map['sold'])
+        self.assertEqual(dash.under_maintenance_units, data['under_maintenance']['count'])
+
+    def test_c2_05_existing_action_view_units_methods(self):
+        """5. Existing action_view_units_* methods continue to work correctly and apply branch domain."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        cases = [
+            ('action_view_units_available', [('occupancy_status', '=', 'available'), ('branch_id', '=', self.branch.id)]),
+            ('action_view_units_rented', [('occupancy_status', '=', 'rented'), ('branch_id', '=', self.branch.id)]),
+            ('action_view_units_reserved', [('occupancy_status', '=', 'reserved'), ('branch_id', '=', self.branch.id)]),
+            ('action_view_units_owner_occupied', [('occupancy_status', '=', 'owner_occupied'), ('branch_id', '=', self.branch.id)]),
+            ('action_view_units_sold', [('occupancy_status', '=', 'sold'), ('branch_id', '=', self.branch.id)]),
+            ('action_view_units_under_maintenance', [('operational_status', '=', 'under_maintenance'), ('branch_id', '=', self.branch.id)]),
+        ]
+        for method_name, expected_domain in cases:
+            action = getattr(dash, method_name)()
+            self.assertEqual(action['type'], 'ir.actions.act_window')
+            self.assertEqual(action['res_model'], 'edara.unit')
+            self.assertEqual(action['domain'], expected_domain)
+
+    def test_c2_06_date_filter_independence(self):
+        """6. Occupancy chart data is current-state data and does not change with period_preset or date filters."""
+        dash_current = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'this_month',
+        })
+        dash_future = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'custom',
+            'date_from': date(2040, 1, 1),
+            'date_to': date(2040, 12, 31),
+        })
+        self.assertEqual(dash_current.occupancy_chart_data, dash_future.occupancy_chart_data)

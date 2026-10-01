@@ -305,3 +305,72 @@
     color: var(--muted-text-color, #6c757d);
     white-space: nowrap;
 }
+
+/* Phase C2: Occupancy Doughnut Chart & Operational Indicator */
+.o_edara_dashboard .o_edara_occupancy_section {
+    background-color: var(--EdaraCard-bg, #ffffff);
+    border: 1px solid var(--border-color, #e3e6ea);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+
+.o_edara_dashboard .o_edara_occupancy_header {
+    border-bottom: 1px solid var(--border-color, #edf0f2);
+}
+
+.o_edara_dashboard .o_operational_indicator {
+    cursor: pointer;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+}
+
+.o_edara_dashboard .o_operational_indicator:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(245, 158, 11, 0.2);
+}
+
+.o_edara_dashboard .o_edara_chart_canvas_wrapper {
+    width: 220px;
+    height: 220px;
+    max-width: 100%;
+}
+
+.o_edara_dashboard .o_edara_doughnut_center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    line-height: 1.1;
+}
+
+.o_edara_dashboard .o_edara_occupancy_legend {
+    width: 100%;
+}
+
+.o_edara_dashboard .o_occupancy_legend_item {
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease-in-out;
+}
+
+.o_edara_dashboard .o_occupancy_legend_item:hover {
+    background-color: var(--EdaraItemHover-bg, #f0f4f8);
+    border-color: var(--border-color, #e2e8f0);
+    transform: translateX(3px);
+}
+
+.o_edara_dashboard .o_legend_color_dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.o_edara_dashboard .o_edara_chart_empty_state {
+    padding: 30px 15px;
+}

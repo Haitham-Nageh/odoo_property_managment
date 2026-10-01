@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="property_managment.EdaraOccupancyChartField">
+        <div class="o_edara_occupancy_widget w-100">
+            <!-- Header with Title and Under Maintenance Operational Indicator -->
+            <div class="o_edara_occupancy_header d-flex align-items-center justify-content-between mb-3 pb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa fa-pie-chart text-primary fs-5"/>
+                    <span class="fw-bold fs-6 text-dark">Occupancy Distribution</span>
+                </div>
+                <div t-if="chartData.under_maintenance"
+                     class="o_operational_indicator btn btn-sm btn-outline-warning d-flex align-items-center gap-2"
+                     role="button"
+                     t-att-title="'View units under maintenance'"
+                     t-on-click="() => this.onSliceClick(chartData.under_maintenance.action_method)">
+                    <i class="fa fa-wrench"/>
+                    <span>Under Maintenance: <strong><t t-esc="chartData.under_maintenance.count"/></strong></span>
+                </div>
+            </div>
+
+            <!-- Zero / Empty State -->
+            <t t-if="chartData.total === 0">
+                <div class="o_edara_chart_empty_state text-center py-4 text-muted">
+                    <i class="fa fa-pie-chart fa-3x mb-2 text-muted opacity-50"/>
+                    <div class="fw-semibold">No units in portfolio</div>
+                    <div class="small text-muted">Occupancy distribution will appear once units are added.</div>
+                </div>
+            </t>
+
+            <!-- Chart + Custom Interactive Legend -->
+            <t t-else="">
+                <div class="o_edara_occupancy_body row align-items-center g-3">
+                    <div class="col-12 col-md-5 d-flex justify-content-center">
+                        <div class="o_edara_chart_canvas_wrapper position-relative">
+                            <canvas t-ref="canvas"/>
+                            <div class="o_edara_doughnut_center text-center">
+                                <span class="fs-4 fw-bold text-dark"><t t-esc="chartData.total"/></span>
+                                <span class="text-muted small d-block">Total Units</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <div class="o_edara_occupancy_legend d-flex flex-column gap-2">
+                            <div t-foreach="chartData.slices" t-as="slice" t-key="slice.status"
+                                 class="o_occupancy_legend_item d-flex align-items-center justify-content-between p-2 rounded"
+                                 role="button"
+                                 t-att-title="'View ' + slice.label + ' units'"
+                                 t-on-click="() => this.onSliceClick(slice.action_method)">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="o_legend_color_dot" t-attf-style="background-color: {{ slice.color }}"/>
+                                    <span class="fw-medium text-dark"><t t-esc="slice.label"/></span>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="badge bg-light text-dark border px-2 py-1"><t t-esc="slice.count"/></span>
+                                    <span class="text-muted small text-end" style="min-width: 45px;"><t t-esc="getPercentage(slice.count)"/>%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

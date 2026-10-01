@@ -57,6 +57,8 @@ top of native Odoo Accounting, Portal, Contacts and Security.
             'property_managment/static/src/css/payment_schedule_filter_shortcuts.css',
             'property_managment/static/src/js/payment_schedule_filter_shortcuts.js',
             'property_managment/static/src/js/payment_schedule_filter_shortcuts.xml',
+            'property_managment/static/src/js/edara_occupancy_chart_field.js',
+            'property_managment/static/src/js/edara_occupancy_chart_field.xml',
         ],
     },
     'installable': True,

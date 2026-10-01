@@ -182,56 +182,16 @@
                         </div>
                     </div>
 
-                    <!-- Occupancy Breakdown -->
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_units_available" class="oe_stat_button" icon="fa-check-circle text-success">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="available_units" readonly="1"/></span>
-                                    <span class="o_stat_text">Available</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_units_rented" class="oe_stat_button" icon="fa-key text-primary">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="occupied_units" readonly="1"/></span>
-                                    <span class="o_stat_text">Rented</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_units_reserved" class="oe_stat_button" icon="fa-clock-o text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="reserved_units" readonly="1"/></span>
-                                    <span class="o_stat_text">Reserved</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_units_under_maintenance" class="oe_stat_button" icon="fa-wrench text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="under_maintenance_units" readonly="1"/></span>
-                                    <span class="o_stat_text">Under Maintenance</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_units_owner_occupied" class="oe_stat_button" icon="fa-home text-muted">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="owner_occupied_units" readonly="1"/></span>
-                                    <span class="o_stat_text">Owner Occupied</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_units_sold" class="oe_stat_button" icon="fa-tag text-muted">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="sold_units" readonly="1"/></span>
-                                    <span class="o_stat_text">Sold</span>
-                                </div>
-                            </button>
-                        </div>
+                    <!-- Occupancy Breakdown (Phase C2: Doughnut Chart + Click-to-Filter) -->
+                    <div class="o_edara_occupancy_section p-3 mt-2 bg-view border rounded shadow-sm">
+                        <!-- Keep individual KPI fields invisible in the view for form data access -->
+                        <field name="available_units" invisible="1"/>
+                        <field name="occupied_units" invisible="1"/>
+                        <field name="reserved_units" invisible="1"/>
+                        <field name="owner_occupied_units" invisible="1"/>
+                        <field name="sold_units" invisible="1"/>
+                        <field name="under_maintenance_units" invisible="1"/>
+                        <field name="occupancy_chart_data" widget="edara_occupancy_chart" readonly="1" class="w-100"/>
                     </div>
 
                     <!-- Lease Lifecycle Statuses -->
