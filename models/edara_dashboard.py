@@ -1172,8 +1172,57 @@ class EdaraDashboard(models.TransientModel):
     # never diverge. None of them use sudo(): whoever clicks the button only
     # ever processes what their own record rules already let them see/write,
     # exactly like every other action in this module (MAT-FIND-015's
-    # "authorization first" pattern - here, the authorization IS simply not
-    # elevating at all).
+    # ============ Phase C4: Contextual Record Creation Shortcuts ============
+
+    def action_new_lease_contract(self):
+        """Phase C4: Opens a blank create form for edara.lease.contract.
+        If a branch is selected on the dashboard, passes restrict_unit_branch_id
+        in context so unit_id selection on the form is filtered to that branch."""
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('property_managment.action_edara_lease_contract')
+        views = action.get('views', [])
+        form_view_entry = next((v for v in views if v[1] == 'form'), None)
+        action['views'] = [form_view_entry] if form_view_entry else [(False, 'form')]
+        action['view_mode'] = 'form'
+        action['target'] = 'current'
+        context = dict(self.env.context)
+        if self.branch_id:
+            context['restrict_unit_branch_id'] = self.branch_id.id
+        action['context'] = context
+        return action
+
+    def action_new_maintenance_request(self):
+        """Phase C4: Opens a blank create form for edara.maintenance.request.
+        If a branch is selected on the dashboard, passes restrict_unit_branch_id
+        in context so unit_id selection on the form is filtered to that branch."""
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('property_managment.action_edara_maintenance_request')
+        views = action.get('views', [])
+        form_view_entry = next((v for v in views if v[1] == 'form'), None)
+        action['views'] = [form_view_entry] if form_view_entry else [(False, 'form')]
+        action['view_mode'] = 'form'
+        action['target'] = 'current'
+        context = dict(self.env.context)
+        if self.branch_id:
+            context['restrict_unit_branch_id'] = self.branch_id.id
+        action['context'] = context
+        return action
+
+    def action_new_tenant(self):
+        """Phase C4: Opens a blank create form for res.partner with default_is_company=False
+        to create an individual tenant record."""
+        self.ensure_one()
+        xml_id = 'contacts.action_contacts' if self.env.ref('contacts.action_contacts', raise_if_not_found=False) else 'base.action_partner_form'
+        action = self.env['ir.actions.act_window']._for_xml_id(xml_id)
+        views = action.get('views', [])
+        form_view_entry = next((v for v in views if v[1] == 'form'), None)
+        action['views'] = [form_view_entry] if form_view_entry else [(False, 'form')]
+        action['view_mode'] = 'form'
+        action['target'] = 'current'
+        context = dict(self.env.context)
+        context['default_is_company'] = False
+        action['context'] = context
+        return action
 
     def _automation_result_notification(self, title, message):
         self.ensure_one()

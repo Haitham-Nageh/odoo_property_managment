@@ -415,23 +415,43 @@
                     <!-- 7. QUICK ACTIONS & AUTOMATION -->
                     <separator string="Quick Actions &amp; Automation"/>
                     <div class="o_edara_quick_actions p-3 mt-2 bg-view border rounded shadow-sm">
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="object" name="action_manual_generate_due_invoices" class="btn btn-secondary"
-                                    confirm="Generate invoices now for every due, uninvoiced payment schedule line you can access?">
-                                <i class="fa fa-file-text-o me-1"/> Generate Due Invoices
-                            </button>
-                            <button type="object" name="action_manual_process_lease_expiry" class="btn btn-secondary"
-                                    confirm="Expire every active contract past its end date, among those you can access?">
-                                <i class="fa fa-clock-o me-1"/> Process Lease Expiry
-                            </button>
-                            <button type="object" name="action_manual_process_reminders" class="btn btn-secondary"
-                                    confirm="Send lease expiry, renewal, overdue payment, maintenance and SLA reminders now, for records you can access?">
-                                <i class="fa fa-bell-o me-1"/> Process Reminders
-                            </button>
-                            <button type="object" name="action_manual_generate_recurring_maintenance" class="btn btn-secondary"
-                                    confirm="Generate maintenance requests now for every due, active recurring definition you can access?">
-                                <i class="fa fa-repeat me-1"/> Generate Recurring Maintenance
-                            </button>
+                        <!-- Create Shortcuts -->
+                        <div class="o_quick_actions_group mb-3 pb-3 border-bottom">
+                            <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Create New</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="object" name="action_new_lease_contract" class="btn btn-primary">
+                                    <i class="fa fa-file-text me-1"/> New Lease Contract
+                                </button>
+                                <button type="object" name="action_new_maintenance_request" class="btn btn-primary">
+                                    <i class="fa fa-wrench me-1"/> New Maintenance Request
+                                </button>
+                                <button type="object" name="action_new_tenant" class="btn btn-primary">
+                                    <i class="fa fa-user-plus me-1"/> New Tenant
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Automation Triggers -->
+                        <div class="o_quick_actions_group">
+                            <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Automation &amp; Operations</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="object" name="action_manual_generate_due_invoices" class="btn btn-secondary"
+                                        confirm="Generate invoices now for every due, uninvoiced payment schedule line you can access?">
+                                    <i class="fa fa-file-text-o me-1"/> Generate Due Invoices
+                                </button>
+                                <button type="object" name="action_manual_process_lease_expiry" class="btn btn-secondary"
+                                        confirm="Expire every active contract past its end date, among those you can access?">
+                                    <i class="fa fa-clock-o me-1"/> Process Lease Expiry
+                                </button>
+                                <button type="object" name="action_manual_process_reminders" class="btn btn-secondary"
+                                        confirm="Send lease expiry, renewal, overdue payment, maintenance and SLA reminders now, for records you can access?">
+                                    <i class="fa fa-bell-o me-1"/> Process Reminders
+                                </button>
+                                <button type="object" name="action_manual_generate_recurring_maintenance" class="btn btn-secondary"
+                                        confirm="Generate maintenance requests now for every due, active recurring definition you can access?">
+                                    <i class="fa fa-repeat me-1"/> Generate Recurring Maintenance
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

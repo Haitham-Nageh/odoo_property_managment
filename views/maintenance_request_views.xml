@@ -119,7 +119,7 @@
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
-                            <field name="unit_id"/>
+                            <field name="unit_id" domain="[('branch_id', '=', context.get('restrict_unit_branch_id'))] if context.get('restrict_unit_branch_id') else []"/>
                             <field name="building_id" readonly="1" groups="base.group_no_one"/>
                             <field name="property_id" readonly="1" groups="base.group_no_one"/>
                             <field name="tenant_id"/>

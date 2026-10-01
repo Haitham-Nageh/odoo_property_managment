@@ -167,6 +167,11 @@
     transform: translateY(-1px);
 }
 
+.o_edara_dashboard .o_quick_actions_title {
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
 /* Phase B: Attention Center Refinement */
 .o_edara_dashboard .o_edara_attention_center .o_attention_box {
     background-color: var(--EdaraCard-bg, #ffffff);

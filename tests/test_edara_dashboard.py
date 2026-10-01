@@ -5,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
+from odoo.tools.safe_eval import safe_eval
 
 
 @tagged('post_install', '-at_install')
@@ -1752,3 +1753,123 @@ class TestEdaraDashboard(TransactionCase):
         action = dash.action_view_monthly_revenue()
         self.assertEqual(action['res_model'], 'account.move')
         self.assertIn(('edara_branch_id', '=', f['branch_a'].id), action['domain'])
+
+    # -- Phase C4: Contextual Record Creation Shortcuts Tests --
+
+    def test_c4_01_action_new_lease_contract(self):
+        """C4-01: action_new_lease_contract returns blank form action with branch context when branch selected."""
+        # Case A: Without branch
+        dash_no_branch = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_a = dash_no_branch.action_new_lease_contract()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.lease.contract')
+        self.assertEqual(action_a['view_mode'], 'form')
+        self.assertEqual(action_a['views'][0][1], 'form')
+        self.assertFalse(action_a.get('res_id'))
+        self.assertNotIn('restrict_unit_branch_id', action_a.get('context', {}))
+
+        # Case B: With branch selected
+        dash_branch = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        action_b = dash_branch.action_new_lease_contract()
+        self.assertEqual(action_b['type'], 'ir.actions.act_window')
+        self.assertEqual(action_b['res_model'], 'edara.lease.contract')
+        self.assertEqual(action_b['view_mode'], 'form')
+        self.assertEqual(action_b['views'][0][1], 'form')
+        self.assertFalse(action_b.get('res_id'))
+        self.assertEqual(action_b['context'].get('restrict_unit_branch_id'), self.branch.id)
+
+    def test_c4_02_action_new_maintenance_request(self):
+        """C4-02: action_new_maintenance_request returns blank form action with branch context when branch selected."""
+        # Case A: Without branch
+        dash_no_branch = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_a = dash_no_branch.action_new_maintenance_request()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.maintenance.request')
+        self.assertEqual(action_a['view_mode'], 'form')
+        self.assertEqual(action_a['views'][0][1], 'form')
+        self.assertFalse(action_a.get('res_id'))
+        self.assertNotIn('restrict_unit_branch_id', action_a.get('context', {}))
+
+        # Case B: With branch selected
+        dash_branch = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        action_b = dash_branch.action_new_maintenance_request()
+        self.assertEqual(action_b['type'], 'ir.actions.act_window')
+        self.assertEqual(action_b['res_model'], 'edara.maintenance.request')
+        self.assertEqual(action_b['view_mode'], 'form')
+        self.assertEqual(action_b['views'][0][1], 'form')
+        self.assertFalse(action_b.get('res_id'))
+        self.assertEqual(action_b['context'].get('restrict_unit_branch_id'), self.branch.id)
+
+    def test_c4_03_action_new_tenant(self):
+        """C4-03: action_new_tenant opens res.partner blank form with default_is_company=False and no branch context."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        action = dash.action_new_tenant()
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'res.partner')
+        self.assertEqual(action['view_mode'], 'form')
+        self.assertEqual(action['views'][0][1], 'form')
+        self.assertFalse(action.get('res_id'))
+        self.assertIs(action['context'].get('default_is_company'), False)
+        self.assertNotIn('restrict_unit_branch_id', action['context'])
+
+    def test_c4_04_unit_domain_branch_restriction_semantics(self):
+        """C4-04: Verify unit domain branch restriction expression and presence in form views."""
+        # 1. Test domain expression evaluation and filtering
+        branch_2 = self.env['edara.branch'].create({
+            'name': 'C4 Test Branch 2', 'code': 'C4B2', 'company_id': self.dash_company.id,
+        })
+        prop_2 = self.env['edara.property'].create({
+            'name': 'C4 Prop 2', 'code': 'C4P2', 'branch_id': branch_2.id,
+        })
+        bld_2 = self.env['edara.building'].create({
+            'name': 'C4 Bld 2', 'code': 'C4B2', 'property_id': prop_2.id,
+        })
+        unit_in_b2 = self.env['edara.unit'].create({
+            'name': 'U-C4-B2', 'code': 'UC4B2', 'building_id': bld_2.id,
+        })
+
+        domain_expr = "[('branch_id', '=', context.get('restrict_unit_branch_id'))] if context.get('restrict_unit_branch_id') else []"
+
+        # Restricted context
+        res_domain = safe_eval(domain_expr, {'context': {'restrict_unit_branch_id': self.branch.id}})
+        self.assertEqual(res_domain, [('branch_id', '=', self.branch.id)])
+        restricted_units = self.env['edara.unit'].search(res_domain)
+        self.assertIn(self.unit_rented, restricted_units)
+        self.assertNotIn(unit_in_b2, restricted_units)
+
+        # Unrestricted context
+        unrestricted_domain = safe_eval(domain_expr, {'context': {}})
+        self.assertEqual(unrestricted_domain, [])
+        unrestricted_units = self.env['edara.unit'].search(unrestricted_domain)
+        self.assertIn(self.unit_rented, unrestricted_units)
+        self.assertIn(unit_in_b2, unrestricted_units)
+
+        # 2. Verify form view arch has the conditional domain on unit_id
+        contract_form = self.env['edara.lease.contract'].get_view(view_type='form')
+        self.assertIn('restrict_unit_branch_id', contract_form['arch'])
+        maint_form = self.env['edara.maintenance.request'].get_view(view_type='form')
+        self.assertIn('restrict_unit_branch_id', maint_form['arch'])
+
+    def test_c4_05_automation_quick_actions_regression(self):
+        """C4-05: Existing four automation quick actions execute properly and return success notifications."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+
+        act_inv = dash.action_manual_generate_due_invoices()
+        self.assertEqual(act_inv['type'], 'ir.actions.client')
+        self.assertEqual(act_inv['tag'], 'display_notification')
+        self.assertEqual(act_inv['params']['type'], 'success')
+
+        act_exp = dash.action_manual_process_lease_expiry()
+        self.assertEqual(act_exp['type'], 'ir.actions.client')
+        self.assertEqual(act_exp['tag'], 'display_notification')
+        self.assertEqual(act_exp['params']['type'], 'success')
+
+        act_rem = dash.action_manual_process_reminders()
+        self.assertEqual(act_rem['type'], 'ir.actions.client')
+        self.assertEqual(act_rem['tag'], 'display_notification')
+        self.assertEqual(act_rem['params']['type'], 'success')
+
+        act_rec = dash.action_manual_generate_recurring_maintenance()
+        self.assertEqual(act_rec['type'], 'ir.actions.client')
+        self.assertEqual(act_rec['tag'], 'display_notification')
+        self.assertEqual(act_rec['params']['type'], 'success')

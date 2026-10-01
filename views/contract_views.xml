@@ -155,7 +155,7 @@
                     </div>
                     <group>
                         <group>
-                            <field name="unit_id" readonly="state != 'draft'"/>
+                            <field name="unit_id" readonly="state != 'draft'" domain="[('branch_id', '=', context.get('restrict_unit_branch_id'))] if context.get('restrict_unit_branch_id') else []"/>
                             <field name="tenant_id" readonly="state != 'draft'"/>
                             <field name="branch_id" readonly="1" groups="base.group_no_one"/>
                             <field name="property_id" readonly="1" groups="base.group_no_one"/>
