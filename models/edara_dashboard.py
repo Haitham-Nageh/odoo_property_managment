@@ -128,6 +128,16 @@ class EdaraDashboard(models.TransientModel):
         compute='_compute_kpis',
         help="Count of security deposits with positive balance on terminated, expired, or cancelled leases.",
     )
+    # Phase C8: Service Charge Allocation & Invoicing Status
+    uninvoiced_service_charge_lines_count = fields.Integer(
+        compute='_compute_kpis',
+        help="Count of service charges with lines that have been allocated but not yet invoiced.",
+    )
+    uninvoiced_service_charge_amount = fields.Monetary(
+        compute='_compute_kpis',
+        currency_field='currency_id',
+        help="Total amount of uninvoiced service charge lines converted to company currency.",
+    )
     has_accounting_access = fields.Boolean(compute='_compute_kpis', help=(
         "Whether the current user has native Odoo read access to account.move "
         "and account.payment - drives whether the Accounting-dependent KPI "
@@ -246,6 +256,8 @@ class EdaraDashboard(models.TransientModel):
         Renewal = self.env['edara.renewal.request']
         Recurring = self.env['edara.recurring.maintenance']
         Deposit = self.env['edara.deposit']
+        ServiceCharge = self.env['edara.service.charge']
+        ServiceChargeLine = self.env['edara.service.charge.line']
         today = fields.Date.context_today(self)
         comp = self.env.company
 
@@ -420,6 +432,18 @@ class EdaraDashboard(models.TransientModel):
                 ]
             )
 
+            # Phase C8: Service Charge Allocation & Invoicing Status
+            sc_lines = ServiceChargeLine.search(branch_domain + [('invoice_id', '=', False)])
+            uninvoiced_service_charge_lines_count = ServiceCharge.search_count(
+                branch_domain + [('state', '=', 'allocated')]
+            )
+            uninvoiced_service_charge_amount = 0.0
+            for sc_line in sc_lines:
+                sc_amt = sc_line.amount
+                if sc_line.currency_id and sc_line.currency_id != comp.currency_id:
+                    sc_amt = sc_line.currency_id._convert(sc_amt, comp.currency_id, comp, today)
+                uninvoiced_service_charge_amount += sc_amt
+
             total_occupancy = available_units + reserved_units + occupied_units + owner_occupied_units + sold_units
             occupancy_data = {
                 'total': total_occupancy,
@@ -563,6 +587,8 @@ class EdaraDashboard(models.TransientModel):
                 'total_held_deposit_amount': total_held_deposit_amount,
                 'held_deposits_count': held_deposits_count,
                 'unsettled_closed_deposits_count': unsettled_closed_deposits_count,
+                'uninvoiced_service_charge_lines_count': uninvoiced_service_charge_lines_count,
+                'uninvoiced_service_charge_amount': uninvoiced_service_charge_amount,
             })
 
     def _render_expiring_leases_html(self, contracts, today):
@@ -993,7 +1019,8 @@ class EdaraDashboard(models.TransientModel):
             elif model in ('edara.property', 'edara.building', 'edara.unit',
                            'edara.lease.contract', 'edara.maintenance.request',
                            'edara.renewal.request', 'edara.recurring.maintenance',
-                           'edara.payment.schedule.line', 'edara.deposit'):
+                           'edara.payment.schedule.line', 'edara.deposit',
+                           'edara.service.charge', 'edara.service.charge.line'):
                 combined_domain.append(('branch_id', '=', self.branch_id.id))
         action['domain'] = combined_domain
         return action
@@ -1237,6 +1264,11 @@ class EdaraDashboard(models.TransientModel):
             ('balance', '>', 0),
             ('contract_id.state', 'in', ('terminated', 'expired', 'cancelled')),
         ])
+
+    # Phase C8: Service Charge Quick Actions
+    def action_view_service_charges_pending_invoice(self):
+        """Phase C8: Opens native Service Charge action filtered to charges with pending invoice lines."""
+        return self._quick_action('action_edara_service_charge', [('state', '=', 'allocated')])
 
     # ============ Business-level manual triggers (MAT-FIND-007, 2026-09-22) ============
     # Each wraps the SAME method the corresponding daily cron calls - see

@@ -2810,3 +2810,352 @@ class TestEdaraDashboard(TransactionCase):
         self.assertIn(f['c_a_exp_with_succ'], matched_soon)
         self.assertNotIn(f['c_a_not_exp'], matched_soon)
         self.assertEqual(dash_a.expiring_soon_contracts_count, 2)
+
+    # =========================================================================
+    # Phase C8: Service Charge Allocation & Invoicing Status
+    # =========================================================================
+
+    def _setup_c8_test_fixture(self):
+        """Setup isolated fixture with two branches, currencies, and service charges with lines."""
+        company = self.dash_company
+        today = fields.Date.context_today(self)
+
+        other_cur = self.env['res.currency'].search([
+            ('id', '!=', company.currency_id.id),
+            ('name', 'in', ('USD', 'EUR', 'ILS', 'JOD'))
+        ], limit=1)
+        other_cur.active = True
+        self.env['res.currency.rate'].search([
+            ('currency_id', '=', other_cur.id),
+            ('company_id', '=', company.id),
+        ]).unlink()
+        self.env['res.currency.rate'].create({
+            'currency_id': other_cur.id,
+            'company_id': company.id,
+            'name': today,
+            'rate': 2.0,
+        })
+
+        branch_a = self.env['edara.branch'].create({
+            'name': 'C8 Branch A', 'code': 'C8BA', 'company_id': company.id,
+        })
+        branch_b = self.env['edara.branch'].create({
+            'name': 'C8 Branch B', 'code': 'C8BB', 'company_id': company.id,
+        })
+
+        prop_a = self.env['edara.property'].create({'name': 'C8 Prop A', 'code': 'C8PA', 'branch_id': branch_a.id})
+        bld_a = self.env['edara.building'].create({'name': 'C8 Bld A', 'code': 'C8BA', 'property_id': prop_a.id})
+        prop_b = self.env['edara.property'].create({'name': 'C8 Prop B', 'code': 'C8PB', 'branch_id': branch_b.id})
+        bld_b = self.env['edara.building'].create({'name': 'C8 Bld B', 'code': 'C8BB', 'property_id': prop_b.id})
+
+        tenant_a = self.env['res.partner'].create({'name': 'C8 Tenant A'})
+        tenant_b = self.env['res.partner'].create({'name': 'C8 Tenant B'})
+
+        u_a1 = self.env['edara.unit'].create({'name': 'C8-UA-1', 'code': 'C8UA1', 'building_id': bld_a.id})
+        u_a2 = self.env['edara.unit'].create({'name': 'C8-UA-2', 'code': 'C8UA2', 'building_id': bld_a.id})
+        u_a3 = self.env['edara.unit'].create({'name': 'C8-UA-3', 'code': 'C8UA3', 'building_id': bld_a.id})
+        u_b1 = self.env['edara.unit'].create({'name': 'C8-UB-1', 'code': 'C8UB1', 'building_id': bld_b.id})
+
+        # Branch A Charge 1: in company currency
+        # Has 2 lines: line 1 uninvoiced (300.0), line 2 invoiced (200.0) -> charge state will be 'allocated'
+        charge_a1 = self.env['edara.service.charge'].create({
+            'building_id': bld_a.id,
+            'currency_id': company.currency_id.id,
+            'allocation_method': 'equal',
+            'total_amount': 500.0,
+        })
+        line_a1_uninv = self.env['edara.service.charge.line'].create({
+            'charge_id': charge_a1.id,
+            'unit_id': u_a1.id,
+            'tenant_id': tenant_a.id,
+            'amount': 300.0,
+        })
+        inv_a = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': tenant_a.id,
+            'company_id': self.env.company.id,
+        })
+        line_a1_inv = self.env['edara.service.charge.line'].create({
+            'charge_id': charge_a1.id,
+            'unit_id': u_a2.id,
+            'tenant_id': tenant_a.id,
+            'amount': 200.0,
+            'invoice_id': inv_a.id,
+        })
+
+        # Branch A Charge 2: in other_cur (rate 2.0 -> 50% in company currency)
+        # 1 uninvoiced line (400.0 in other_cur -> 200.0 in company currency)
+        charge_a2 = self.env['edara.service.charge'].create({
+            'building_id': bld_a.id,
+            'currency_id': other_cur.id,
+            'allocation_method': 'equal',
+            'total_amount': 400.0,
+        })
+        line_a2_uninv = self.env['edara.service.charge.line'].create({
+            'charge_id': charge_a2.id,
+            'unit_id': u_a3.id,
+            'tenant_id': tenant_a.id,
+            'amount': 400.0,
+        })
+
+        # Branch B Charge 1: in company currency
+        # 1 uninvoiced line (750.0)
+        charge_b1 = self.env['edara.service.charge'].create({
+            'building_id': bld_b.id,
+            'currency_id': company.currency_id.id,
+            'allocation_method': 'equal',
+            'total_amount': 750.0,
+        })
+        line_b1_uninv = self.env['edara.service.charge.line'].create({
+            'charge_id': charge_b1.id,
+            'unit_id': u_b1.id,
+            'tenant_id': tenant_b.id,
+            'amount': 750.0,
+        })
+
+        return {
+            'branch_a': branch_a,
+            'branch_b': branch_b,
+            'other_cur': other_cur,
+            'comp_cur': company.currency_id,
+            'charge_a1': charge_a1,
+            'charge_a2': charge_a2,
+            'charge_b1': charge_b1,
+            'line_a1_uninv': line_a1_uninv,
+            'line_a1_inv': line_a1_inv,
+            'line_a2_uninv': line_a2_uninv,
+            'line_b1_uninv': line_b1_uninv,
+            'u_a1': u_a1,
+            'tenant_a': tenant_a,
+            'today': today,
+        }
+
+    def test_c8_01_basic_count_and_amount(self):
+        """C8-01: Verify uninvoiced count and multi-currency converted amount in company currency."""
+        f = self._setup_c8_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        # Branch A has 2 uninvoiced lines (line_a1_uninv: 300, line_a2_uninv: 400 in other_cur)
+        self.assertEqual(dash_a.uninvoiced_service_charge_lines_count, 2)
+
+        # Multi-currency conversion: 400 other_cur at rate 2.0 = 200 in company currency
+        converted_other = f['other_cur']._convert(400.0, f['comp_cur'], self.dash_company, f['today'])
+        expected_amount = 300.0 + converted_other
+        naive_sum = 300.0 + 400.0  # 700.0
+
+        self.assertAlmostEqual(dash_a.uninvoiced_service_charge_amount, expected_amount, places=2)
+        self.assertEqual(dash_a.uninvoiced_service_charge_amount, 500.0)
+        self.assertNotEqual(round(dash_a.uninvoiced_service_charge_amount, 2), round(naive_sum, 2))
+
+    def test_c8_02_invoiced_lines_excluded(self):
+        """C8-02: Verify invoiced lines are excluded, and zero-amount uninvoiced lines contribute to count but 0 to amount."""
+        f = self._setup_c8_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        # Initially 2 uninvoiced lines, 500.0 converted amount
+        self.assertEqual(dash_a.uninvoiced_service_charge_lines_count, 2)
+        self.assertEqual(dash_a.uninvoiced_service_charge_amount, 500.0)
+        # line_a1_inv (200.0) is linked to invoice_id, so it must not be included
+        self.assertTrue(f['line_a1_inv'].invoice_id)
+
+        # Now test Section 13: Add zero-amount uninvoiced line to charge_a1
+        zero_line = self.env['edara.service.charge.line'].create({
+            'charge_id': f['charge_a1'].id,
+            'unit_id': f['u_a1'].id,
+            'tenant_id': f['tenant_a'].id,
+            'amount': 0.0,
+        })
+        dash_updated = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        # charge_a1 remains in 'allocated' state, so charge count remains 2
+        self.assertEqual(dash_updated.uninvoiced_service_charge_lines_count, 2)
+        # Amount remains exactly 500.0 (0-amount line adds 0.0)
+        self.assertEqual(dash_updated.uninvoiced_service_charge_amount, 500.0)
+
+        # Now invoice line_a1_uninv; zero_line is still uninvoiced on charge_a1, so charge_a1 is still allocated
+        inv_extra = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': f['tenant_a'].id,
+            'company_id': self.env.company.id,
+        })
+        f['line_a1_uninv'].invoice_id = inv_extra.id
+
+        dash_after_inv = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        # charge_a1 and charge_a2 are both still allocated -> count remains 2
+        self.assertEqual(dash_after_inv.uninvoiced_service_charge_lines_count, 2)
+        # amount decreases to 200.0 (line_a2_uninv: 200.0 + zero_line: 0.0)
+        self.assertEqual(dash_after_inv.uninvoiced_service_charge_amount, 200.0)
+
+        # Now invoice zero_line: ALL lines on charge_a1 are now invoiced -> state transitions to 'invoiced'
+        inv_zero = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': f['tenant_a'].id,
+            'company_id': self.env.company.id,
+        })
+        zero_line.invoice_id = inv_zero.id
+        self.assertEqual(f['charge_a1'].state, 'invoiced')
+
+        dash_fully_inv = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        # Only charge_a2 is now allocated -> charge count drops to 1
+        self.assertEqual(dash_fully_inv.uninvoiced_service_charge_lines_count, 1)
+        self.assertEqual(dash_fully_inv.uninvoiced_service_charge_amount, 200.0)
+
+    def test_c8_03_branch_isolation(self):
+        """C8-03: Branch A sees Branch A only, Branch B sees Branch B only, all branches aggregates both."""
+        f = self._setup_c8_test_fixture()
+
+        # Branch A
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_a.uninvoiced_service_charge_lines_count, 2)
+        self.assertEqual(dash_a.uninvoiced_service_charge_amount, 500.0)
+
+        # Branch B
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        self.assertEqual(dash_b.uninvoiced_service_charge_lines_count, 1)
+        self.assertEqual(dash_b.uninvoiced_service_charge_amount, 750.0)
+
+        # All branches (global)
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertEqual(dash_all.uninvoiced_service_charge_lines_count, 3)
+        self.assertEqual(dash_all.uninvoiced_service_charge_amount, 1250.0)
+
+    def test_c8_04_empty_case(self):
+        """C8-04: When no pending Service Charge lines exist, count is 0 and amount is 0.0 with no exception."""
+        branch_empty = self.env['edara.branch'].create({
+            'name': 'C8 Empty Branch', 'code': 'C8EMPTY', 'company_id': self.dash_company.id,
+        })
+        dash_empty = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_empty.id})
+
+        self.assertEqual(dash_empty.uninvoiced_service_charge_lines_count, 0)
+        self.assertEqual(dash_empty.uninvoiced_service_charge_amount, 0.0)
+
+    def test_c8_05_drilldown(self):
+        """C8-05: action_view_service_charges_pending_invoice returns valid native action filtered to allocated charges."""
+        f = self._setup_c8_test_fixture()
+
+        # Branch A drilldown
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        action_a = dash_a.action_view_service_charges_pending_invoice()
+
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.service.charge')
+        self.assertIn(('state', '=', 'allocated'), action_a['domain'])
+        self.assertIn(('branch_id', '=', f['branch_a'].id), action_a['domain'])
+
+        matched_a = self.env['edara.service.charge'].search(action_a['domain'])
+        self.assertIn(f['charge_a1'], matched_a)
+        self.assertIn(f['charge_a2'], matched_a)
+        self.assertNotIn(f['charge_b1'], matched_a)
+
+        # Verify draft charge (no lines) is excluded
+        charge_draft = self.env['edara.service.charge'].create({
+            'building_id': f['charge_a1'].building_id.id,
+            'allocation_method': 'equal',
+            'total_amount': 100.0,
+        })
+        self.assertEqual(charge_draft.state, 'draft')
+        matched_after_draft = self.env['edara.service.charge'].search(action_a['domain'])
+        self.assertNotIn(charge_draft, matched_after_draft)
+
+        # Global drilldown (no branch context)
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_all = dash_all.action_view_service_charges_pending_invoice()
+        self.assertEqual(action_all['res_model'], 'edara.service.charge')
+        self.assertIn(('state', '=', 'allocated'), action_all['domain'])
+        self.assertFalse(any(t[0] == 'branch_id' for t in action_all['domain']))
+
+        matched_all = self.env['edara.service.charge'].search(action_all['domain'])
+        self.assertIn(f['charge_a1'], matched_all)
+        self.assertIn(f['charge_a2'], matched_all)
+        self.assertIn(f['charge_b1'], matched_all)
+        self.assertNotIn(charge_draft, matched_all)
+
+    def test_c8_06_viewer_and_regression(self):
+        """C8-06: Viewer without accounting access can read C8 KPIs and invoke drilldown; existing KPIs remain intact."""
+        f = self._setup_c8_test_fixture()
+        viewer = new_test_user(
+            self.env, login='c8_dash_viewer@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        f['branch_a'].user_ids = [(4, viewer.id)]
+
+        dash_viewer = self.env['edara.dashboard'].with_user(viewer).create({'branch_id': f['branch_a'].id})
+        self.assertFalse(dash_viewer.has_accounting_access)
+
+        # Viewer can read C8 KPIs
+        self.assertEqual(dash_viewer.uninvoiced_service_charge_lines_count, 2)
+        self.assertEqual(dash_viewer.uninvoiced_service_charge_amount, 500.0)
+
+        # Viewer can invoke C8 drilldown
+        act = dash_viewer.action_view_service_charges_pending_invoice()
+        self.assertEqual(act['res_model'], 'edara.service.charge')
+
+        # Regression: C1-C7 core behavior intact
+        self.assertGreaterEqual(dash_viewer.total_properties, 1)
+        self.assertGreaterEqual(dash_viewer.total_buildings, 1)
+        self.assertGreaterEqual(dash_viewer.total_units, 2)
+
+    def test_c8_07_charge_granularity_boundary_multiple_lines(self):
+        """C8-07: Verify charge-level granularity when charges contain multiple uninvoiced lines.
+        Charge A: 3 uninvoiced lines.
+        Charge B: 1 uninvoiced line.
+        Total lines = 4.
+        Expected KPI count == 2 (NOT 4).
+        Drilldown returns exactly those 2 Service Charges.
+        """
+        company = self.dash_company
+        branch = self.env['edara.branch'].create({
+            'name': 'C8-07 Granularity Branch', 'code': 'C807', 'company_id': company.id,
+        })
+        prop = self.env['edara.property'].create({'name': 'C8-07 Prop', 'code': 'C807P', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'C8-07 Bld', 'code': 'C807B', 'property_id': prop.id})
+        tenant = self.env['res.partner'].create({'name': 'C8-07 Tenant'})
+
+        u1 = self.env['edara.unit'].create({'name': 'C807-U1', 'code': 'C807U1', 'building_id': bld.id})
+        u2 = self.env['edara.unit'].create({'name': 'C807-U2', 'code': 'C807U2', 'building_id': bld.id})
+        u3 = self.env['edara.unit'].create({'name': 'C807-U3', 'code': 'C807U3', 'building_id': bld.id})
+        u4 = self.env['edara.unit'].create({'name': 'C807-U4', 'code': 'C807U4', 'building_id': bld.id})
+
+        # Charge A has 3 uninvoiced lines
+        charge_a = self.env['edara.service.charge'].create({
+            'building_id': bld.id, 'allocation_method': 'equal', 'total_amount': 300.0,
+        })
+        self.env['edara.service.charge.line'].create([
+            {'charge_id': charge_a.id, 'unit_id': u1.id, 'tenant_id': tenant.id, 'amount': 100.0},
+            {'charge_id': charge_a.id, 'unit_id': u2.id, 'tenant_id': tenant.id, 'amount': 100.0},
+            {'charge_id': charge_a.id, 'unit_id': u3.id, 'tenant_id': tenant.id, 'amount': 100.0},
+        ])
+        self.assertEqual(charge_a.state, 'allocated')
+        self.assertEqual(len(charge_a.line_ids), 3)
+
+        # Charge B has 1 uninvoiced line
+        charge_b = self.env['edara.service.charge'].create({
+            'building_id': bld.id, 'allocation_method': 'equal', 'total_amount': 150.0,
+        })
+        self.env['edara.service.charge.line'].create({
+            'charge_id': charge_b.id, 'unit_id': u4.id, 'tenant_id': tenant.id, 'amount': 150.0,
+        })
+        self.assertEqual(charge_b.state, 'allocated')
+        self.assertEqual(len(charge_b.line_ids), 1)
+
+        # Total uninvoiced lines in this branch = 3 + 1 = 4
+        total_uninv_lines = self.env['edara.service.charge.line'].search_count([
+            ('branch_id', '=', branch.id), ('invoice_id', '=', False),
+        ])
+        self.assertEqual(total_uninv_lines, 4)
+
+        # Dashboard KPI must count CHARGES pending invoice (2), NOT lines (4)
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch.id})
+        self.assertEqual(dash.uninvoiced_service_charge_lines_count, 2)
+        self.assertNotEqual(dash.uninvoiced_service_charge_lines_count, 4)
+
+        # Amount is total of all lines: 300 + 150 = 450.0
+        self.assertEqual(dash.uninvoiced_service_charge_amount, 450.0)
+
+        # Drilldown returns exactly those 2 Service Charges
+        action = dash.action_view_service_charges_pending_invoice()
+        self.assertEqual(action['res_model'], 'edara.service.charge')
+        matched = self.env['edara.service.charge'].search(action['domain'])
+        self.assertEqual(len(matched), 2)
+        self.assertEqual(len(matched), dash.uninvoiced_service_charge_lines_count)
+        self.assertIn(charge_a, matched)
+        self.assertIn(charge_b, matched)

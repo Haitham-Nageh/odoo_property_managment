@@ -384,6 +384,27 @@
                         </div>
                     </div>
 
+                    <!-- 5b. SERVICE CHARGES PENDING INVOICING (Phase C8) -->
+                    <separator string="Service Charges Pending Invoicing"/>
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-6 col-md-6 col-12">
+                            <button type="object" name="action_view_service_charges_pending_invoice" class="oe_stat_button" icon="fa-file-text-o text-info">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="uninvoiced_service_charge_lines_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Pending Invoice</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-6 col-md-6 col-12">
+                            <button type="object" name="action_view_service_charges_pending_invoice" class="oe_stat_button" icon="fa-bolt text-warning">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="uninvoiced_service_charge_amount" widget="monetary" readonly="1"/></span>
+                                    <span class="o_stat_text">Uninvoiced Amount</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- 6. MAINTENANCE OVERVIEW -->
                     <separator string="Maintenance Overview"/>
                     <div class="row g-3 mt-1">
