@@ -65,10 +65,12 @@ class EdaraDashboard(models.TransientModel):
     under_maintenance_units = fields.Integer(compute='_compute_kpis')
 
     draft_contracts_count = fields.Integer(compute='_compute_kpis')
+    scheduled_contracts_count = fields.Integer(compute='_compute_kpis')
     active_contracts_count = fields.Integer(compute='_compute_kpis')
     renewed_contracts_count = fields.Integer(compute='_compute_kpis')
     terminated_contracts_count = fields.Integer(compute='_compute_kpis')
     expired_contracts_count = fields.Integer(compute='_compute_kpis')
+    cancelled_contracts_count = fields.Integer(compute='_compute_kpis')
     expiring_soon_contracts_count = fields.Integer(compute='_compute_kpis')
 
     maintenance_new_count = fields.Integer(compute='_compute_kpis')
@@ -319,7 +321,7 @@ class EdaraDashboard(models.TransientModel):
 
             contract_counts = {
                 state: Contract.search_count(branch_domain + [('state', '=', state)])
-                for state in ('draft', 'active', 'renewed', 'terminated', 'expired')
+                for state in ('draft', 'scheduled', 'active', 'renewed', 'terminated', 'expired', 'cancelled')
             }
             # Independent lookahead window (today through today + 30 days)
             expiring_soon_domain = branch_domain + _expiring_soon_domain(today)
@@ -488,10 +490,12 @@ class EdaraDashboard(models.TransientModel):
                 'occupancy_chart_data': occupancy_chart_data,
                 'revenue_trend_data': revenue_trend_data,
                 'draft_contracts_count': contract_counts['draft'],
+                'scheduled_contracts_count': contract_counts['scheduled'],
                 'active_contracts_count': contract_counts['active'],
                 'renewed_contracts_count': contract_counts['renewed'],
                 'terminated_contracts_count': contract_counts['terminated'],
                 'expired_contracts_count': contract_counts['expired'],
+                'cancelled_contracts_count': contract_counts['cancelled'],
                 'expiring_soon_contracts_count': expiring_soon_count,
                 'expiring_leases_html': expiring_leases_html,
                 'maintenance_new_count': maintenance_counts['new'],
@@ -1002,6 +1006,12 @@ class EdaraDashboard(models.TransientModel):
     def action_view_contracts_draft(self):
         return self._quick_action('action_edara_lease_contract', [('state', '=', 'draft')])
 
+    def action_view_contracts_scheduled(self):
+        return self._quick_action(
+            'action_edara_lease_contract',
+            [('state', '=', 'scheduled')],
+        )
+
     def action_view_contracts_active(self):
         return self._quick_action('action_edara_lease_contract', [('state', '=', 'active')])
 
@@ -1013,6 +1023,12 @@ class EdaraDashboard(models.TransientModel):
 
     def action_view_contracts_expired(self):
         return self._quick_action('action_edara_lease_contract', [('state', '=', 'expired')])
+
+    def action_view_contracts_cancelled(self):
+        return self._quick_action(
+            'action_edara_lease_contract',
+            [('state', '=', 'cancelled')],
+        )
 
     def action_view_contracts_expiring_soon(self):
         """BD-003 (2026-09-22): ACTIVE contracts ending within the next

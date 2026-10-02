@@ -194,54 +194,79 @@
                         <field name="occupancy_chart_data" widget="edara_occupancy_chart" readonly="1" class="w-100"/>
                     </div>
 
-                    <!-- Lease Lifecycle Statuses -->
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_active" class="oe_stat_button" icon="fa-check-circle text-success">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="active_contracts_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Active Leases</span>
+                    <!-- Lease Lifecycle Statuses (Phase C5) -->
+                    <div class="o_edara_lifecycle_section mt-3">
+                        <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Lease Lifecycle Statuses</div>
+                        <div class="row g-3">
+                            <!-- 1. Live Group (2 cards) -->
+                            <div class="col-xl-4 col-lg-5 col-12 d-flex flex-column o_lifecycle_group o_lifecycle_live">
+                                <div class="text-muted small fw-semibold text-uppercase mb-2 pb-1 border-bottom">Live</div>
+                                <div class="row g-2 flex-grow-1">
+                                    <div class="col-6">
+                                        <button type="object" name="action_view_contracts_active" class="oe_stat_button" icon="fa-check-circle text-success">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="active_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Active Leases</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="object" name="action_view_contracts_scheduled" class="oe_stat_button" icon="fa-clock-o text-info">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="scheduled_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Scheduled Leases</span>
+                                            </div>
+                                        </button>
+                                    </div>
                                 </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_draft" class="oe_stat_button" icon="fa-pencil text-muted">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="draft_contracts_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Draft Leases</span>
+                            </div>
+
+                            <!-- 2. Historical Group (5 cards) -->
+                            <div class="col-xl-8 col-lg-7 col-12 d-flex flex-column o_lifecycle_group o_lifecycle_historical border-start ps-lg-3">
+                                <div class="text-muted small fw-semibold text-uppercase mb-2 pb-1 border-bottom">Historical</div>
+                                <div class="row g-2 flex-grow-1">
+                                    <div class="col-lg col-md-4 col-6">
+                                        <button type="object" name="action_view_contracts_draft" class="oe_stat_button" icon="fa-pencil text-muted">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="draft_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Draft Leases</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-lg col-md-4 col-6">
+                                        <button type="object" name="action_view_contracts_renewed" class="oe_stat_button" icon="fa-refresh text-primary">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="renewed_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Renewed</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-lg col-md-4 col-6">
+                                        <button type="object" name="action_view_contracts_terminated" class="oe_stat_button" icon="fa-ban text-muted">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="terminated_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Terminated</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-lg col-md-4 col-6">
+                                        <button type="object" name="action_view_contracts_expired" class="oe_stat_button" icon="fa-hourglass-end text-danger">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="expired_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Expired</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-lg col-md-4 col-6">
+                                        <button type="object" name="action_view_contracts_cancelled" class="oe_stat_button" icon="fa-times-circle text-muted">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="cancelled_contracts_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Cancelled</span>
+                                            </div>
+                                        </button>
+                                    </div>
                                 </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_renewed" class="oe_stat_button" icon="fa-refresh text-primary">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="renewed_contracts_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Renewed</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_terminated" class="oe_stat_button" icon="fa-ban text-muted">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="terminated_contracts_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Terminated</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_contracts_expired" class="oe_stat_button" icon="fa-hourglass-end text-danger">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="expired_contracts_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Expired</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_lease_timeline" class="oe_stat_button" icon="fa-tasks text-primary">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_text">Lease Timeline</span>
-                                </div>
-                            </button>
+                            </div>
                         </div>
                     </div>
 

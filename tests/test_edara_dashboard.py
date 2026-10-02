@@ -294,10 +294,12 @@ class TestEdaraDashboard(TransactionCase):
             ('action_view_units_sold', 'edara.unit', [('occupancy_status', '=', 'sold')]),
             ('action_view_units_under_maintenance', 'edara.unit', [('operational_status', '=', 'under_maintenance')]),
             ('action_view_contracts_draft', 'edara.lease.contract', [('state', '=', 'draft')]),
+            ('action_view_contracts_scheduled', 'edara.lease.contract', [('state', '=', 'scheduled')]),
             ('action_view_contracts_active', 'edara.lease.contract', [('state', '=', 'active')]),
             ('action_view_contracts_renewed', 'edara.lease.contract', [('state', '=', 'renewed')]),
             ('action_view_contracts_terminated', 'edara.lease.contract', [('state', '=', 'terminated')]),
             ('action_view_contracts_expired', 'edara.lease.contract', [('state', '=', 'expired')]),
+            ('action_view_contracts_cancelled', 'edara.lease.contract', [('state', '=', 'cancelled')]),
             ('action_view_maintenance_new', 'edara.maintenance.request', [('state', '=', 'new')]),
             ('action_view_maintenance_assigned', 'edara.maintenance.request', [('state', '=', 'assigned')]),
             ('action_view_maintenance_in_progress', 'edara.maintenance.request', [('state', '=', 'in_progress')]),
@@ -1873,3 +1875,331 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(act_rec['type'], 'ir.actions.client')
         self.assertEqual(act_rec['tag'], 'display_notification')
         self.assertEqual(act_rec['params']['type'], 'success')
+
+    # -- Phase C5: Lease Lifecycle Data Completeness & Visual Grouping Tests --
+
+    def _setup_c5_test_fixture(self):
+        """Sets up two isolated branches with units and lease contracts covering
+        all 7 real lifecycle states for targeted Phase C5 tests."""
+        company = self.dash_company
+        branch_a = self.env['edara.branch'].create({
+            'name': 'C5 Branch A', 'code': 'C5A', 'company_id': company.id,
+        })
+        branch_b = self.env['edara.branch'].create({
+            'name': 'C5 Branch B', 'code': 'C5B', 'company_id': company.id,
+        })
+        prop_a = self.env['edara.property'].create({
+            'name': 'C5 Prop A', 'code': 'C5PA', 'branch_id': branch_a.id,
+        })
+        prop_b = self.env['edara.property'].create({
+            'name': 'C5 Prop B', 'code': 'C5PB', 'branch_id': branch_b.id,
+        })
+        bld_a = self.env['edara.building'].create({
+            'name': 'C5 Bld A', 'code': 'C5BA', 'property_id': prop_a.id,
+        })
+        bld_b = self.env['edara.building'].create({
+            'name': 'C5 Bld B', 'code': 'C5BB', 'property_id': prop_b.id,
+        })
+        tenant = self.env['res.partner'].create({'name': 'C5 Test Tenant'})
+        today = fields.Date.context_today(self)
+
+        def make_unit(bld, name):
+            return self.env['edara.unit'].create({
+                'name': name, 'code': name, 'building_id': bld.id,
+            })
+
+        # Contracts for Branch A: explicit records for each of the 7 states
+        # 1. Draft
+        u_draft = make_unit(bld_a, 'C5-U-DRAFT')
+        c_draft = self.env['edara.lease.contract'].create({
+            'unit_id': u_draft.id, 'tenant_id': tenant.id,
+            'start_date': today, 'end_date': today + timedelta(days=365),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+
+        # 2. Scheduled (start_date in the future)
+        u_sched = make_unit(bld_a, 'C5-U-SCHED')
+        c_sched = self.env['edara.lease.contract'].create({
+            'unit_id': u_sched.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=30), 'end_date': today + timedelta(days=395),
+            'rent_amount': 1200, 'deposit_required': False,
+        })
+        c_sched.action_activate()
+
+        # 3. Active
+        u_active = make_unit(bld_a, 'C5-U-ACTIVE')
+        c_active = self.env['edara.lease.contract'].create({
+            'unit_id': u_active.id, 'tenant_id': tenant.id,
+            'start_date': today, 'end_date': today + timedelta(days=365),
+            'rent_amount': 1500, 'deposit_required': False,
+        })
+        c_active.action_activate()
+
+        # 4. Renewed (past term ended, renewed with successor)
+        u_renew = make_unit(bld_a, 'C5-U-RENEW')
+        c_renew = self.env['edara.lease.contract'].create({
+            'unit_id': u_renew.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=400), 'end_date': today - timedelta(days=1),
+            'rent_amount': 1100, 'deposit_required': False,
+        })
+        c_renew.action_activate()
+        c_renew.action_renew(today, today + timedelta(days=365), 1150)
+
+        # 5. Terminated (manually terminated before expiry)
+        u_term = make_unit(bld_a, 'C5-U-TERM')
+        c_term = self.env['edara.lease.contract'].create({
+            'unit_id': u_term.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=100), 'end_date': today + timedelta(days=200),
+            'rent_amount': 1300, 'deposit_required': False,
+        })
+        c_term.action_activate()
+        c_term.action_terminate(reason='C5 Terminate Test')
+
+        # 6. Expired (term ended with no successor)
+        u_exp = make_unit(bld_a, 'C5-U-EXP')
+        c_exp = self.env['edara.lease.contract'].create({
+            'unit_id': u_exp.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=400), 'end_date': today - timedelta(days=1),
+            'rent_amount': 1400, 'deposit_required': False,
+        })
+        c_exp.action_activate()
+        self.env['edara.lease.contract']._cron_expire_contracts()
+
+        # 7. Cancelled (scheduled lease withdrawn before starting)
+        u_canc = make_unit(bld_a, 'C5-U-CANC')
+        c_canc = self.env['edara.lease.contract'].create({
+            'unit_id': u_canc.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=45), 'end_date': today + timedelta(days=410),
+            'rent_amount': 1600, 'deposit_required': False,
+        })
+        c_canc.action_activate()
+        c_canc.action_cancel()
+
+        # Branch B: 1 scheduled and 1 cancelled contract
+        u_b_sched = make_unit(bld_b, 'C5-UB-SCHED')
+        c_b_sched = self.env['edara.lease.contract'].create({
+            'unit_id': u_b_sched.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=15), 'end_date': today + timedelta(days=380),
+            'rent_amount': 2000, 'deposit_required': False,
+        })
+        c_b_sched.action_activate()
+
+        u_b_canc = make_unit(bld_b, 'C5-UB-CANC')
+        c_b_canc = self.env['edara.lease.contract'].create({
+            'unit_id': u_b_canc.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=20), 'end_date': today + timedelta(days=385),
+            'rent_amount': 2100, 'deposit_required': False,
+        })
+        c_b_canc.action_activate()
+        c_b_canc.action_cancel()
+
+        return {
+            'branch_a': branch_a,
+            'branch_b': branch_b,
+            'contracts_a': {
+                'draft': c_draft,
+                'scheduled': c_sched,
+                'active': c_active,
+                'renewed': c_renew,
+                'terminated': c_term,
+                'expired': c_exp,
+                'cancelled': c_canc,
+            },
+            'contracts_b': {
+                'scheduled': c_b_sched,
+                'cancelled': c_b_canc,
+            },
+        }
+
+    def test_c5_01_seven_lifecycle_states(self):
+        """C5-01: Verify dashboard counts include all seven real lifecycle states
+        (draft, scheduled, active, renewed, terminated, expired, cancelled) with known counts."""
+        f = self._setup_c5_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        self.assertEqual(dash.draft_contracts_count, 1)
+        self.assertEqual(dash.scheduled_contracts_count, 1)
+        # c_active + renewal successor = 2 active contracts in Branch A
+        self.assertEqual(dash.active_contracts_count, 2)
+        self.assertEqual(dash.renewed_contracts_count, 1)
+        self.assertEqual(dash.terminated_contracts_count, 1)
+        self.assertEqual(dash.expired_contracts_count, 1)
+        self.assertEqual(dash.cancelled_contracts_count, 1)
+
+    def test_c5_02_scheduled_count(self):
+        """C5-02: Verify scheduled_contracts_count matches actual number of scheduled contracts."""
+        f = self._setup_c5_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash.scheduled_contracts_count, 1)
+
+        # Create another scheduled contract in Branch A
+        bld_a = self.env['edara.building'].search([('property_id.branch_id', '=', f['branch_a'].id)], limit=1)
+        u_extra = self.env['edara.unit'].create({
+            'name': 'C5-U-SCHED-2', 'code': 'C5US2', 'building_id': bld_a.id,
+        })
+        today = fields.Date.context_today(self)
+        c_extra = self.env['edara.lease.contract'].create({
+            'unit_id': u_extra.id, 'tenant_id': f['contracts_a']['draft'].tenant_id.id,
+            'start_date': today + timedelta(days=50), 'end_date': today + timedelta(days=400),
+            'rent_amount': 1250, 'deposit_required': False,
+        })
+        c_extra.action_activate()
+        self.assertEqual(c_extra.state, 'scheduled')
+
+        dash_updated = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_updated.scheduled_contracts_count, 2)
+
+    def test_c5_03_cancelled_count(self):
+        """C5-03: Verify cancelled_contracts_count matches actual number of cancelled contracts."""
+        f = self._setup_c5_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash.cancelled_contracts_count, 1)
+
+        # Create and cancel another scheduled contract in Branch A
+        bld_a = self.env['edara.building'].search([('property_id.branch_id', '=', f['branch_a'].id)], limit=1)
+        u_extra = self.env['edara.unit'].create({
+            'name': 'C5-U-CANC-2', 'code': 'C5UC2', 'building_id': bld_a.id,
+        })
+        today = fields.Date.context_today(self)
+        c_extra = self.env['edara.lease.contract'].create({
+            'unit_id': u_extra.id, 'tenant_id': f['contracts_a']['draft'].tenant_id.id,
+            'start_date': today + timedelta(days=60), 'end_date': today + timedelta(days=410),
+            'rent_amount': 1350, 'deposit_required': False,
+        })
+        c_extra.action_activate()
+        c_extra.action_cancel()
+        self.assertEqual(c_extra.state, 'cancelled')
+
+        dash_updated = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_updated.cancelled_contracts_count, 2)
+
+    def test_c5_04_branch_filtering(self):
+        """C5-04: Verify scheduled and cancelled counts respect the existing dashboard branch context."""
+        f = self._setup_c5_test_fixture()
+
+        # Branch A Dashboard
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_a.scheduled_contracts_count, 1)
+        self.assertEqual(dash_a.cancelled_contracts_count, 1)
+        self.assertEqual(dash_a.draft_contracts_count, 1)
+
+        # Branch B Dashboard
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        self.assertEqual(dash_b.scheduled_contracts_count, 1)
+        self.assertEqual(dash_b.cancelled_contracts_count, 1)
+        # Branch B has zero draft contracts
+        self.assertEqual(dash_b.draft_contracts_count, 0)
+
+        # Verify cross-branch contract IDs are excluded
+        sched_contracts_in_a = self.env['edara.lease.contract'].search([
+            ('branch_id', '=', f['branch_a'].id), ('state', '=', 'scheduled')
+        ])
+        self.assertIn(f['contracts_a']['scheduled'], sched_contracts_in_a)
+        self.assertNotIn(f['contracts_b']['scheduled'], sched_contracts_in_a)
+
+    def test_c5_05_drilldown_scheduled(self):
+        """C5-05: action_view_contracts_scheduled returns correct native act_window with scheduled state and branch filter."""
+        f = self._setup_c5_test_fixture()
+
+        # Case A: With Branch Selected
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        action_a = dash_a.action_view_contracts_scheduled()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.lease.contract')
+        self.assertIn(('state', '=', 'scheduled'), action_a['domain'])
+        self.assertIn(('branch_id', '=', f['branch_a'].id), action_a['domain'])
+
+        matched_a = self.env['edara.lease.contract'].search(action_a['domain'])
+        self.assertIn(f['contracts_a']['scheduled'], matched_a)
+        self.assertNotIn(f['contracts_b']['scheduled'], matched_a)
+
+        # Case B: Without Branch Selected (all accessible branches)
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_all = dash_all.action_view_contracts_scheduled()
+        self.assertEqual(action_all['type'], 'ir.actions.act_window')
+        self.assertEqual(action_all['res_model'], 'edara.lease.contract')
+        self.assertIn(('state', '=', 'scheduled'), action_all['domain'])
+        # No branch_id restriction in domain
+        self.assertFalse(any(t[0] == 'branch_id' for t in action_all['domain']))
+
+        matched_all = self.env['edara.lease.contract'].search(action_all['domain'])
+        self.assertIn(f['contracts_a']['scheduled'], matched_all)
+        self.assertIn(f['contracts_b']['scheduled'], matched_all)
+
+    def test_c5_06_drilldown_cancelled(self):
+        """C5-06: action_view_contracts_cancelled returns correct native act_window with cancelled state and branch filter."""
+        f = self._setup_c5_test_fixture()
+
+        # Case A: With Branch Selected
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        action_a = dash_a.action_view_contracts_cancelled()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.lease.contract')
+        self.assertIn(('state', '=', 'cancelled'), action_a['domain'])
+        self.assertIn(('branch_id', '=', f['branch_a'].id), action_a['domain'])
+
+        matched_a = self.env['edara.lease.contract'].search(action_a['domain'])
+        self.assertIn(f['contracts_a']['cancelled'], matched_a)
+        self.assertNotIn(f['contracts_b']['cancelled'], matched_a)
+
+        # Case B: Without Branch Selected
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_all = dash_all.action_view_contracts_cancelled()
+        self.assertEqual(action_all['type'], 'ir.actions.act_window')
+        self.assertEqual(action_all['res_model'], 'edara.lease.contract')
+        self.assertIn(('state', '=', 'cancelled'), action_all['domain'])
+        self.assertFalse(any(t[0] == 'branch_id' for t in action_all['domain']))
+
+        matched_all = self.env['edara.lease.contract'].search(action_all['domain'])
+        self.assertIn(f['contracts_a']['cancelled'], matched_all)
+        self.assertIn(f['contracts_b']['cancelled'], matched_all)
+
+    def test_c5_07_existing_lifecycle_regression(self):
+        """C5-07: Original five lifecycle counts remain correct and unregressed."""
+        f = self._setup_c5_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        self.assertEqual(dash.draft_contracts_count, 1)
+        self.assertEqual(dash.active_contracts_count, 2)
+        self.assertEqual(dash.renewed_contracts_count, 1)
+        self.assertEqual(dash.terminated_contracts_count, 1)
+        self.assertEqual(dash.expired_contracts_count, 1)
+
+    def test_c5_08_empty_states(self):
+        """C5-08: Scheduled and cancelled counts return 0 when no such contracts exist."""
+        branch_empty = self.env['edara.branch'].create({
+            'name': 'C5 Empty Branch', 'code': 'C5EMPTY', 'company_id': self.dash_company.id,
+        })
+        dash_empty = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_empty.id})
+
+        self.assertEqual(dash_empty.scheduled_contracts_count, 0)
+        self.assertEqual(dash_empty.cancelled_contracts_count, 0)
+        self.assertEqual(dash_empty.draft_contracts_count, 0)
+        self.assertEqual(dash_empty.active_contracts_count, 0)
+        self.assertEqual(dash_empty.renewed_contracts_count, 0)
+        self.assertEqual(dash_empty.terminated_contracts_count, 0)
+        self.assertEqual(dash_empty.expired_contracts_count, 0)
+
+    def test_c5_09_existing_actions_regression(self):
+        """C5-09: Existing contract actions and timeline action remain unchanged and functional."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+
+        expected = [
+            ('action_view_contracts_draft', [('state', '=', 'draft')]),
+            ('action_view_contracts_active', [('state', '=', 'active')]),
+            ('action_view_contracts_renewed', [('state', '=', 'renewed')]),
+            ('action_view_contracts_terminated', [('state', '=', 'terminated')]),
+            ('action_view_contracts_expired', [('state', '=', 'expired')]),
+        ]
+        for method_name, state_domain in expected:
+            action = getattr(dash, method_name)()
+            self.assertEqual(action['type'], 'ir.actions.act_window', method_name)
+            self.assertEqual(action['res_model'], 'edara.lease.contract', method_name)
+            self.assertIn(state_domain[0], action['domain'], method_name)
+            self.assertIn(('branch_id', '=', self.branch.id), action['domain'], method_name)
+
+        # Lease timeline action
+        action_timeline = dash.action_view_lease_timeline()
+        self.assertEqual(action_timeline['type'], 'ir.actions.act_window')
+        self.assertEqual(action_timeline['res_model'], 'edara.lease.contract')
+        self.assertEqual(action_timeline['views'][0][1], 'gantt')
