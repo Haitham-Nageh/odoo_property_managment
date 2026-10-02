@@ -350,7 +350,36 @@
                         </div>
                     </div>
 
-                    <!-- 5. MAINTENANCE OVERVIEW -->
+                    <!-- 5. SECURITY DEPOSITS (Phase C6) -->
+                    <separator string="Security Deposits"/>
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-4 col-md-4 col-12">
+                            <button type="object" name="action_view_deposits_held" class="oe_stat_button" icon="fa-shield text-primary">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="total_held_deposit_amount" widget="monetary" readonly="1"/></span>
+                                    <span class="o_stat_text">Total Held</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-4 col-md-4 col-12">
+                            <button type="object" name="action_view_deposits_held" class="oe_stat_button" icon="fa-lock text-info">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="held_deposits_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Held Deposits</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-4 col-md-4 col-12">
+                            <button type="object" name="action_view_deposits_unsettled_closed" class="oe_stat_button" icon="fa-exclamation-triangle text-warning">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="unsettled_closed_deposits_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Unsettled on Closed Leases</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 6. MAINTENANCE OVERVIEW -->
                     <separator string="Maintenance Overview"/>
                     <div class="row g-3 mt-1">
                         <div class="col-lg-2 col-md-4 col-6">

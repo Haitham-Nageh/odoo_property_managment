@@ -2203,3 +2203,391 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(action_timeline['type'], 'ir.actions.act_window')
         self.assertEqual(action_timeline['res_model'], 'edara.lease.contract')
         self.assertEqual(action_timeline['views'][0][1], 'gantt')
+
+    # =========================================================================
+    # Phase C6: Security Deposit Liability & Settlement Tests
+    # =========================================================================
+
+    def _setup_c6_test_fixture(self):
+        """Phase C6: Multi-branch, multi-currency fixture for Security Deposit tests."""
+        today = fields.Date.context_today(self)
+        company = self.dash_company
+        comp_cur = company.currency_id
+
+        # Setup second currency with rate 2.0 (so 500 second currency = 250 company currency)
+        other_cur = self.env['res.currency'].with_context(active_test=False).search([
+            ('name', '!=', comp_cur.name),
+            ('name', 'in', ('USD', 'EUR', 'ILS', 'JOD'))
+        ], limit=1)
+        other_cur.active = True
+        self.env['res.currency.rate'].search([
+            ('currency_id', '=', other_cur.id),
+            ('company_id', '=', company.id),
+        ]).unlink()
+        self.env['res.currency.rate'].create({
+            'currency_id': other_cur.id,
+            'company_id': company.id,
+            'name': today,
+            'rate': 2.0,
+        })
+
+        branch_a = self.env['edara.branch'].create({
+            'name': 'C6 Branch A', 'code': 'C6BA', 'company_id': company.id,
+        })
+        branch_b = self.env['edara.branch'].create({
+            'name': 'C6 Branch B', 'code': 'C6BB', 'company_id': company.id,
+        })
+
+        prop_a = self.env['edara.property'].create({
+            'name': 'C6 Prop A', 'code': 'C6PA', 'branch_id': branch_a.id,
+        })
+        bld_a = self.env['edara.building'].create({
+            'name': 'C6 Bld A', 'code': 'C6BLDA', 'property_id': prop_a.id,
+        })
+        prop_b = self.env['edara.property'].create({
+            'name': 'C6 Prop B', 'code': 'C6PB', 'branch_id': branch_b.id,
+        })
+        bld_b = self.env['edara.building'].create({
+            'name': 'C6 Bld B', 'code': 'C6BLDB', 'property_id': prop_b.id,
+        })
+
+        tenant = self.env['res.partner'].create({'name': 'C6 Tenant', 'company_id': company.id})
+
+        def make_unit(bld, name):
+            return self.env['edara.unit'].create({
+                'name': name, 'code': name.replace('-', ''), 'building_id': bld.id,
+            })
+
+        # 1. Branch A: Active lease, company currency, balance=1000 (state='held')
+        u_a1 = make_unit(bld_a, 'C6-UA-1')
+        c_a1 = self.env['edara.lease.contract'].create({
+            'unit_id': u_a1.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=30), 'end_date': today + timedelta(days=335),
+            'rent_amount': 1000, 'deposit_required': True, 'deposit_amount': 1000,
+        })
+        c_a1.action_activate()
+        dep_a1 = self.env['edara.deposit'].create({'contract_id': c_a1.id, 'amount': 1000})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_a1.id, 'transaction_type': 'held', 'amount': 1000,
+        })
+
+        # 2. Branch A: Active lease, other_cur, balance=500 (state='held')
+        u_a2 = make_unit(bld_a, 'C6-UA-2')
+        c_a2 = self.env['edara.lease.contract'].create({
+            'unit_id': u_a2.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=20), 'end_date': today + timedelta(days=345),
+            'rent_amount': 500, 'currency_id': other_cur.id,
+            'deposit_required': True, 'deposit_amount': 500,
+        })
+        c_a2.action_activate()
+        dep_a2 = self.env['edara.deposit'].create({'contract_id': c_a2.id, 'amount': 500})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_a2.id, 'transaction_type': 'held', 'amount': 500,
+        })
+
+        # 3. Branch A: Terminated lease, company currency, balance=800 (state='held')
+        u_a_term = make_unit(bld_a, 'C6-UA-TERM')
+        c_a_term = self.env['edara.lease.contract'].create({
+            'unit_id': u_a_term.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=120), 'end_date': today + timedelta(days=200),
+            'rent_amount': 800, 'deposit_required': True, 'deposit_amount': 800,
+        })
+        c_a_term.action_activate()
+        c_a_term.action_terminate(reason='C6 Terminate Test')
+        dep_a_term = self.env['edara.deposit'].create({'contract_id': c_a_term.id, 'amount': 800})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_a_term.id, 'transaction_type': 'held', 'amount': 800,
+        })
+
+        # 4. Branch A: Cancelled lease, company currency, balance=400 (state='held')
+        u_a_canc = make_unit(bld_a, 'C6-UA-CANC')
+        c_a_canc = self.env['edara.lease.contract'].create({
+            'unit_id': u_a_canc.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=30), 'end_date': today + timedelta(days=395),
+            'rent_amount': 400, 'deposit_required': True, 'deposit_amount': 400,
+        })
+        c_a_canc.action_activate()
+        c_a_canc.action_cancel()
+        dep_a_canc = self.env['edara.deposit'].create({'contract_id': c_a_canc.id, 'amount': 400})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_a_canc.id, 'transaction_type': 'held', 'amount': 400,
+        })
+
+        # 5. Branch A: Expired lease, settled deposit (held=600, refund=600 -> balance=0, state='closed')
+        u_a_exp = make_unit(bld_a, 'C6-UA-EXP')
+        c_a_exp = self.env['edara.lease.contract'].create({
+            'unit_id': u_a_exp.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=400), 'end_date': today - timedelta(days=1),
+            'rent_amount': 600, 'deposit_required': True, 'deposit_amount': 600,
+        })
+        c_a_exp.action_activate()
+        self.env['edara.lease.contract']._cron_expire_contracts()
+        dep_a_exp = self.env['edara.deposit'].create({'contract_id': c_a_exp.id, 'amount': 600})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_a_exp.id, 'transaction_type': 'held', 'amount': 600,
+        })
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_a_exp.id, 'transaction_type': 'refund', 'amount': 600,
+        })
+
+        # 6. Branch A: Draft lease, draft deposit (amount=300, no transactions -> balance=0, state='draft')
+        u_a_draft = make_unit(bld_a, 'C6-UA-DRAFT')
+        c_a_draft = self.env['edara.lease.contract'].create({
+            'unit_id': u_a_draft.id, 'tenant_id': tenant.id,
+            'start_date': today + timedelta(days=10), 'end_date': today + timedelta(days=375),
+            'rent_amount': 300, 'deposit_required': True, 'deposit_amount': 300,
+        })
+        dep_a_draft = self.env['edara.deposit'].create({'contract_id': c_a_draft.id, 'amount': 300})
+
+        # 7. Branch B: Active lease, company currency, balance=700 (state='held')
+        u_b1 = make_unit(bld_b, 'C6-UB-1')
+        c_b1 = self.env['edara.lease.contract'].create({
+            'unit_id': u_b1.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=10), 'end_date': today + timedelta(days=355),
+            'rent_amount': 700, 'deposit_required': True, 'deposit_amount': 700,
+        })
+        c_b1.action_activate()
+        dep_b1 = self.env['edara.deposit'].create({'contract_id': c_b1.id, 'amount': 700})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_b1.id, 'transaction_type': 'held', 'amount': 700,
+        })
+
+        return {
+            'branch_a': branch_a,
+            'branch_b': branch_b,
+            'other_cur': other_cur,
+            'deposits_a': {
+                'held_comp': dep_a1,
+                'held_other': dep_a2,
+                'term_unsettled': dep_a_term,
+                'canc_unsettled': dep_a_canc,
+                'exp_settled': dep_a_exp,
+                'draft': dep_a_draft,
+            },
+            'deposits_b': {
+                'held_comp': dep_b1,
+            },
+        }
+
+    def test_c6_01_held_count(self):
+        """C6-01: Verify dashboard correctly counts deposits in state = 'held'."""
+        f = self._setup_c6_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        # Branch A has 4 held deposits (held_comp, held_other, term_unsettled, canc_unsettled)
+        self.assertEqual(dash_a.held_deposits_count, 4)
+
+        # Branch B has 1 held deposit
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        self.assertEqual(dash_b.held_deposits_count, 1)
+
+    def test_c6_02_currency_safe_total(self):
+        """C6-02: Verify multi-currency conversion to company currency (rate != 1.0) and proves raw sum is not used."""
+        f = self._setup_c6_test_fixture()
+        today = fields.Date.context_today(self)
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        comp_cur = self.dash_company.currency_id
+        other_cur = f['other_cur']
+
+        # Independent calculation of expected converted total
+        # In Branch A:
+        # held_comp: 1000 in company currency
+        # held_other: 500 in other_cur (rate 2.0 -> 250 in company currency)
+        # term_unsettled: 800 in company currency
+        # canc_unsettled: 400 in company currency
+        converted_other = other_cur._convert(500.0, comp_cur, self.dash_company, today)
+        expected_total = 1000.0 + converted_other + 800.0 + 400.0
+        naive_raw_sum = 1000.0 + 500.0 + 800.0 + 400.0
+
+        self.assertAlmostEqual(dash_a.total_held_deposit_amount, expected_total, places=2)
+        # Explicit proof: multi-currency conversion differs from naive raw sum
+        self.assertNotEqual(round(dash_a.total_held_deposit_amount, 2), round(naive_raw_sum, 2))
+
+    def test_c6_03_unsettled_closed_lease(self):
+        """C6-03: Verify deposit is counted when balance > 0 and lease state in (terminated, expired, cancelled)."""
+        f = self._setup_c6_test_fixture()
+        today = fields.Date.context_today(self)
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        # Initially Branch A has 2 unsettled closed leases: term_unsettled (800) and canc_unsettled (400)
+        self.assertEqual(dash_a.unsettled_closed_deposits_count, 2)
+
+        # Now create an expired lease with balance > 0 to verify the third closed state ('expired')
+        bld_a = self.env['edara.building'].search([('property_id.branch_id', '=', f['branch_a'].id)], limit=1)
+        u_exp2 = self.env['edara.unit'].create({
+            'name': 'C6-UA-EXP2', 'code': 'C6UAEXP2', 'building_id': bld_a.id,
+        })
+        tenant = f['deposits_a']['held_comp'].tenant_id
+        c_exp2 = self.env['edara.lease.contract'].create({
+            'unit_id': u_exp2.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=200), 'end_date': today - timedelta(days=2),
+            'rent_amount': 550, 'deposit_required': True, 'deposit_amount': 550,
+        })
+        c_exp2.action_activate()
+        self.env['edara.lease.contract']._cron_expire_contracts()
+        self.assertEqual(c_exp2.state, 'expired')
+
+        dep_exp2 = self.env['edara.deposit'].create({'contract_id': c_exp2.id, 'amount': 550})
+        self.env['edara.deposit.transaction'].create({
+            'deposit_id': dep_exp2.id, 'transaction_type': 'held', 'amount': 550,
+        })
+        self.assertEqual(dep_exp2.balance, 550)
+
+        dash_a_updated = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        # Now 3: terminated, cancelled, and expired
+        self.assertEqual(dash_a_updated.unsettled_closed_deposits_count, 3)
+
+    def test_c6_04_fully_settled_closed_lease_excluded(self):
+        """C6-04: A deposit on terminated/expired/cancelled with balance = 0 must NOT be counted as unsettled."""
+        f = self._setup_c6_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        # exp_settled is on an expired contract but has balance == 0 (state='closed')
+        dep_exp_settled = f['deposits_a']['exp_settled']
+        self.assertEqual(dep_exp_settled.contract_id.state, 'expired')
+        self.assertEqual(dep_exp_settled.balance, 0.0)
+
+        # Unsettled count is 2 (term_unsettled + canc_unsettled), exp_settled is excluded
+        self.assertEqual(dash_a.unsettled_closed_deposits_count, 2)
+
+    def test_c6_05_active_lease_excluded(self):
+        """C6-05: A deposit with balance > 0 on an active lease must NOT be counted in unsettled_closed_deposits_count."""
+        f = self._setup_c6_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        dep_active = f['deposits_a']['held_comp']
+        self.assertEqual(dep_active.contract_id.state, 'active')
+        self.assertGreater(dep_active.balance, 0)
+
+        # Active contracts with positive balances are held, but not in unsettled closed count
+        self.assertEqual(dash_a.unsettled_closed_deposits_count, 2)
+
+    def test_c6_06_branch_isolation(self):
+        """C6-06: Deposits across two branches are strictly isolated by branch, and aggregate when no branch is selected."""
+        f = self._setup_c6_test_fixture()
+
+        # Branch A dashboard
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_a.held_deposits_count, 4)
+        self.assertEqual(dash_a.unsettled_closed_deposits_count, 2)
+
+        # Branch B dashboard
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        self.assertEqual(dash_b.held_deposits_count, 1)
+        self.assertEqual(dash_b.unsettled_closed_deposits_count, 0)
+        self.assertEqual(dash_b.total_held_deposit_amount, 700.0)
+
+        # Global dashboard (no branch selected)
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertEqual(dash_all.held_deposits_count, 5)  # 4 + 1
+        self.assertEqual(dash_all.unsettled_closed_deposits_count, 2)  # 2 + 0
+        self.assertAlmostEqual(
+            dash_all.total_held_deposit_amount,
+            dash_a.total_held_deposit_amount + dash_b.total_held_deposit_amount,
+            places=2
+        )
+
+    def test_c6_07_empty_state(self):
+        """C6-07: A company/branch with no deposits produces 0 values with no exception."""
+        branch_empty = self.env['edara.branch'].create({
+            'name': 'C6 Empty Branch', 'code': 'C6EMPTY', 'company_id': self.dash_company.id,
+        })
+        dash_empty = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_empty.id})
+
+        self.assertEqual(dash_empty.total_held_deposit_amount, 0.0)
+        self.assertEqual(dash_empty.held_deposits_count, 0)
+        self.assertEqual(dash_empty.unsettled_closed_deposits_count, 0)
+
+    def test_c6_08_viewer_access(self):
+        """C6-08: An EDARA viewer without native accounting access can read C6 deposit metrics and execute actions."""
+        f = self._setup_c6_test_fixture()
+        viewer = new_test_user(
+            self.env, login='c6_dash_viewer@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        f['branch_a'].user_ids = [(4, viewer.id)]
+
+        dash_viewer = self.env['edara.dashboard'].with_user(viewer).create({'branch_id': f['branch_a'].id})
+        # Viewer does not have native accounting access
+        self.assertFalse(dash_viewer.has_accounting_access)
+
+        # Viewer can read all C6 metrics without error
+        self.assertEqual(dash_viewer.held_deposits_count, 4)
+        self.assertEqual(dash_viewer.unsettled_closed_deposits_count, 2)
+        self.assertGreater(dash_viewer.total_held_deposit_amount, 0.0)
+
+        # Viewer can call C6 actions without error
+        act_held = dash_viewer.action_view_deposits_held()
+        self.assertEqual(act_held['res_model'], 'edara.deposit')
+        act_unsettled = dash_viewer.action_view_deposits_unsettled_closed()
+        self.assertEqual(act_unsettled['res_model'], 'edara.deposit')
+
+    def test_c6_09_drilldown_held(self):
+        """C6-09: action_view_deposits_held returns act_window with ('state', '=', 'held') and branch restriction."""
+        f = self._setup_c6_test_fixture()
+
+        # Case A: With Branch Selected
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        action_a = dash_a.action_view_deposits_held()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.deposit')
+        self.assertIn(('state', '=', 'held'), action_a['domain'])
+        self.assertIn(('branch_id', '=', f['branch_a'].id), action_a['domain'])
+
+        matched_a = self.env['edara.deposit'].search(action_a['domain'])
+        self.assertIn(f['deposits_a']['held_comp'], matched_a)
+        self.assertIn(f['deposits_a']['held_other'], matched_a)
+        self.assertIn(f['deposits_a']['term_unsettled'], matched_a)
+        self.assertIn(f['deposits_a']['canc_unsettled'], matched_a)
+        self.assertNotIn(f['deposits_b']['held_comp'], matched_a)
+        self.assertNotIn(f['deposits_a']['exp_settled'], matched_a)
+        self.assertNotIn(f['deposits_a']['draft'], matched_a)
+
+        # Case B: Without Branch Selected
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_all = dash_all.action_view_deposits_held()
+        self.assertEqual(action_all['res_model'], 'edara.deposit')
+        self.assertIn(('state', '=', 'held'), action_all['domain'])
+        self.assertFalse(any(t[0] == 'branch_id' for t in action_all['domain']))
+
+        matched_all = self.env['edara.deposit'].search(action_all['domain'])
+        self.assertIn(f['deposits_a']['held_comp'], matched_all)
+        self.assertIn(f['deposits_b']['held_comp'], matched_all)
+
+    def test_c6_10_drilldown_unsettled_closed(self):
+        """C6-10: action_view_deposits_unsettled_closed returns act_window with balance > 0 and closed lease states."""
+        f = self._setup_c6_test_fixture()
+
+        # Case A: With Branch Selected
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        action_a = dash_a.action_view_deposits_unsettled_closed()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.deposit')
+        self.assertIn(('balance', '>', 0), action_a['domain'])
+        self.assertIn(('contract_id.state', 'in', ('terminated', 'expired', 'cancelled')), action_a['domain'])
+        self.assertIn(('branch_id', '=', f['branch_a'].id), action_a['domain'])
+
+        matched_a = self.env['edara.deposit'].search(action_a['domain'])
+        self.assertIn(f['deposits_a']['term_unsettled'], matched_a)
+        self.assertIn(f['deposits_a']['canc_unsettled'], matched_a)
+        self.assertNotIn(f['deposits_a']['held_comp'], matched_a)  # active lease
+        self.assertNotIn(f['deposits_a']['exp_settled'], matched_a)  # balance = 0
+        self.assertNotIn(f['deposits_b']['held_comp'], matched_a)  # different branch
+
+        # Case B: Without Branch Selected
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_all = dash_all.action_view_deposits_unsettled_closed()
+        self.assertEqual(action_all['res_model'], 'edara.deposit')
+        self.assertIn(('balance', '>', 0), action_all['domain'])
+        self.assertIn(('contract_id.state', 'in', ('terminated', 'expired', 'cancelled')), action_all['domain'])
+        self.assertFalse(any(t[0] == 'branch_id' for t in action_all['domain']))
+
+    def test_c6_11_regression(self):
+        """C6-11: Full dashboard existing behavior (C1-C5) remains intact."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        self.assertEqual(dash.total_properties, 1)
+        self.assertEqual(dash.total_buildings, 1)
+        self.assertEqual(dash.total_units, 2)
+        self.assertEqual(dash.occupied_units, 1)
+        self.assertEqual(dash.available_units, 1)
+        self.assertEqual(dash.active_contracts_count, 1)

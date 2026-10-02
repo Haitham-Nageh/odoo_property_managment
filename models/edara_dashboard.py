@@ -114,6 +114,19 @@ class EdaraDashboard(models.TransientModel):
     schedule_due_today_count = fields.Integer(compute='_compute_kpis')
     schedule_due_this_month_count = fields.Integer(compute='_compute_kpis')
     schedule_paid_count = fields.Integer(compute='_compute_kpis')
+    # Phase C6: Security Deposit Liability & Settlement
+    total_held_deposit_amount = fields.Monetary(
+        compute='_compute_kpis', currency_field='currency_id',
+        help="Total outstanding security deposit liability currently held, converted to company currency.",
+    )
+    held_deposits_count = fields.Integer(
+        compute='_compute_kpis',
+        help="Count of security deposits currently in 'held' state.",
+    )
+    unsettled_closed_deposits_count = fields.Integer(
+        compute='_compute_kpis',
+        help="Count of security deposits with positive balance on terminated, expired, or cancelled leases.",
+    )
     has_accounting_access = fields.Boolean(compute='_compute_kpis', help=(
         "Whether the current user has native Odoo read access to account.move "
         "and account.payment - drives whether the Accounting-dependent KPI "
@@ -231,6 +244,7 @@ class EdaraDashboard(models.TransientModel):
         Building = self.env['edara.building']
         Renewal = self.env['edara.renewal.request']
         Recurring = self.env['edara.recurring.maintenance']
+        Deposit = self.env['edara.deposit']
         today = fields.Date.context_today(self)
         comp = self.env.company
 
@@ -385,6 +399,23 @@ class EdaraDashboard(models.TransientModel):
                 branch_domain, branch, comp, has_accounting_access,
             )
 
+            # Phase C6: Security Deposit Liability & Settlement
+            held_deposits = Deposit.search(branch_domain + [('state', '=', 'held')])
+            total_held_deposit_amount = 0.0
+            for dep in held_deposits:
+                dep_bal = dep.balance
+                if dep.currency_id and dep.currency_id != comp.currency_id:
+                    dep_bal = dep.currency_id._convert(dep_bal, comp.currency_id, comp, today)
+                total_held_deposit_amount += dep_bal
+
+            held_deposits_count = len(held_deposits)
+            unsettled_closed_deposits_count = Deposit.search_count(
+                branch_domain + [
+                    ('balance', '>', 0),
+                    ('contract_id.state', 'in', ('terminated', 'expired', 'cancelled')),
+                ]
+            )
+
             total_occupancy = available_units + reserved_units + occupied_units + owner_occupied_units + sold_units
             occupancy_data = {
                 'total': total_occupancy,
@@ -524,6 +555,9 @@ class EdaraDashboard(models.TransientModel):
                 'schedule_due_today_count': schedule_due_today_count,
                 'schedule_due_this_month_count': schedule_due_this_month_count,
                 'schedule_paid_count': schedule_paid_count,
+                'total_held_deposit_amount': total_held_deposit_amount,
+                'held_deposits_count': held_deposits_count,
+                'unsettled_closed_deposits_count': unsettled_closed_deposits_count,
             })
 
     def _render_expiring_leases_html(self, contracts, today):
@@ -954,7 +988,7 @@ class EdaraDashboard(models.TransientModel):
             elif model in ('edara.property', 'edara.building', 'edara.unit',
                            'edara.lease.contract', 'edara.maintenance.request',
                            'edara.renewal.request', 'edara.recurring.maintenance',
-                           'edara.payment.schedule.line'):
+                           'edara.payment.schedule.line', 'edara.deposit'):
                 combined_domain.append(('branch_id', '=', self.branch_id.id))
         action['domain'] = combined_domain
         return action
@@ -1178,6 +1212,16 @@ class EdaraDashboard(models.TransientModel):
             ('vendor_bill_id', '!=', False), ('vendor_bill_id.state', '=', 'posted'),
             ('vendor_bill_id.invoice_date', '>=', d_from),
             ('vendor_bill_id.invoice_date', '<=', d_to),
+        ])
+
+    # Phase C6: Security Deposit Quick Actions
+    def action_view_deposits_held(self):
+        return self._quick_action('action_edara_deposit', [('state', '=', 'held')])
+
+    def action_view_deposits_unsettled_closed(self):
+        return self._quick_action('action_edara_deposit', [
+            ('balance', '>', 0),
+            ('contract_id.state', 'in', ('terminated', 'expired', 'cancelled')),
         ])
 
     # ============ Business-level manual triggers (MAT-FIND-007, 2026-09-22) ============
