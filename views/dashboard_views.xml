@@ -59,9 +59,14 @@
                                         <i class="fa fa-clock-o text-warning me-2 fs-5"/>
                                         <span>Expiring Leases</span>
                                     </div>
-                                    <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-outline-warning fw-semibold">
-                                        <field name="expiring_soon_contracts_count" readonly="1"/> Due Soon (30d)
-                                    </button>
+                                    <div class="d-flex gap-1 flex-wrap justify-content-end">
+                                        <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-outline-warning fw-semibold">
+                                            <field name="expiring_soon_contracts_count" readonly="1"/> Due Soon (30d)
+                                        </button>
+                                        <button type="object" name="action_view_contracts_expiring_without_renewal" class="btn btn-sm btn-outline-danger fw-semibold" title="Expiring within 30 days without renewal in progress">
+                                            <field name="expiring_without_renewal_count" readonly="1"/> Without Renewal
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="card-body p-2 d-flex flex-column justify-content-between">
                                     <field name="expiring_leases_html" widget="html" readonly="1" class="w-100"/>

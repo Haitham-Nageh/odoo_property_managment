@@ -72,6 +72,7 @@ class EdaraDashboard(models.TransientModel):
     expired_contracts_count = fields.Integer(compute='_compute_kpis')
     cancelled_contracts_count = fields.Integer(compute='_compute_kpis')
     expiring_soon_contracts_count = fields.Integer(compute='_compute_kpis')
+    expiring_without_renewal_count = fields.Integer(compute='_compute_kpis')
 
     maintenance_new_count = fields.Integer(compute='_compute_kpis')
     maintenance_assigned_count = fields.Integer(compute='_compute_kpis')
@@ -342,6 +343,9 @@ class EdaraDashboard(models.TransientModel):
             expiring_soon_count = Contract.search_count(expiring_soon_domain)
             expiring_soon_records = Contract.search(expiring_soon_domain, order='end_date asc, id asc', limit=5)
             expiring_leases_html = dashboard._render_expiring_leases_html(expiring_soon_records, today)
+            expiring_without_renewal_count = Contract.search_count(
+                expiring_soon_domain + [('successor_contract_id', '=', False)]
+            )
 
             if has_accounting_access:
                 overdue_payments_html = dashboard._render_overdue_payments_html(overdue_lines[:5], today, comp)
@@ -528,6 +532,7 @@ class EdaraDashboard(models.TransientModel):
                 'expired_contracts_count': contract_counts['expired'],
                 'cancelled_contracts_count': contract_counts['cancelled'],
                 'expiring_soon_contracts_count': expiring_soon_count,
+                'expiring_without_renewal_count': expiring_without_renewal_count,
                 'expiring_leases_html': expiring_leases_html,
                 'maintenance_new_count': maintenance_counts['new'],
                 'maintenance_assigned_count': maintenance_counts['assigned'],
@@ -1069,6 +1074,15 @@ class EdaraDashboard(models.TransientModel):
         EXPIRING_SOON_WINDOW_DAYS (30) calendar days."""
         today = fields.Date.context_today(self)
         return self._quick_action('action_edara_lease_contract', _expiring_soon_domain(today))
+
+    def action_view_contracts_expiring_without_renewal(self):
+        """Phase C7: ACTIVE contracts ending within the next 30 calendar days
+        that do not have a successor renewal contract in progress."""
+        today = fields.Date.context_today(self)
+        return self._quick_action(
+            'action_edara_lease_contract',
+            _expiring_soon_domain(today) + [('successor_contract_id', '=', False)],
+        )
 
     def action_view_lease_timeline(self):
         """Phase 11.1: Native Gantt timeline quick action from Dashboard tile."""

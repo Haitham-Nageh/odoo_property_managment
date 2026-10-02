@@ -2591,3 +2591,222 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(dash.occupied_units, 1)
         self.assertEqual(dash.available_units, 1)
         self.assertEqual(dash.active_contracts_count, 1)
+
+    # =========================================================================
+    # Phase C7: Renewal Pipeline — Expiring Without Renewal in Progress
+    # =========================================================================
+
+    def _setup_c7_test_fixture(self):
+        """Setup isolated fixture with two branches, multiple units, and contracts for C7 tests."""
+        company = self.dash_company
+        branch_a = self.env['edara.branch'].create({
+            'name': 'C7 Branch A',
+            'code': 'C7A',
+            'company_id': company.id,
+        })
+        branch_b = self.env['edara.branch'].create({
+            'name': 'C7 Branch B',
+            'code': 'C7B',
+            'company_id': company.id,
+        })
+        prop_a = self.env['edara.property'].create({'name': 'C7 Prop A', 'code': 'C7PA', 'branch_id': branch_a.id})
+        bld_a = self.env['edara.building'].create({'name': 'C7 Bld A', 'code': 'C7BA', 'property_id': prop_a.id})
+        prop_b = self.env['edara.property'].create({'name': 'C7 Prop B', 'code': 'C7PB', 'branch_id': branch_b.id})
+        bld_b = self.env['edara.building'].create({'name': 'C7 Bld B', 'code': 'C7BB', 'property_id': prop_b.id})
+
+        tenant_a = self.env['res.partner'].create({'name': 'C7 Tenant A'})
+        tenant_b = self.env['res.partner'].create({'name': 'C7 Tenant B'})
+
+        today = date.today()
+
+        def make_contract(building, tenant, start_d, end_d, rent=1000):
+            unit = self.env['edara.unit'].create({
+                'name': f'U-{fields.Date.to_string(today)}-{len(self.env["edara.unit"].search([]))}',
+                'code': f'U{len(self.env["edara.unit"].search([]))}',
+                'building_id': building.id,
+            })
+            contract = self.env['edara.lease.contract'].create({
+                'unit_id': unit.id,
+                'tenant_id': tenant.id,
+                'start_date': start_d,
+                'end_date': end_d,
+                'rent_amount': rent,
+                'deposit_required': False,
+            })
+            contract.action_activate()
+            return contract
+
+        # Branch A contracts:
+        # 1. c_a_exp_no_succ: active, ends in 10 days, no successor -> SHOULD BE INCLUDED in expiring without renewal
+        c_a_exp_no_succ = make_contract(bld_a, tenant_a, today - timedelta(days=100), today + timedelta(days=10))
+
+        # 2. c_a_exp_with_succ: active, ends in 15 days, has real successor via action_renew -> EXCLUDED from expiring without renewal
+        c_a_exp_with_succ = make_contract(bld_a, tenant_a, today - timedelta(days=100), today + timedelta(days=15))
+        c_a_exp_with_succ.action_renew(
+            c_a_exp_with_succ.end_date + timedelta(days=1),
+            c_a_exp_with_succ.end_date + timedelta(days=365),
+            1200,
+        )
+
+        # 3. c_a_not_exp: active, ends in 60 days (> 30d window), no successor -> EXCLUDED (not expiring soon)
+        c_a_not_exp = make_contract(bld_a, tenant_a, today - timedelta(days=100), today + timedelta(days=60))
+
+        # 4. c_a_draft: draft, ends in 10 days -> EXCLUDED (not active)
+        u_draft = self.env['edara.unit'].create({
+            'name': 'U-Draft-C7',
+            'code': 'UDC7',
+            'building_id': bld_a.id,
+        })
+        c_a_draft = self.env['edara.lease.contract'].create({
+            'unit_id': u_draft.id,
+            'tenant_id': tenant_a.id,
+            'start_date': today,
+            'end_date': today + timedelta(days=10),
+            'rent_amount': 1000,
+            'deposit_required': False,
+        })
+
+        # Branch B contracts:
+        # 1. c_b_exp_no_succ: active, ends in 20 days, no successor -> SHOULD BE INCLUDED in Branch B
+        c_b_exp_no_succ = make_contract(bld_b, tenant_b, today - timedelta(days=100), today + timedelta(days=20))
+
+        return {
+            'branch_a': branch_a,
+            'branch_b': branch_b,
+            'bld_a': bld_a,
+            'bld_b': bld_b,
+            'tenant_a': tenant_a,
+            'tenant_b': tenant_b,
+            'c_a_exp_no_succ': c_a_exp_no_succ,
+            'c_a_exp_with_succ': c_a_exp_with_succ,
+            'c_a_not_exp': c_a_not_exp,
+            'c_a_draft': c_a_draft,
+            'c_b_exp_no_succ': c_b_exp_no_succ,
+            'today': today,
+        }
+
+    def test_c7_01_basic_count(self):
+        """C7-01: Verify expiring_without_renewal_count includes active expiring leases without successor."""
+        f = self._setup_c7_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        # Branch A has:
+        # - c_a_exp_no_succ: active, expiring in 10d, no successor -> INCLUDED
+        # - c_a_exp_with_succ: active, expiring in 15d, HAS successor -> EXCLUDED
+        # - c_a_not_exp: active, ends in 60d (>30d) -> EXCLUDED
+        # - c_a_draft: draft, ends in 10d -> EXCLUDED
+        self.assertEqual(dash_a.expiring_without_renewal_count, 1)
+        self.assertEqual(dash_a.expiring_soon_contracts_count, 2)
+
+    def test_c7_02_real_renewal_exclusion(self):
+        """C7-02: Verify that executing real action_renew() excludes the contract from expiring_without_renewal_count."""
+        today = date.today()
+        branch = self.env['edara.branch'].create({
+            'name': 'C7-02 Branch',
+            'code': 'C702',
+            'company_id': self.dash_company.id,
+        })
+        prop = self.env['edara.property'].create({'name': 'C7-02 Prop', 'code': 'C702P', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'C7-02 Bld', 'code': 'C702B', 'property_id': prop.id})
+        unit = self.env['edara.unit'].create({'name': 'C7-02 U1', 'code': 'C702U1', 'building_id': bld.id})
+        tenant = self.env['res.partner'].create({'name': 'C7-02 Tenant'})
+
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': unit.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=100),
+            'end_date': today + timedelta(days=20),
+            'rent_amount': 1000,
+            'deposit_required': False,
+        })
+        contract.action_activate()
+
+        # Before renewal: contract has no successor -> counted
+        dash_before = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch.id})
+        self.assertEqual(dash_before.expiring_without_renewal_count, 1)
+        self.assertEqual(dash_before.expiring_soon_contracts_count, 1)
+
+        # Execute real renewal workflow
+        successor = contract.action_renew(
+            contract.end_date + timedelta(days=1),
+            contract.end_date + timedelta(days=365),
+            1100,
+        )
+        self.assertTrue(contract.successor_contract_id)
+        self.assertEqual(contract.successor_contract_id, successor)
+
+        # After renewal: contract now has a successor -> excluded from without_renewal, but still in expiring_soon
+        dash_after = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch.id})
+        self.assertEqual(dash_after.expiring_without_renewal_count, 0)
+        self.assertEqual(dash_after.expiring_soon_contracts_count, 1)
+
+    def test_c7_03_branch_isolation(self):
+        """C7-03: Branch A sees only Branch A, Branch B sees only Branch B, no branch sees combined."""
+        f = self._setup_c7_test_fixture()
+
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_a.expiring_without_renewal_count, 1)
+
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        self.assertEqual(dash_b.expiring_without_renewal_count, 1)
+
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertGreaterEqual(dash_all.expiring_without_renewal_count, 2)
+
+    def test_c7_04_empty_state(self):
+        """C7-04: Branch with no qualifying contracts returns 0 without error."""
+        branch_empty = self.env['edara.branch'].create({
+            'name': 'C7 Empty Branch',
+            'code': 'C7EMPTY',
+            'company_id': self.dash_company.id,
+        })
+        dash_empty = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_empty.id})
+        self.assertEqual(dash_empty.expiring_without_renewal_count, 0)
+        self.assertEqual(dash_empty.expiring_soon_contracts_count, 0)
+
+    def test_c7_05_drilldown(self):
+        """C7-05: action_view_contracts_expiring_without_renewal returns valid act_window matching qualifying contracts."""
+        f = self._setup_c7_test_fixture()
+
+        # Case A: With Branch Selected
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        action_a = dash_a.action_view_contracts_expiring_without_renewal()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.lease.contract')
+        self.assertIn(('state', '=', 'active'), action_a['domain'])
+        self.assertIn(('successor_contract_id', '=', False), action_a['domain'])
+        self.assertIn(('branch_id', '=', f['branch_a'].id), action_a['domain'])
+
+        matched_a = self.env['edara.lease.contract'].search(action_a['domain'])
+        self.assertEqual(matched_a, f['c_a_exp_no_succ'])
+        self.assertNotIn(f['c_a_exp_with_succ'], matched_a)
+        self.assertNotIn(f['c_a_not_exp'], matched_a)
+        self.assertNotIn(f['c_a_draft'], matched_a)
+        self.assertNotIn(f['c_b_exp_no_succ'], matched_a)
+
+        # Case B: Without Branch Selected
+        dash_all = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        action_all = dash_all.action_view_contracts_expiring_without_renewal()
+        self.assertEqual(action_all['res_model'], 'edara.lease.contract')
+        self.assertIn(('state', '=', 'active'), action_all['domain'])
+        self.assertIn(('successor_contract_id', '=', False), action_all['domain'])
+        self.assertFalse(any(t[0] == 'branch_id' for t in action_all['domain']))
+
+        matched_all = self.env['edara.lease.contract'].search(action_all['domain'])
+        self.assertIn(f['c_a_exp_no_succ'], matched_all)
+        self.assertIn(f['c_b_exp_no_succ'], matched_all)
+        self.assertNotIn(f['c_a_exp_with_succ'], matched_all)
+
+    def test_c7_06_existing_expiring_kpi_regression(self):
+        """C7-06: Existing expiring_soon_contracts_count and drilldown remain unchanged."""
+        f = self._setup_c7_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        action_soon = dash_a.action_view_contracts_expiring_soon()
+        self.assertEqual(action_soon['res_model'], 'edara.lease.contract')
+        matched_soon = self.env['edara.lease.contract'].search(action_soon['domain'])
+
+        # Both with-successor and without-successor active expiring leases are present
+        self.assertIn(f['c_a_exp_no_succ'], matched_soon)
+        self.assertIn(f['c_a_exp_with_succ'], matched_soon)
+        self.assertNotIn(f['c_a_not_exp'], matched_soon)
+        self.assertEqual(dash_a.expiring_soon_contracts_count, 2)
