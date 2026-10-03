@@ -325,7 +325,8 @@ class TestEdaraDashboard(TransactionCase):
         dashboard = self.env['edara.dashboard'].create({})
         for method_name, kpi_field in (
                 ('action_view_maintenance_sla_at_risk', 'maintenance_sla_at_risk_count'),
-                ('action_view_maintenance_sla_breached', 'maintenance_sla_breached_count')):
+                ('action_view_maintenance_sla_breached', 'maintenance_sla_breached_count'),
+                ('action_view_vendor_requests_sla_risk', 'vendor_sla_risk_count')):
             action = getattr(dashboard, method_name)()
             self.assertEqual(action['res_model'], 'edara.maintenance.request', method_name)
             domain_count = self.env['edara.maintenance.request'].search_count(action['domain'])
@@ -356,7 +357,8 @@ class TestEdaraDashboard(TransactionCase):
         dashboard = self.env['edara.dashboard'].with_user(viewer).create({})
         for method_name in ('action_view_properties', 'action_view_buildings', 'action_view_renewals_pending',
                              'action_view_maintenance_open', 'action_view_maintenance_sla_at_risk',
-                             'action_view_maintenance_sla_breached', 'action_view_lease_timeline'):
+                             'action_view_maintenance_sla_breached', 'action_view_vendor_requests_sla_risk',
+                             'action_view_lease_timeline'):
             action = getattr(dashboard, method_name)()
             self.assertEqual(action['type'], 'ir.actions.act_window', method_name)
 
@@ -3159,3 +3161,256 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(len(matched), dash.uninvoiced_service_charge_lines_count)
         self.assertIn(charge_a, matched)
         self.assertIn(charge_b, matched)
+
+    # =========================================================================
+    # Phase C9: Vendor SLA Risk Tests
+    # =========================================================================
+
+    def _setup_c9_test_fixture(self):
+        """Phase C9: Setup two branches with units, vendors, and maintenance requests
+        exercising SLA states (at_risk, breached, within) with and without vendor assignments."""
+        company = self.dash_company
+        # Branch A
+        branch_a = self.env['edara.branch'].create({
+            'name': 'C9 Branch A',
+            'code': 'C9BA',
+            'company_id': company.id,
+            'sla_resolution_hours': 24.0,
+        })
+        prop_a = self.env['edara.property'].create({
+            'name': 'C9 Property A',
+            'code': 'C9PA',
+            'branch_id': branch_a.id,
+        })
+        bld_a = self.env['edara.building'].create({
+            'name': 'C9 Building A',
+            'code': 'C9BA1',
+            'property_id': prop_a.id,
+        })
+        unit_a1 = self.env['edara.unit'].create({
+            'name': 'C9-U-A1',
+            'code': 'C9UA1',
+            'building_id': bld_a.id,
+        })
+        unit_a2 = self.env['edara.unit'].create({
+            'name': 'C9-U-A2',
+            'code': 'C9UA2',
+            'building_id': bld_a.id,
+        })
+        unit_a3 = self.env['edara.unit'].create({
+            'name': 'C9-U-A3',
+            'code': 'C9UA3',
+            'building_id': bld_a.id,
+        })
+        unit_a4 = self.env['edara.unit'].create({
+            'name': 'C9-U-A4',
+            'code': 'C9UA4',
+            'building_id': bld_a.id,
+        })
+
+        # Branch B
+        branch_b = self.env['edara.branch'].create({
+            'name': 'C9 Branch B',
+            'code': 'C9BB',
+            'company_id': company.id,
+            'sla_resolution_hours': 24.0,
+        })
+        prop_b = self.env['edara.property'].create({
+            'name': 'C9 Property B',
+            'code': 'C9PB',
+            'branch_id': branch_b.id,
+        })
+        bld_b = self.env['edara.building'].create({
+            'name': 'C9 Building B',
+            'code': 'C9BB1',
+            'property_id': prop_b.id,
+        })
+        unit_b1 = self.env['edara.unit'].create({
+            'name': 'C9-U-B1',
+            'code': 'C9UB1',
+            'building_id': bld_b.id,
+        })
+
+        vendor_1 = self.env['res.partner'].create({'name': 'C9 Vendor 1'})
+        vendor_2 = self.env['res.partner'].create({'name': 'C9 Vendor 2'})
+
+        Maintenance = self.env['edara.maintenance.request']
+
+        # req_a_breached: Branch A, Vendor 1, breached (30 hours old > 24)
+        req_a_breached = Maintenance.create({
+            'title': 'C9 Maint A Breached Vendor',
+            'unit_id': unit_a1.id,
+            'vendor_id': vendor_1.id,
+            'state': 'in_progress',
+        })
+        self.env.cr.execute(
+            "UPDATE edara_maintenance_request SET create_date = create_date - interval '30 hours' WHERE id = %s",
+            (req_a_breached.id,)
+        )
+        req_a_breached.invalidate_recordset()
+
+        # req_a_at_risk: Branch A, Vendor 1, at_risk (20 hours old: 20/24 = 83.3% > 80%)
+        req_a_at_risk = Maintenance.create({
+            'title': 'C9 Maint A At Risk Vendor',
+            'unit_id': unit_a2.id,
+            'vendor_id': vendor_1.id,
+            'state': 'assigned',
+        })
+        self.env.cr.execute(
+            "UPDATE edara_maintenance_request SET create_date = create_date - interval '20 hours' WHERE id = %s",
+            (req_a_at_risk.id,)
+        )
+        req_a_at_risk.invalidate_recordset()
+
+        # req_a_within: Branch A, Vendor 1, within SLA (2 hours old)
+        req_a_within = Maintenance.create({
+            'title': 'C9 Maint A Within Vendor',
+            'unit_id': unit_a3.id,
+            'vendor_id': vendor_1.id,
+            'state': 'new',
+        })
+        self.env.cr.execute(
+            "UPDATE edara_maintenance_request SET create_date = create_date - interval '2 hours' WHERE id = %s",
+            (req_a_within.id,)
+        )
+        req_a_within.invalidate_recordset()
+
+        # req_a_no_vendor: Branch A, NO vendor, breached (30 hours old)
+        req_a_no_vendor = Maintenance.create({
+            'title': 'C9 Maint A Breached No Vendor',
+            'unit_id': unit_a4.id,
+            'vendor_id': False,
+            'state': 'in_progress',
+        })
+        self.env.cr.execute(
+            "UPDATE edara_maintenance_request SET create_date = create_date - interval '30 hours' WHERE id = %s",
+            (req_a_no_vendor.id,)
+        )
+        req_a_no_vendor.invalidate_recordset()
+
+        # req_b_breached: Branch B, Vendor 2, breached (30 hours old)
+        req_b_breached = Maintenance.create({
+            'title': 'C9 Maint B Breached Vendor',
+            'unit_id': unit_b1.id,
+            'vendor_id': vendor_2.id,
+            'state': 'in_progress',
+        })
+        self.env.cr.execute(
+            "UPDATE edara_maintenance_request SET create_date = create_date - interval '30 hours' WHERE id = %s",
+            (req_b_breached.id,)
+        )
+        req_b_breached.invalidate_recordset()
+
+        # Verify real computed sla_states
+        self.assertEqual(req_a_breached.sla_state, 'breached')
+        self.assertEqual(req_a_at_risk.sla_state, 'at_risk')
+        self.assertEqual(req_a_within.sla_state, 'within')
+        self.assertEqual(req_a_no_vendor.sla_state, 'breached')
+        self.assertEqual(req_b_breached.sla_state, 'breached')
+
+        return {
+            'branch_a': branch_a,
+            'branch_b': branch_b,
+            'vendor_1': vendor_1,
+            'vendor_2': vendor_2,
+            'req_a_breached': req_a_breached,
+            'req_a_at_risk': req_a_at_risk,
+            'req_a_within': req_a_within,
+            'req_a_no_vendor': req_a_no_vendor,
+            'req_b_breached': req_b_breached,
+        }
+
+    def test_c9_01_vendor_sla_risk_positive_cases(self):
+        """C9-01: Vendor-assigned maintenance requests currently at_risk or breached
+        through the real SLA mechanism are counted by vendor_sla_risk_count."""
+        f = self._setup_c9_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_a.vendor_sla_risk_count, 2)
+
+    def test_c9_02_negative_boundary_within_sla(self):
+        """C9-02: Vendor-assigned requests still within SLA are NOT counted in vendor_sla_risk_count."""
+        f = self._setup_c9_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(f['req_a_within'].sla_state, 'within')
+        self.assertTrue(f['req_a_within'].vendor_id)
+        self.assertEqual(dash_a.vendor_sla_risk_count, 2)
+        risk_ids = dash_a._vendor_sla_risk_request_ids()
+        self.assertNotIn(f['req_a_within'].id, risk_ids)
+
+    def test_c9_03_negative_boundary_no_vendor(self):
+        """C9-03: Maintenance requests that are breached/at_risk but lack a vendor_id
+        are NOT included in vendor_sla_risk_count, proving C9 is not copying the generic SLA metric."""
+        f = self._setup_c9_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(f['req_a_no_vendor'].sla_state, 'breached')
+        self.assertFalse(f['req_a_no_vendor'].vendor_id)
+        # Generic SLA breached count includes req_a_no_vendor AND req_a_breached (= 2)
+        self.assertEqual(dash_a.maintenance_sla_breached_count, 2)
+        # But vendor SLA risk count only includes the 2 vendor requests (req_a_breached + req_a_at_risk)
+        self.assertEqual(dash_a.vendor_sla_risk_count, 2)
+        risk_ids = dash_a._vendor_sla_risk_request_ids()
+        self.assertNotIn(f['req_a_no_vendor'].id, risk_ids)
+
+    def test_c9_04_branch_isolation(self):
+        """C9-04: Branch scoping isolates Vendor SLA Risk counts; global view aggregates all accessible branches."""
+        f = self._setup_c9_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        self.assertEqual(dash_a.vendor_sla_risk_count, 2)
+
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        self.assertEqual(dash_b.vendor_sla_risk_count, 1)
+
+        dash_global = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertGreaterEqual(dash_global.vendor_sla_risk_count, 3)
+        global_risk_ids = set(dash_global._vendor_sla_risk_request_ids())
+        self.assertTrue({f['req_a_breached'].id, f['req_a_at_risk'].id, f['req_b_breached'].id}.issubset(global_risk_ids))
+
+    def test_c9_05_drilldown_exactness(self):
+        """C9-05: action_view_vendor_requests_sla_risk() returns exact record IDs matching vendor_sla_risk_count."""
+        f = self._setup_c9_test_fixture()
+        dash_a = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+
+        action_a = dash_a.action_view_vendor_requests_sla_risk()
+        self.assertEqual(action_a['type'], 'ir.actions.act_window')
+        self.assertEqual(action_a['res_model'], 'edara.maintenance.request')
+
+        matched_a = self.env['edara.maintenance.request'].search(action_a['domain'])
+        self.assertEqual(len(matched_a), dash_a.vendor_sla_risk_count)
+        self.assertEqual(set(matched_a.ids), {f['req_a_breached'].id, f['req_a_at_risk'].id})
+        self.assertNotIn(f['req_a_within'], matched_a)
+        self.assertNotIn(f['req_a_no_vendor'], matched_a)
+        self.assertNotIn(f['req_b_breached'], matched_a)
+
+        dash_b = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_b'].id})
+        action_b = dash_b.action_view_vendor_requests_sla_risk()
+        matched_b = self.env['edara.maintenance.request'].search(action_b['domain'])
+        self.assertEqual(len(matched_b), dash_b.vendor_sla_risk_count)
+        self.assertEqual(set(matched_b.ids), {f['req_b_breached'].id})
+
+    def test_c9_06_viewer_access_and_regression(self):
+        """C9-06: Viewer without accounting access can read vendor_sla_risk_count and invoke drilldown; C1-C8 remain intact."""
+        f = self._setup_c9_test_fixture()
+        viewer = new_test_user(
+            self.env, login='c9_dash_viewer@example.com', groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id, company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        f['branch_a'].user_ids = [(4, viewer.id)]
+
+        dash_viewer = self.env['edara.dashboard'].with_user(viewer).create({'branch_id': f['branch_a'].id})
+        self.assertFalse(dash_viewer.has_accounting_access)
+
+        # Viewer can read C9 KPI
+        self.assertEqual(dash_viewer.vendor_sla_risk_count, 2)
+
+        # Viewer can invoke C9 drilldown without AccessError
+        action = dash_viewer.action_view_vendor_requests_sla_risk()
+        self.assertEqual(action['res_model'], 'edara.maintenance.request')
+        matched = self.env['edara.maintenance.request'].with_user(viewer).search(action['domain'])
+        self.assertEqual(len(matched), 2)
+
+        # Regression: C1-C8 core counts and behavior intact
+        self.assertGreaterEqual(dash_viewer.total_properties, 1)
+        self.assertGreaterEqual(dash_viewer.total_buildings, 1)
+        self.assertGreaterEqual(dash_viewer.total_units, 2)
+        self.assertEqual(dash_viewer.maintenance_sla_at_risk_count, 1)
+        self.assertEqual(dash_viewer.maintenance_sla_breached_count, 2)

@@ -85,6 +85,13 @@ class EdaraDashboard(models.TransientModel):
     maintenance_sla_breached_count = fields.Integer(compute='_compute_kpis', help=(
         "Open requests currently 'Breached' per their branch's configured "
         "SLA resolution target."))
+    # Phase C9: Vendor SLA Risk
+    vendor_sla_risk_count = fields.Integer(
+        string='Vendor SLA Risk',
+        compute='_compute_kpis',
+        help="Phase C9: Open maintenance requests assigned to an external vendor that are "
+             "currently 'At Risk' or 'Breached' per their branch's configured SLA target.",
+    )
     recurring_maintenance_due_count = fields.Integer(compute='_compute_kpis', help=(
         "Active recurring maintenance definitions whose next occurrence is "
         "due today or overdue."))
@@ -385,6 +392,9 @@ class EdaraDashboard(models.TransientModel):
             sla_breached_recs = sla_candidates.filtered(lambda r: r.sla_state == 'breached')
             sla_at_risk_count = len(sla_at_risk_recs)
             sla_breached_count = len(sla_breached_recs)
+            # Phase C9: Vendor SLA Risk
+            vendor_sla_risk_ids = dashboard._vendor_sla_risk_request_ids()
+            vendor_sla_risk_count = len(vendor_sla_risk_ids)
 
             def _maint_urgency_rank(r):
                 if r.sla_state == 'breached':
@@ -566,6 +576,7 @@ class EdaraDashboard(models.TransientModel):
                 'maintenance_urgent_count': maintenance_urgent_count,
                 'maintenance_sla_at_risk_count': sla_at_risk_count,
                 'maintenance_sla_breached_count': sla_breached_count,
+                'vendor_sla_risk_count': vendor_sla_risk_count,
                 'maintenance_attention_html': maintenance_attention_html,
                 'recurring_maintenance_due_count': recurring_maintenance_due_count,
                 'currency_id': self.env.company.currency_id.id,
@@ -1158,6 +1169,27 @@ class EdaraDashboard(models.TransientModel):
     def action_view_maintenance_sla_breached(self):
         return self._quick_action(
             'action_edara_maintenance_request', [('id', 'in', self._sla_request_ids('breached'))])
+
+    def _vendor_sla_risk_request_ids(self):
+        """Phase C9: Open maintenance requests assigned to an external vendor that
+        are currently 'At Risk' or 'Breached' per their branch's configured SLA."""
+        domain = [
+            ('state', 'in', ('new', 'assigned', 'in_progress')),
+            ('branch_id.sla_resolution_hours', '>', 0),
+            ('vendor_id', '!=', False),
+        ]
+        if self.branch_id:
+            domain.append(('branch_id', '=', self.branch_id.id))
+        candidates = self.env['edara.maintenance.request'].search(domain)
+        return candidates.filtered(lambda r: r.sla_state in ('at_risk', 'breached')).ids
+
+    def action_view_vendor_requests_sla_risk(self):
+        """Phase C9: Opens native Maintenance Requests view filtered to vendor-assigned requests at risk or breached."""
+        vendor_sla_risk_ids = self._vendor_sla_risk_request_ids()
+        return self._quick_action(
+            'action_edara_maintenance_request',
+            [('id', 'in', vendor_sla_risk_ids)],
+        )
 
     def action_view_maintenance_urgent(self):
         return self._quick_action(

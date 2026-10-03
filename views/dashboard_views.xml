@@ -460,7 +460,7 @@
 
                     <!-- SLA & Recurring Status -->
                     <div class="row g-3 mt-1">
-                        <div class="col-lg-4 col-md-4 col-12">
+                        <div class="col-lg-3 col-md-6 col-12">
                             <button type="object" name="action_view_maintenance_sla_at_risk" class="oe_stat_button" icon="fa-hourglass-half text-warning">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="maintenance_sla_at_risk_count" readonly="1"/></span>
@@ -468,7 +468,7 @@
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-4 col-md-4 col-12">
+                        <div class="col-lg-3 col-md-6 col-12">
                             <button type="object" name="action_view_maintenance_sla_breached" class="oe_stat_button" icon="fa-exclamation-triangle text-danger">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="maintenance_sla_breached_count" readonly="1"/></span>
@@ -476,7 +476,15 @@
                                 </div>
                             </button>
                         </div>
-                        <div class="col-lg-4 col-md-4 col-12">
+                        <div class="col-lg-3 col-md-6 col-12">
+                            <button type="object" name="action_view_vendor_requests_sla_risk" class="oe_stat_button" icon="fa-truck text-warning">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="vendor_sla_risk_count" readonly="1"/></span>
+                                    <span class="o_stat_text">Vendor SLA Risk</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="col-lg-3 col-md-6 col-12">
                             <button type="object" name="action_view_recurring_maintenance_due" class="oe_stat_button" icon="fa-repeat text-primary">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="recurring_maintenance_due_count" readonly="1"/></span>
