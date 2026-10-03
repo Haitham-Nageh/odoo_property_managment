@@ -7,6 +7,7 @@ import { useService } from "@web/core/utils/hooks";
 import { Component, onWillStart, useEffect, useRef } from "@odoo/owl";
 import { cookie } from "@web/core/browser/cookie";
 import { getCustomColor } from "@web/core/colors/colors";
+import { _t } from "@web/core/l10n/translation";
 
 const colorScheme = cookie.get("color_scheme");
 const CHART_LABEL_COLOR = getCustomColor(
@@ -78,6 +79,14 @@ export class EdaraRevenueTrendChartField extends Component {
         return data.months.every((m) => m.value === 0);
     }
 
+    get currencyFallback() {
+        return _t("Company Currency");
+    }
+
+    getCurrencyFallback() {
+        return this.currencyFallback;
+    }
+
     renderChart() {
         if (this.chart) {
             this.chart.destroy();
@@ -124,7 +133,8 @@ export class EdaraRevenueTrendChartField extends Component {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
                                 });
-                                return ` Revenue: ${currencySymbol ? currencySymbol + " " : ""}${formatted}`;
+                                const labelPrefix = _t("Revenue: ");
+                                return ` ${labelPrefix}${currencySymbol ? currencySymbol + " " : ""}${formatted}`;
                             },
                         },
                     },

@@ -7,6 +7,7 @@ import { useService } from "@web/core/utils/hooks";
 import { Component, onWillStart, useEffect, useRef } from "@odoo/owl";
 import { cookie } from "@web/core/browser/cookie";
 import { getBorderWhite } from "@web/core/colors/colors";
+import { _t } from "@web/core/l10n/translation";
 
 const colorScheme = cookie.get("color_scheme");
 
@@ -64,6 +65,18 @@ export class EdaraOccupancyChartField extends Component {
             return 0;
         }
         return Math.round((count / total) * 100);
+    }
+
+    get underMaintenanceTitle() {
+        return _t("View units under maintenance");
+    }
+
+    getUnderMaintenanceTitle() {
+        return this.underMaintenanceTitle;
+    }
+
+    getSliceTitle(slice) {
+        return _t("View %s units", slice.label);
     }
 
     renderChart() {

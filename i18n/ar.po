@@ -132,8 +132,8 @@ msgid ""
 "%(unit)s cannot be marked %(status)s while it still has a currently active "
 "lease contract covering today. Terminate or end the lease first."
 msgstr ""
-"لا يمكن تعيين الوحدة %(unit)s بالحالة %(status)s ما دام لديها عقد إيجار "
-"نشط حاليًا يشمل تاريخ اليوم. يجب إنهاء عقد الإيجار أو إنهاؤه أولًا."
+"لا يمكن تعيين الوحدة %(unit)s بالحالة %(status)s ما دام لديها عقد إيجار نشط "
+"حاليًا يشمل تاريخ اليوم. يجب إنهاء عقد الإيجار أو إنهاؤه أولًا."
 
 #. module: property_managment
 #. odoo-python
@@ -4480,7 +4480,7 @@ msgstr "إجمالي الإيرادات"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__total_units
 msgid "Total Units"
-msgstr "Total الوحدةs"
+msgstr "إجمالي الوحدات"
 
 #. module: property_managment
 #. odoo-python
@@ -4903,3 +4903,200 @@ msgstr "sqm"
 #, python-format
 msgid "The deposit amount cannot be changed after collection has started."
 msgstr "لا يمكن تعديل مبلغ التأمين بعد بدء التحصيل."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "No leases expiring soon"
+msgstr "لا توجد عقود إيجار تنتهي قريباً"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Expires today"
+msgstr "ينتهي اليوم"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Expired %(days)sd ago"
+msgstr "انتهى منذ %(days)s يوم"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "1 day remaining"
+msgstr "يوم واحد متبقي"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "%(days)s days remaining"
+msgstr "متبقي %(days)s يوم"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Expires: %(date)s"
+msgstr "تاريخ الانتهاء: %(date)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "No overdue payments"
+msgstr "لا توجد دفعات متأخرة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Due: %(date)s"
+msgstr "تاريخ الاستحقاق: %(date)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "%(days)sd overdue"
+msgstr "متأخر %(days)s يوم"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "No maintenance requiring attention"
+msgstr "لا توجد طلبات صيانة تتطلب الاهتمام"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "SLA Breached"
+msgstr "تم تجاوز اتفاقية مستوى الخدمة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "SLA At Risk"
+msgstr "اتفاقية مستوى الخدمة معرضة للخطر"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "No pending renewal decisions"
+msgstr "لا توجد قرارات تجديد معلقة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Requested until: %(date)s"
+msgstr "مطلوب حتى: %(date)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "No recent activity"
+msgstr "لا يوجد نشاط حديث"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Lease Terminated: %(name)s"
+msgstr "إنهاء عقد الإيجار: %(name)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Maintenance Completed: %(name)s%(title)s"
+msgstr "اكتملت الصيانة: %(name)s%(title)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Completed"
+msgstr "مكتمل"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Renewal %(status)s: Lease %(contract)s"
+msgstr "تجديد %(status)s: عقد %(contract)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Payment Received: %(amount)s for Lease %(contract)s"
+msgstr "تم استلام الدفعة: %(amount)s لعقد الإيجار %(contract)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Payment Received: %(amount)s from %(partner)s"
+msgstr "تم استلام الدفعة: %(amount)s من %(partner)s"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Unknown Tenant"
+msgstr "مستأجر غير معروف"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.js:0
+msgid "View units under maintenance"
+msgstr "عرض الوحدات قيد الصيانة"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.js:0
+msgid "View %s units"
+msgstr "عرض وحدات %s"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.xml:0
+msgid "Occupancy Distribution"
+msgstr "توزيع الإشغال"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.xml:0
+msgid "No units in portfolio"
+msgstr "لا توجد وحدات في المحفظة"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.xml:0
+msgid "Occupancy distribution will appear once units are added."
+msgstr "سيظهر توزيع الإشغال بمجرد إضافة الوحدات."
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.js:0
+msgid "Revenue: "
+msgstr "الإيرادات: "
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.js:0
+msgid "Company Currency"
+msgstr "عملة الشركة"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.xml:0
+msgid "Revenue Trend (Trailing 6 Months)"
+msgstr "اتجاه الإيرادات (آخر 6 أشهر)"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.xml:0
+msgid "No revenue in trailing 6 months"
+msgstr "لا توجد إيرادات في آخر 6 أشهر"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.xml:0
+msgid "Revenue trend will appear once customer invoices are posted."
+msgstr "سيظهر اتجاه الإيرادات بمجرد ترحيل فواتير العملاء."
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__vendor_sla_risk_count
+msgid "Vendor SLA Risk"
+msgstr "مخاطر SLA للموردين"

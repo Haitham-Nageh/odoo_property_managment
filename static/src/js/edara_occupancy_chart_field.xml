@@ -11,7 +11,7 @@
                 <div t-if="chartData.under_maintenance"
                      class="o_operational_indicator btn btn-sm btn-outline-warning d-flex align-items-center gap-2"
                      role="button"
-                     t-att-title="'View units under maintenance'"
+                     t-att-title="underMaintenanceTitle"
                      t-on-click="() => this.onSliceClick(chartData.under_maintenance.action_method)">
                     <i class="fa fa-wrench"/>
                     <span>Under Maintenance: <strong><t t-esc="chartData.under_maintenance.count"/></strong></span>
@@ -44,7 +44,7 @@
                             <div t-foreach="chartData.slices" t-as="slice" t-key="slice.status"
                                  class="o_occupancy_legend_item d-flex align-items-center justify-content-between p-2 rounded"
                                  role="button"
-                                 t-att-title="'View ' + slice.label + ' units'"
+                                 t-att-title="getSliceTitle(slice)"
                                  t-on-click="() => this.onSliceClick(slice.action_method)">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="o_legend_color_dot" t-attf-style="background-color: {{ slice.color }}"/>

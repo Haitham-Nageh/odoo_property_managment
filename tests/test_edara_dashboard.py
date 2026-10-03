@@ -3414,3 +3414,113 @@ class TestEdaraDashboard(TransactionCase):
         self.assertGreaterEqual(dash_viewer.total_units, 2)
         self.assertEqual(dash_viewer.maintenance_sla_at_risk_count, 1)
         self.assertEqual(dash_viewer.maintenance_sla_breached_count, 2)
+
+    def test_d1_01_html_helpers_translation_wrapping_regression(self):
+        """Phase D1: Translation wrapping regression test.
+        Verifies that native _() translation wrapping preserves HTML structure,
+        CSS classes, icons, dynamic interpolation values, and empty states in English context.
+        """
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': self.branch.id})
+        today = date.today()
+
+        # 1. Empty States
+        empty_exp = dash._render_expiring_leases_html(self.env['edara.lease.contract'], today)
+        self.assertIn('o_edara_empty_state', empty_exp)
+        self.assertIn('No leases expiring soon', empty_exp)
+
+        empty_overdue = dash._render_overdue_payments_html(self.env['edara.payment.schedule.line'], today, self.dash_company)
+        self.assertIn('o_edara_empty_state', empty_overdue)
+        self.assertIn('No overdue payments', empty_overdue)
+
+        empty_maint = dash._render_maintenance_attention_html(self.env['edara.maintenance.request'])
+        self.assertIn('o_edara_empty_state', empty_maint)
+        self.assertIn('No maintenance requiring attention', empty_maint)
+
+        empty_ren = dash._render_pending_renewals_html(self.env['edara.renewal.request'], self.dash_company)
+        self.assertIn('o_edara_empty_state', empty_ren)
+        self.assertIn('No pending renewal decisions', empty_ren)
+
+        # 2. Populated Expiring Leases HTML & Dynamic Interpolation
+        tenant = self.env['res.partner'].create({'name': 'D1 Tenant Corp'})
+        unit_d1 = self.env['edara.unit'].create({
+            'name': 'U-D1-01', 'code': 'UD101', 'building_id': self.building.id,
+        })
+        unit_d2 = self.env['edara.unit'].create({
+            'name': 'U-D1-02', 'code': 'UD102', 'building_id': self.building.id,
+        })
+        c_today = self.env['edara.lease.contract'].create({
+            'name': 'LC-D1-TODAY',
+            'unit_id': unit_d1.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=365),
+            'end_date': today,
+            'rent_amount': 1000.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+        c_future = self.env['edara.lease.contract'].create({
+            'name': 'LC-D1-FUT',
+            'unit_id': unit_d2.id,
+            'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=360),
+            'end_date': today + timedelta(days=5),
+            'rent_amount': 1500.0,
+            'deposit_required': False,
+            'state': 'active',
+        })
+        rendered_exp = dash._render_expiring_leases_html(c_today | c_future, today)
+        self.assertIn('o_attention_list', rendered_exp)
+        self.assertIn('Expires today', rendered_exp)
+        self.assertIn('5 days remaining', rendered_exp)
+        self.assertIn(f'Expires: {today.strftime("%Y-%m-%d")}', rendered_exp)
+        self.assertNotIn('%(', rendered_exp)
+
+        # 3. Populated Overdue Payments HTML & Dynamic Interpolation
+        sched_line = self.env['edara.payment.schedule.line'].create({
+            'contract_id': self.contract.id,
+            'due_date': today - timedelta(days=12),
+            'amount': 2500.0,
+        })
+        rendered_due = dash._render_overdue_payments_html(sched_line, today, self.dash_company)
+        self.assertIn('o_attention_list', rendered_due)
+        self.assertIn('12d overdue', rendered_due)
+        self.assertIn(f'Due: {(today - timedelta(days=12)).strftime("%Y-%m-%d")}', rendered_due)
+        self.assertNotIn('%(', rendered_due)
+
+        # 4. Populated Maintenance Attention HTML & Badge Labels
+        req_urgent = self.env['edara.maintenance.request'].create({
+            'title': 'D1 Broken HVAC',
+            'unit_id': self.unit_rented.id,
+            'priority': 'urgent',
+            'state': 'in_progress',
+        })
+        # Set create_date back in time so elapsed > target -> SLA Breached
+        self.env.cr.execute(
+            "UPDATE edara_maintenance_request SET create_date = %s WHERE id = %s",
+            (fields.Datetime.now() - timedelta(days=30), req_urgent.id),
+        )
+        req_urgent.invalidate_recordset(['create_date', 'sla_state'])
+        rendered_maint = dash._render_maintenance_attention_html(req_urgent)
+        self.assertIn('Urgent', rendered_maint)
+        self.assertIn('SLA Breached', rendered_maint)
+        self.assertNotIn('%(', rendered_maint)
+
+        # 5. Populated Pending Renewals HTML
+        ren_start = self.contract.end_date + timedelta(days=1)
+        ren_end = self.contract.end_date + timedelta(days=365)
+        ren_req = self.env['edara.renewal.request'].create({
+            'contract_id': self.contract.id,
+            'requested_start_date': ren_start,
+            'requested_end_date': ren_end,
+            'requested_rent_amount': 3200.0,
+            'state': 'submitted',
+        })
+        rendered_ren = dash._render_pending_renewals_html(ren_req, self.dash_company)
+        self.assertIn('Submitted', rendered_ren)
+        self.assertIn(f'Requested until: {ren_end.strftime("%Y-%m-%d")}', rendered_ren)
+        self.assertNotIn('%(', rendered_ren)
+
+        # 6. Recent Activity HTML
+        empty_act = dash._render_recent_activity_html([('branch_id', '=', self.branch.id)], self.branch, self.dash_company, False)
+        self.assertNotIn('%(', empty_act)
+

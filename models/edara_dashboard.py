@@ -607,20 +607,24 @@ class EdaraDashboard(models.TransientModel):
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
                 '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
-                '<span>No leases expiring soon</span>'
+                f'<span>{_("No leases expiring soon")}</span>'
                 '</div>'
             )
         items = []
         for c in contracts:
             days_left = (c.end_date - today).days if c.end_date else 0
             if days_left <= 0:
-                badge = '<span class="badge bg-danger text-white">Expires today</span>' if days_left == 0 else f'<span class="badge bg-danger text-white">Expired {-days_left}d ago</span>'
+                badge = (
+                    f'<span class="badge bg-danger text-white">{_("Expires today")}</span>'
+                    if days_left == 0
+                    else f'<span class="badge bg-danger text-white">{_("Expired %(days)sd ago", days=-days_left)}</span>'
+                )
             elif days_left == 1:
-                badge = '<span class="badge bg-danger text-white">1 day remaining</span>'
+                badge = f'<span class="badge bg-danger text-white">{_("1 day remaining")}</span>'
             elif days_left <= 7:
-                badge = f'<span class="badge bg-danger text-white">{days_left} days remaining</span>'
+                badge = f'<span class="badge bg-danger text-white">{_("%(days)s days remaining", days=days_left)}</span>'
             else:
-                badge = f'<span class="badge bg-warning text-dark">{days_left} days remaining</span>'
+                badge = f'<span class="badge bg-warning text-dark">{_("%(days)s days remaining", days=days_left)}</span>'
 
             tenant_name = html_escape(c.tenant_id.name or _('Unknown Tenant'))
             contract_ref = html_escape(c.name or '')
@@ -628,6 +632,7 @@ class EdaraDashboard(models.TransientModel):
             if c.property_id:
                 unit_info += f' • {html_escape(c.property_id.name)}'
             expiry_str = c.end_date.strftime('%Y-%m-%d') if c.end_date else ''
+            expiry_line = _("Expires: %(date)s", date=expiry_str)
 
             items.append(
                 f'<a href="/odoo/action-property_managment.action_edara_lease_contract/{c.id}" '
@@ -636,7 +641,7 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="fw-bold text-dark text-truncate">{tenant_name} '
                 f'<span class="text-muted fw-normal small">({contract_ref})</span></div>'
                 f'<div class="text-muted small text-truncate"><i class="fa fa-building-o me-1"/>{unit_info}</div>'
-                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>Expires: {expiry_str}</div>'
+                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>{expiry_line}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0">'
                 f'{badge}'
@@ -650,7 +655,7 @@ class EdaraDashboard(models.TransientModel):
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
                 '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
-                '<span>No overdue payments</span>'
+                f'<span>{_("No overdue payments")}</span>'
                 '</div>'
             )
         items = []
@@ -665,6 +670,8 @@ class EdaraDashboard(models.TransientModel):
             contract_ref = html_escape(l.contract_id.name or '')
             unit_str = f" • {html_escape(l.unit_id.name)}" if l.unit_id else ""
             due_str = l.due_date.strftime('%Y-%m-%d') if l.due_date else ''
+            due_line = _("Due: %(date)s", date=due_str)
+            overdue_badge = _("%(days)sd overdue", days=days_overdue)
 
             items.append(
                 f'<a href="/odoo/action-property_managment.action_edara_payment_schedule_line/{l.id}" '
@@ -672,11 +679,11 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="me-2 text-truncate">'
                 f'<div class="fw-bold text-dark text-truncate">{tenant_name} '
                 f'<span class="text-muted fw-normal small">({contract_ref}{unit_str})</span></div>'
-                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>Due: {due_str}</div>'
+                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>{due_line}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0">'
                 f'<div class="fw-bold text-danger">{amt_str}</div>'
-                f'<span class="badge bg-danger text-white">{days_overdue}d overdue</span>'
+                f'<span class="badge bg-danger text-white">{overdue_badge}</span>'
                 f'</div>'
                 f'</a>'
             )
@@ -687,7 +694,7 @@ class EdaraDashboard(models.TransientModel):
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
                 '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
-                '<span>No maintenance requiring attention</span>'
+                f'<span>{_("No maintenance requiring attention")}</span>'
                 '</div>'
             )
         items = []
@@ -700,14 +707,14 @@ class EdaraDashboard(models.TransientModel):
 
             badges = []
             if req.priority == 'urgent':
-                badges.append('<span class="badge bg-danger text-white">Urgent</span>')
+                badges.append(f'<span class="badge bg-danger text-white">{_("Urgent")}</span>')
             elif req.priority == 'high':
-                badges.append('<span class="badge bg-warning text-dark">High</span>')
+                badges.append(f'<span class="badge bg-warning text-dark">{_("High")}</span>')
 
             if req.sla_state == 'breached':
-                badges.append('<span class="badge bg-danger text-white">SLA Breached</span>')
+                badges.append(f'<span class="badge bg-danger text-white">{_("SLA Breached")}</span>')
             elif req.sla_state == 'at_risk':
-                badges.append('<span class="badge bg-warning text-dark">SLA At Risk</span>')
+                badges.append(f'<span class="badge bg-warning text-dark">{_("SLA At Risk")}</span>')
 
             badges_html = ' '.join(badges)
 
@@ -731,7 +738,7 @@ class EdaraDashboard(models.TransientModel):
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
                 '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
-                '<span>No pending renewal decisions</span>'
+                f'<span>{_("No pending renewal decisions")}</span>'
                 '</div>'
             )
         items = []
@@ -744,6 +751,8 @@ class EdaraDashboard(models.TransientModel):
             curr = ren.currency_id or comp.currency_id
             curr_str = curr.symbol or curr.name or ''
             rent_str = f"{rent_amt:,.2f} {html_escape(curr_str)}"
+            requested_line = _("Requested until: %(date)s", date=end_date_str)
+            submitted_badge = _("Submitted")
 
             items.append(
                 f'<a href="/odoo/action-property_managment.action_edara_renewal_request/{ren.id}" '
@@ -751,11 +760,11 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="me-2 text-truncate">'
                 f'<div class="fw-bold text-dark text-truncate">{tenant_name} '
                 f'<span class="text-muted fw-normal small">({contract_ref}{unit_str})</span></div>'
-                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>Requested until: {end_date_str}</div>'
+                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>{requested_line}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0">'
                 f'<div class="fw-bold text-primary">{rent_str}</div>'
-                f'<span class="badge bg-info text-dark">Submitted</span>'
+                f'<span class="badge bg-info text-dark">{submitted_badge}</span>'
                 f'</div>'
                 f'</a>'
             )
@@ -794,9 +803,9 @@ class EdaraDashboard(models.TransientModel):
                 'action_xml_id': 'property_managment.action_edara_lease_contract',
                 'timestamp': timestamp,
                 'raw_date': t_date,
-                'title': f"Lease Terminated: {c.name}",
+                'title': _("Lease Terminated: %(name)s", name=c.name),
                 'subtitle': f"{tenant_name}{unit_str}",
-                'badge_label': 'Terminated',
+                'badge_label': _('Terminated'),
                 'badge_class': 'bg-danger-subtle text-danger border border-danger-subtle',
                 'icon_class': 'fa fa-ban text-danger',
                 'icon_bg': 'bg-danger-subtle',
@@ -831,9 +840,9 @@ class EdaraDashboard(models.TransientModel):
                 'action_xml_id': 'property_managment.action_edara_maintenance_request',
                 'timestamp': timestamp,
                 'raw_date': raw_dt,
-                'title': f"Maintenance Completed: {m.name}{m_title}",
+                'title': _("Maintenance Completed: %(name)s%(title)s", name=m.name, title=m_title),
                 'subtitle': unit_str.strip(),
-                'badge_label': 'Completed',
+                'badge_label': _('Completed'),
                 'badge_class': 'bg-success-subtle text-success border border-success-subtle',
                 'icon_class': 'fa fa-wrench text-success',
                 'icon_bg': 'bg-success-subtle',
@@ -847,7 +856,7 @@ class EdaraDashboard(models.TransientModel):
         for ren in renewal_candidates:
             timestamp = ren.write_date or datetime.min
             is_approved = (ren.state == 'approved')
-            status_label = 'Approved' if is_approved else 'Rejected'
+            status_label = _('Approved') if is_approved else _('Rejected')
             badge_class = (
                 'bg-success-subtle text-success border border-success-subtle'
                 if is_approved
@@ -863,7 +872,7 @@ class EdaraDashboard(models.TransientModel):
                 'action_xml_id': 'property_managment.action_edara_renewal_request',
                 'timestamp': timestamp,
                 'raw_date': timestamp,
-                'title': f"Renewal {status_label}: Lease {contract_str}",
+                'title': _("Renewal %(status)s: Lease %(contract)s", status=status_label, contract=contract_str),
                 'subtitle': tenant_str,
                 'badge_label': status_label,
                 'badge_class': badge_class,
@@ -896,10 +905,10 @@ class EdaraDashboard(models.TransientModel):
 
                 if len(reconciled_contracts) == 1:
                     contract_name = reconciled_contracts[0].name
-                    title = f"Payment Received: {amt_str} for Lease {contract_name}"
+                    title = _("Payment Received: %(amount)s for Lease %(contract)s", amount=amt_str, contract=contract_name)
                     subtitle = partner_name
                 else:
-                    title = f"Payment Received: {amt_str} from {partner_name}"
+                    title = _("Payment Received: %(amount)s from %(partner)s", amount=amt_str, partner=partner_name)
                     subtitle = ""
 
                 activities.append({
@@ -909,7 +918,7 @@ class EdaraDashboard(models.TransientModel):
                     'raw_date': p_date,
                     'title': title,
                     'subtitle': subtitle,
-                    'badge_label': 'Paid',
+                    'badge_label': _('Paid'),
                     'badge_class': 'bg-primary-subtle text-primary border border-primary-subtle',
                     'icon_class': 'fa fa-money text-primary',
                     'icon_bg': 'bg-primary-subtle',
@@ -919,7 +928,7 @@ class EdaraDashboard(models.TransientModel):
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
                 '<i class="fa fa-history text-muted fs-5 mb-1 d-block"/>'
-                '<span>No recent activity</span>'
+                f'<span>{_("No recent activity")}</span>'
                 '</div>'
             )
 
