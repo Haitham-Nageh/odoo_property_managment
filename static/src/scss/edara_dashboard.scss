@@ -5,17 +5,11 @@
    small form-header smart-button strip); this dashboard is a full-page KPI
    grid, not a button box, so it gets its own card treatment.
 
-   Phase 6.1 note: the "css error occured, using an old style" fallback the
-   user saw was NOT caused by this file or by :has() below - the actual cause
-   was the whole backend SCSS bundle (hundreds of native Odoo .scss files)
-   failing to compile because the `libsass` Python package required by
-   requirements.txt was never actually installed in server/.venv. That is
-   fixed at the environment level (pip install), not in this stylesheet.
-   :has() itself compiled cleanly once libsass was present, and Odoo's own
-   button_box.scss already relies on :has() - it was never the problem. */
+   Theme Hardening: Built with native Odoo/Bootstrap SCSS tokens for seamless
+   Light and Dark theme compatibility. */
 
 .o_edara_dashboard .o_horizontal_separator {
-    border-bottom: 2px solid var(--border-color, #dee2e6);
+    border-bottom: 2px solid $border-color;
     padding-bottom: 6px;
     margin-top: 28px;
 }
@@ -63,8 +57,8 @@
     min-height: 112px;
     padding: 16px 12px;
     margin-bottom: 16px;
-    background-color: var(--EdaraCard-bg, #fafbfc);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
@@ -94,7 +88,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .03em;
-    color: var(--muted-text-color, #6c757d);
+    color: $text-muted;
     margin-bottom: 8px;
 }
 
@@ -107,24 +101,24 @@
     font-weight: 700;
     line-height: 1;
     padding: 5px 16px;
-    background-color: #fff;
-    border: 1px solid var(--border-color, #d8dce1);
+    background-color: transparent;
+    border: 1px solid $border-color;
     border-radius: 6px;
-    color: var(--body-color, #2b2b2b);
+    color: $body-color;
 }
 
 /* State accent on the number badge only - reuses the text-success/warning/
    danger/primary classes already present on each tile's icon, no new state
    model, no JS. */
-.o_edara_dashboard .oe_stat_button:has(.text-danger) .o_stat_value { border-color: var(--danger, #dc3545); color: var(--danger, #dc3545); }
-.o_edara_dashboard .oe_stat_button:has(.text-warning) .o_stat_value { border-color: var(--warning, #b8860b); color: var(--warning, #b8860b); }
-.o_edara_dashboard .oe_stat_button:has(.text-success) .o_stat_value { border-color: var(--success, #28a745); color: var(--success, #28a745); }
-.o_edara_dashboard .oe_stat_button:has(.text-primary) .o_stat_value { border-color: var(--primary, #714b67); color: var(--primary, #714b67); }
+.o_edara_dashboard .oe_stat_button:has(.text-danger) .o_stat_value { border-color: $danger; color: $danger; }
+.o_edara_dashboard .oe_stat_button:has(.text-warning) .o_stat_value { border-color: $warning; color: $warning; }
+.o_edara_dashboard .oe_stat_button:has(.text-success) .o_stat_value { border-color: $success; color: $success; }
+.o_edara_dashboard .oe_stat_button:has(.text-primary) .o_stat_value { border-color: $primary; color: $primary; }
 
 /* Phase A Foundation: Global Context Bar */
 .o_edara_dashboard .o_edara_context_bar {
-    background-color: var(--EdaraCard-bg, #ffffff);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
 }
@@ -135,22 +129,22 @@
 
 /* Phase A Foundation: Attention Required cards accent */
 .o_edara_dashboard .o_attention_card {
-    border-top: 3px solid var(--border-color, #d8dce1) !important;
+    border-top: 3px solid $border-color !important;
 }
 .o_edara_dashboard .o_attention_card:has(.text-danger) {
-    border-top-color: var(--danger, #dc3545) !important;
+    border-top-color: $danger !important;
 }
 .o_edara_dashboard .o_attention_card:has(.text-warning) {
-    border-top-color: var(--warning, #b8860b) !important;
+    border-top-color: $warning !important;
 }
 .o_edara_dashboard .o_attention_card:has(.text-primary) {
-    border-top-color: var(--primary, #714b67) !important;
+    border-top-color: $primary !important;
 }
 
 /* Phase A Foundation: Quick Actions Bar */
 .o_edara_dashboard .o_edara_quick_actions {
-    background-color: var(--EdaraCard-bg, #fafbfc);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
 }
 
@@ -174,8 +168,8 @@
 
 /* Phase B: Attention Center Refinement */
 .o_edara_dashboard .o_edara_attention_center .o_attention_box {
-    background-color: var(--EdaraCard-bg, #ffffff);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
     transition: box-shadow 0.15s ease-in-out;
@@ -188,7 +182,7 @@
 .o_edara_dashboard .o_attention_box .card-header {
     border-top-left-radius: 7px;
     border-top-right-radius: 7px;
-    background-color: var(--EdaraHeader-bg, #fbfcfd);
+    background-color: $card-cap-bg;
 }
 
 .o_edara_dashboard .o_attention_box .o_field_html {
@@ -202,29 +196,29 @@
     align-items: center;
     padding: 8px 12px;
     margin-bottom: 6px;
-    background-color: var(--EdaraItem-bg, #f8fafc);
-    border: 1px solid var(--border-color, #edf0f2);
+    background-color: $body-tertiary-bg;
+    border: 1px solid $border-color;
     border-radius: 6px;
     text-decoration: none !important;
     transition: all 0.15s ease-in-out;
 }
 
 .o_edara_dashboard .o_attention_item:hover {
-    background-color: var(--EdaraItemHover-bg, #f0f4f8);
-    border-color: var(--primary, #714b67);
+    background-color: $body-secondary-bg;
+    border-color: $primary;
     transform: translateY(-1px);
 }
 
 .o_edara_dashboard .o_edara_empty_state {
     padding: 24px 12px;
     text-align: center;
-    color: var(--text-muted, #6c757d);
+    color: $text-muted;
 }
 
 /* Phase C1: Recent Activity Operational Timeline */
 .o_edara_dashboard .o_edara_recent_activity {
-    background-color: var(--EdaraCard-bg, #ffffff);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
 }
@@ -247,16 +241,16 @@
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    background-color: var(--EdaraItem-bg, #f8fafc);
-    border: 1px solid var(--border-color, #edf0f2);
+    background-color: $body-tertiary-bg;
+    border: 1px solid $border-color;
     border-radius: 6px;
     text-decoration: none !important;
     transition: all 0.15s ease-in-out;
 }
 
 .o_edara_dashboard .o_activity_item:hover {
-    background-color: var(--EdaraItemHover-bg, #f0f4f8);
-    border-color: var(--primary, #714b67);
+    background-color: $body-secondary-bg;
+    border-color: $primary;
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
 }
@@ -273,26 +267,6 @@
     font-size: 0.9rem;
 }
 
-.o_edara_dashboard .o_activity_icon.bg-danger-subtle {
-    background-color: #fee2e2 !important;
-    color: #dc2626 !important;
-}
-
-.o_edara_dashboard .o_activity_icon.bg-success-subtle {
-    background-color: #dcfce7 !important;
-    color: #16a34a !important;
-}
-
-.o_edara_dashboard .o_activity_icon.bg-primary-subtle {
-    background-color: #e0e7ff !important;
-    color: #4338ca !important;
-}
-
-.o_edara_dashboard .o_activity_icon.bg-warning-subtle {
-    background-color: #fef3c7 !important;
-    color: #d97706 !important;
-}
-
 .o_edara_dashboard .o_activity_content {
     flex: 1 1 auto;
     min-width: 0;
@@ -307,20 +281,20 @@
 
 .o_edara_dashboard .o_activity_date {
     font-size: 0.8rem;
-    color: var(--muted-text-color, #6c757d);
+    color: $text-muted;
     white-space: nowrap;
 }
 
 /* Phase C2: Occupancy Doughnut Chart & Operational Indicator */
 .o_edara_dashboard .o_edara_occupancy_section {
-    background-color: var(--EdaraCard-bg, #ffffff);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
 }
 
 .o_edara_dashboard .o_edara_occupancy_header {
-    border-bottom: 1px solid var(--border-color, #edf0f2);
+    border-bottom: 1px solid $border-color;
 }
 
 .o_edara_dashboard .o_operational_indicator {
@@ -363,8 +337,8 @@
 }
 
 .o_edara_dashboard .o_occupancy_legend_item:hover {
-    background-color: var(--EdaraItemHover-bg, #f0f4f8);
-    border-color: var(--border-color, #e2e8f0);
+    background-color: $body-secondary-bg;
+    border-color: $border-color;
     transform: translateX(3px);
 }
 
@@ -382,14 +356,14 @@
 
 /* Phase C3: Revenue Trend Bar Chart */
 .o_edara_dashboard .o_edara_revenue_trend_section {
-    background-color: var(--EdaraCard-bg, #ffffff);
-    border: 1px solid var(--border-color, #e3e6ea);
+    background-color: $card-bg;
+    border: 1px solid $border-color;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
 }
 
 .o_edara_dashboard .o_edara_revenue_trend_header {
-    border-bottom: 1px solid var(--border-color, #edf0f2);
+    border-bottom: 1px solid $border-color;
 }
 
 .o_edara_dashboard .o_edara_revenue_chart_canvas_wrapper {

@@ -53,7 +53,7 @@ top of native Odoo Accounting, Portal, Contacts and Security.
     ],
     'assets': {
         'web.assets_backend': [
-            'property_managment/static/src/css/edara_dashboard.css',
+            'property_managment/static/src/scss/edara_dashboard.scss',
             'property_managment/static/src/css/payment_schedule_filter_shortcuts.css',
             'property_managment/static/src/js/payment_schedule_filter_shortcuts.js',
             'property_managment/static/src/js/payment_schedule_filter_shortcuts.xml',

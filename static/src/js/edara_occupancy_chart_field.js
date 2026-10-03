@@ -5,6 +5,10 @@ import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { useService } from "@web/core/utils/hooks";
 import { Component, onWillStart, useEffect, useRef } from "@odoo/owl";
+import { cookie } from "@web/core/browser/cookie";
+import { getBorderWhite } from "@web/core/colors/colors";
+
+const colorScheme = cookie.get("color_scheme");
 
 export class EdaraOccupancyChartField extends Component {
     static template = "property_managment.EdaraOccupancyChartField";
@@ -82,7 +86,7 @@ export class EdaraOccupancyChartField extends Component {
                     {
                         data: activeSlices.map((s) => s.count),
                         backgroundColor: activeSlices.map((s) => s.color),
-                        borderColor: "#ffffff",
+                        borderColor: getBorderWhite(colorScheme),
                         borderWidth: 2,
                         hoverOffset: 6,
                     },

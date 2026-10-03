@@ -5,6 +5,20 @@ import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { useService } from "@web/core/utils/hooks";
 import { Component, onWillStart, useEffect, useRef } from "@odoo/owl";
+import { cookie } from "@web/core/browser/cookie";
+import { getCustomColor } from "@web/core/colors/colors";
+
+const colorScheme = cookie.get("color_scheme");
+const CHART_LABEL_COLOR = getCustomColor(
+    colorScheme,
+    "#111827",
+    "#E4E4E4"
+);
+const CHART_GRID_COLOR = getCustomColor(
+    colorScheme,
+    "rgba(0,0,0,.1)",
+    "rgba(255,255,255,.15)"
+);
 
 export class EdaraRevenueTrendChartField extends Component {
     static template = "property_managment.EdaraRevenueTrendChartField";
@@ -122,17 +136,17 @@ export class EdaraRevenueTrendChartField extends Component {
                         },
                         ticks: {
                             font: { size: 12 },
-                            color: "#64748B",
+                            color: CHART_LABEL_COLOR,
                         },
                     },
                     y: {
                         beginAtZero: true,
                         grid: {
-                            color: "#F1F5F9",
+                            color: CHART_GRID_COLOR,
                         },
                         ticks: {
                             font: { size: 11 },
-                            color: "#64748B",
+                            color: CHART_LABEL_COLOR,
                             callback: (value) => {
                                 return `${currencySymbol ? currencySymbol + " " : ""}${value.toLocaleString()}`;
                             },
