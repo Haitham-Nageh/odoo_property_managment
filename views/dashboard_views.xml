@@ -72,7 +72,7 @@
                                     <field name="expiring_leases_html" widget="html" readonly="1" class="w-100"/>
                                     <div class="text-end pt-2 border-top mt-2">
                                         <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-link text-decoration-none p-0">
-                                            View All Expiring Leases &#8594;
+                                            View All Expiring Leases <i class="fa fa-arrow-right ms-1"/>
                                         </button>
                                     </div>
                                 </div>
@@ -95,7 +95,7 @@
                                     <field name="overdue_payments_html" widget="html" readonly="1" class="w-100"/>
                                     <div class="text-end pt-2 border-top mt-2">
                                         <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-link text-decoration-none text-danger p-0">
-                                            View All Overdue Payments &#8594;
+                                            View All Overdue Payments <i class="fa fa-arrow-right ms-1"/>
                                         </button>
                                     </div>
                                 </div>
@@ -126,7 +126,7 @@
                                     <field name="maintenance_attention_html" widget="html" readonly="1" class="w-100"/>
                                     <div class="text-end pt-2 border-top mt-2">
                                         <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-link text-decoration-none p-0">
-                                            View Urgent Requests &#8594;
+                                            View Urgent Requests <i class="fa fa-arrow-right ms-1"/>
                                         </button>
                                     </div>
                                 </div>
@@ -149,7 +149,7 @@
                                     <field name="pending_renewals_html" widget="html" readonly="1" class="w-100"/>
                                     <div class="text-end pt-2 border-top mt-2">
                                         <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-link text-decoration-none p-0">
-                                            Review Renewal Decisions &#8594;
+                                            Review Renewal Decisions <i class="fa fa-arrow-right ms-1"/>
                                         </button>
                                     </div>
                                 </div>

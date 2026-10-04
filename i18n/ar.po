@@ -766,6 +766,8 @@ msgid "Approve"
 msgstr "اعتماد"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_renewal_request__state__approved
 msgid "Approved"
 msgstr "معتمد"
@@ -812,6 +814,7 @@ msgstr "مُسنَد إلى"
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__sla_state__at_risk
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid "At Risk"
 msgstr "معرض للخطر"
 
@@ -836,6 +839,8 @@ msgid "Automation"
 msgstr "الأتمتة"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__occupancy_status__available
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_search
 msgid "Available"
@@ -895,6 +900,7 @@ msgstr "تكرار الفوترة"
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_request_search
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_recurring_maintenance_search
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_report_search
 msgid "Branch"
 msgstr "الفرع"
@@ -934,6 +940,7 @@ msgstr ""
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__sla_state__breached
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid "Breached"
 msgstr "تم الانتهاك"
 
@@ -1187,6 +1194,8 @@ msgid "Contact"
 msgstr "جهة الاتصال"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields,field_description:property_managment.field_edara_deposit__contract_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_deposit_transaction__contract_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_lease_renewal_wizard__contract_id
@@ -2151,6 +2160,8 @@ msgid "Held"
 msgstr "محتجز"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__priority__high
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__priority__high
 msgid "High"
@@ -3153,6 +3164,8 @@ msgid "Owner"
 msgstr "المالك"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__occupancy_status__owner_occupied
 msgid "Owner Occupied"
 msgstr "إشغال المالك"
@@ -3180,6 +3193,8 @@ msgid "Ownership percentage must be between 0 and 100."
 msgstr "يجب أن تكون نسبة الملكية بين 0 و 100."
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_payment_schedule_line__state__paid
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_payment_schedule_line_search
 msgid "Paid"
@@ -3600,6 +3615,8 @@ msgid "Reject this renewal request?"
 msgstr "رفض طلب التجديد هذا؟"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_renewal_request__state__rejected
 msgid "Rejected"
 msgstr "مرفوض"
@@ -3741,6 +3758,8 @@ msgid "Rental Income Account"
 msgstr "حساب إيرادات الإيجار"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__occupancy_status__rented
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_report_search
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_search
@@ -3799,6 +3818,8 @@ msgid "Required before rejecting - reason for the decision"
 msgstr "مطلوب قبل الرفض - سبب القرار"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__occupancy_status__reserved
 msgid "Reserved"
 msgstr "محجوز"
@@ -3951,6 +3972,7 @@ msgstr "مبلغ التأمين Liability Account"
 #. module: property_managment
 #: model:ir.actions.act_window,name:property_managment.action_edara_deposit
 #: model:ir.ui.menu,name:property_managment.menu_edara_deposit
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_deposit_list
 msgid "Security Deposits"
 msgstr "مبالغ التأمين"
@@ -4062,6 +4084,8 @@ msgid "Short unique code for this branch within its company (e.g. RAM, NBL)."
 msgstr "رمز فريد قصير لهذا الفرع داخل شركته (مثل RAM، NBL)."
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__occupancy_status__sold
 msgid "Sold"
 msgstr "مباع"
@@ -4146,6 +4170,8 @@ msgid "Submit Request"
 msgstr "تقديم الطلب"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_renewal_request__state__submitted
 msgid "Submitted"
 msgstr "مُقدَّم"
@@ -4226,6 +4252,8 @@ msgid ""
 msgstr "هل تريد إنهاء عقد الإيجار هذا؟ سيتم إلغاء التجديد المجدول معه."
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__terminated
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
 msgid "Terminated"
@@ -4593,8 +4621,11 @@ msgid "Updates about your lease, payments and requests"
 msgstr "تحديثات بشأن عقد الإيجار والمدفوعات والطلبات"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__priority__urgent
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__priority__urgent
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid "Urgent"
 msgstr "عاجل"
 
@@ -5100,3 +5131,350 @@ msgstr "سيظهر اتجاه الإيرادات بمجرد ترحيل فوات�
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__vendor_sla_risk_count
 msgid "Vendor SLA Risk"
 msgstr "مخاطر SLA للموردين"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid ""
+"Operational Command Center — occupancy, leases, collections and maintenance "
+"at a glance."
+msgstr ""
+"مركز العمليات والتحكم — نظرة شاملة على الإشغال وعقود الإيجار والتحصيلات "
+"والصيانة."
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "All Accessible Branches"
+msgstr "جميع الفروع المتاحة"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Reporting Period"
+msgstr "فترة التقرير"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Date From"
+msgstr "من تاريخ"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Date To"
+msgstr "إلى تاريخ"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Attention Required"
+msgstr "يتطلب الاهتمام"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid ""
+"<i class=\"fa fa-clock-o text-warning me-2 fs-5\"/>\n"
+"                                        <span>Expiring Leases</span>"
+msgstr ""
+"<i class=\"fa fa-clock-o text-warning me-2 fs-5\"/>\n"
+"                                        <span>عقود تنتهي قريباً</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Due Soon (30d)"
+msgstr "تستحق قريباً (30 يوماً)"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Without Renewal"
+msgstr "بدون تجديد"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Expiring within 30 days without renewal in progress"
+msgstr "تنتهي خلال 30 يوماً بدون تجديد قيد التنفيذ"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "View All Expiring Leases <i class=\"fa fa-arrow-right ms-1\"/>"
+msgstr ""
+"عرض جميع عقود الإيجار المنتهية قريباً <i class=\"fa fa-arrow-right ms-1\"/>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid ""
+"<i class=\"fa fa-exclamation-circle text-danger me-2 fs-5\"/>\n"
+"                                        <span>Overdue Payments</span>"
+msgstr ""
+"<i class=\"fa fa-exclamation-circle text-danger me-2 fs-5\"/>\n"
+"                                        <span>الدفعات المتأخرة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Overdue ("
+msgstr "متأخرة ("
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid ")"
+msgstr ")"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "View All Overdue Payments <i class=\"fa fa-arrow-right ms-1\"/>"
+msgstr "عرض جميع الدفعات المتأخرة <i class=\"fa fa-arrow-right ms-1\"/>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid ""
+"<i class=\"fa fa-wrench text-danger me-2 fs-5\"/>\n"
+"                                        <span>Maintenance Attention</span>"
+msgstr ""
+"<i class=\"fa fa-wrench text-danger me-2 fs-5\"/>\n"
+"                                        <span>طلبات صيانة تتطلب الاهتمام</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "View Urgent Requests <i class=\"fa fa-arrow-right ms-1\"/>"
+msgstr "عرض الطلبات العاجلة <i class=\"fa fa-arrow-right ms-1\"/>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid ""
+"<i class=\"fa fa-refresh text-warning me-2 fs-5\"/>\n"
+"                                        <span>Pending Renewals</span>"
+msgstr ""
+"<i class=\"fa fa-refresh text-warning me-2 fs-5\"/>\n"
+"                                        <span>التجديدات قيد الانتظار</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Awaiting Decision"
+msgstr "بانتظار القرار"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Review Renewal Decisions <i class=\"fa fa-arrow-right ms-1\"/>"
+msgstr "مراجعة قرارات التجديد <i class=\"fa fa-arrow-right ms-1\"/>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Portfolio & Occupancy"
+msgstr "المحفظة العقارية والإشغال"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Lease Lifecycle Statuses"
+msgstr "حالات دورة حياة عقود الإيجار"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Live"
+msgstr "حالية"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Active Leases</span>"
+msgstr "<span class=\"o_stat_text\">العقود النشطة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Scheduled Leases</span>"
+msgstr "<span class=\"o_stat_text\">العقود المجدولة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Historical"
+msgstr "تاريخية"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Draft Leases</span>"
+msgstr "<span class=\"o_stat_text\">عقود مسودة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Financial Overview"
+msgstr "نظرة عامة على المالية"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Revenue (Period)</span>"
+msgstr "<span class=\"o_stat_text\">الإيرادات (الفترة)</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Payments Recorded</span>"
+msgstr "<span class=\"o_stat_text\">الدفعات المسجلة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Maintenance Expenses</span>"
+msgstr "<span class=\"o_stat_text\">مصاريف الصيانة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Due in Period</span>"
+msgstr "<span class=\"o_stat_text\">مستحق خلال الفترة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Total Held</span>"
+msgstr "<span class=\"o_stat_text\">إجمالي المحتجز</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Held Deposits</span>"
+msgstr "<span class=\"o_stat_text\">التأمينات المحتجزة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Unsettled on Closed Leases</span>"
+msgstr "<span class=\"o_stat_text\">غير مسواة لعقود مغلقة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Service Charges Pending Invoicing"
+msgstr "رسوم الخدمات بانتظار الفوترة"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Pending Invoice</span>"
+msgstr "<span class=\"o_stat_text\">بانتظار الفوترة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Uninvoiced Amount</span>"
+msgstr "<span class=\"o_stat_text\">المبلغ غير المفوتر</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Maintenance Overview"
+msgstr "نظرة عامة على الصيانة"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Open Requests</span>"
+msgstr "<span class=\"o_stat_text\">الطلبات المفتوحة</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_stat_text\">Vendor SLA Risk</span>"
+msgstr "<span class=\"o_stat_text\">مخاطر SLA للموردين</span>"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Recent Activity"
+msgstr "الأنشطة الأخيرة"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Quick Actions & Automation"
+msgstr "الإجراءات السريعة والأتمتة"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Create New"
+msgstr "إنشاء جديد"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-file-text me-1\"/> New Lease Contract"
+msgstr "<i class=\"fa fa-file-text me-1\"/> عقد إيجار جديد"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-wrench me-1\"/> New Maintenance Request"
+msgstr "<i class=\"fa fa-wrench me-1\"/> طلب صيانة جديد"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-user-plus me-1\"/> New Tenant"
+msgstr "<i class=\"fa fa-user-plus me-1\"/> مستأجر جديد"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Automation &amp; Operations"
+msgstr "الأتمتة والعمليات"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-file-text-o me-1\"/> Generate Due Invoices"
+msgstr "<i class=\"fa fa-file-text-o me-1\"/> إنشاء الفواتير المستحقة"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-clock-o me-1\"/> Process Lease Expiry"
+msgstr "<i class=\"fa fa-clock-o me-1\"/> معالجة انتهاء عقود الإيجار"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-bell-o me-1\"/> Process Reminders"
+msgstr "<i class=\"fa fa-bell-o me-1\"/> معالجة التذكيرات"
+
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<i class=\"fa fa-repeat me-1\"/> Generate Recurring Maintenance"
+msgstr "<i class=\"fa fa-repeat me-1\"/> إنشاء الصيانة الدورية"
+
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Customer"
+msgstr "عميل"
+
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Date From (%(start)s) cannot be later than Date To (%(end)s)."
+msgstr "لا يمكن أن يكون تاريخ البدء (%(start)s) بعد تاريخ الانتهاء (%(end)s)."
+

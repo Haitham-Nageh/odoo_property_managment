@@ -371,3 +371,10 @@
     height: 220px;
     position: relative;
 }
+
+/* Phase D2: RTL Directional Arrow Mirroring */
+.o_rtl .o_edara_dashboard .fa-arrow-right,
+[dir="rtl"] .o_edara_dashboard .fa-arrow-right,
+.o_edara_dashboard [dir="rtl"] .fa-arrow-right {
+    transform: scaleX(-1);
+}
