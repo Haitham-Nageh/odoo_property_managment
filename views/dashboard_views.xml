@@ -29,21 +29,9 @@
                     <!-- 1. GLOBAL CONTEXT BAR -->
                     <div class="o_edara_context_bar p-3 mb-4 bg-view border rounded shadow-sm">
                         <div class="row align-items-center g-3">
-                            <div class="col-lg-3 col-md-6 col-12">
+                            <div class="col-lg-4 col-md-6 col-12">
                                 <label for="branch_id" class="fw-bold text-muted small text-uppercase d-block mb-1">Branch</label>
                                 <field name="branch_id" placeholder="All Accessible Branches" readonly="not has_multiple_branches" options="{'no_create': True, 'no_open': True}"/>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-12">
-                                <label for="period_preset" class="fw-bold text-muted small text-uppercase d-block mb-1">Reporting Period</label>
-                                <field name="period_preset" required="1"/>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-6">
-                                <label for="date_from" class="fw-bold text-muted small text-uppercase d-block mb-1">Date From</label>
-                                <field name="date_from" readonly="period_preset != 'custom'" required="period_preset == 'custom'"/>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-6">
-                                <label for="date_to" class="fw-bold text-muted small text-uppercase d-block mb-1">Date To</label>
-                                <field name="date_to" readonly="period_preset != 'custom'" required="period_preset == 'custom'"/>
                             </div>
                         </div>
                     </div>
@@ -277,7 +265,17 @@
 
                     <!-- 4. FINANCIAL OVERVIEW (Gated behind has_accounting_access) -->
                     <div invisible="not has_accounting_access">
-                        <separator string="Financial Overview"/>
+                        <div class="o_horizontal_separator d-flex justify-content-between align-items-center flex-wrap gap-2 text-uppercase fw-bolder small">
+                            <span>Financial Overview</span>
+                            <div class="d-flex align-items-center gap-2" style="text-transform: none; font-weight: normal;">
+                                <field name="period_preset" required="1" class="mb-0" style="min-width: 140px;"/>
+                                <div invisible="period_preset != 'custom'" class="d-flex align-items-center gap-1">
+                                    <field name="date_from" readonly="period_preset != 'custom'" required="period_preset == 'custom'" class="mb-0" style="width: 125px;"/>
+                                    <span class="text-muted">–</span>
+                                    <field name="date_to" readonly="period_preset != 'custom'" required="period_preset == 'custom'" class="mb-0" style="width: 125px;"/>
+                                </div>
+                            </div>
+                        </div>
                         <div class="row g-3 mt-1">
                             <div class="col-lg-3 col-md-6 col-12">
                                 <button type="object" name="action_view_monthly_revenue" class="oe_stat_button" icon="fa-line-chart text-success">
@@ -319,6 +317,7 @@
                         </div>
 
                         <!-- Schedule & Collections -->
+                        <separator string="Schedule &amp; Collections"/>
                         <div class="row g-3 mt-1">
                             <div class="col-lg-3 col-md-6 col-6">
                                 <button type="object" name="action_view_schedule_due_today" class="oe_stat_button" icon="fa-calendar-o text-warning">

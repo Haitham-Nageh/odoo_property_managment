@@ -17,6 +17,36 @@ def _next_month_start(month_start):
             else month_start.replace(year=month_start.year + 1, month=1))
 
 
+def _preset_dates(preset, today):
+    month_start = today.replace(day=1)
+    if preset == 'this_month':
+        d_from = month_start
+        d_to = _next_month_start(month_start) - timedelta(days=1)
+    elif preset == 'last_month':
+        if today.month > 1:
+            d_from = today.replace(month=today.month - 1, day=1)
+        else:
+            d_from = today.replace(year=today.year - 1, month=12, day=1)
+        d_to = month_start - timedelta(days=1)
+    elif preset == 'this_quarter':
+        q_start_month = ((today.month - 1) // 3) * 3 + 1
+        d_from = today.replace(month=q_start_month, day=1)
+        q_end_month = q_start_month + 2
+        if q_end_month < 12:
+            next_q_start = today.replace(month=q_end_month + 1, day=1)
+        else:
+            next_q_start = today.replace(year=today.year + 1, month=1, day=1)
+        d_to = next_q_start - timedelta(days=1)
+    elif preset == 'this_year':
+        d_from = date(today.year, 1, 1)
+        d_to = date(today.year, 12, 31)
+    else:
+        d_from = None
+        d_to = None
+    return d_from, d_to
+
+
+
 def _expiring_soon_domain(today):
     return [
         ('state', '=', 'active'),
@@ -48,6 +78,8 @@ class EdaraDashboard(models.TransientModel):
     )
     period_preset = fields.Selection([
         ('this_month', 'This Month'),
+        ('last_month', 'Last Month'),
+        ('this_quarter', 'This Quarter'),
         ('this_year', 'This Year'),
         ('custom', 'Custom'),
     ], string='Reporting Period', default='this_month', required=True)
@@ -161,13 +193,10 @@ class EdaraDashboard(models.TransientModel):
     @api.onchange('period_preset')
     def _onchange_period_preset(self):
         today = fields.Date.context_today(self)
-        if self.period_preset == 'this_month':
-            month_start = today.replace(day=1)
-            self.date_from = month_start
-            self.date_to = _next_month_start(month_start) - timedelta(days=1)
-        elif self.period_preset == 'this_year':
-            self.date_from = date(today.year, 1, 1)
-            self.date_to = date(today.year, 12, 31)
+        d_from, d_to = _preset_dates(self.period_preset, today)
+        if d_from and d_to:
+            self.date_from = d_from
+            self.date_to = d_to
 
     @api.onchange('date_from', 'date_to')
     def _onchange_dates(self):
@@ -192,10 +221,10 @@ class EdaraDashboard(models.TransientModel):
         d_from = self.date_from
         d_to = self.date_to
         if not d_from or not d_to:
-            if self.period_preset == 'this_year':
-                d_from = d_from or date(today.year, 1, 1)
-                d_to = d_to or date(today.year, 12, 31)
-            else:
+            p_from, p_to = _preset_dates(self.period_preset, today)
+            d_from = d_from or p_from
+            d_to = d_to or p_to
+            if not d_from or not d_to:
                 m_start = today.replace(day=1)
                 d_from = d_from or m_start
                 d_to = d_to or (_next_month_start(m_start) - timedelta(days=1))
@@ -217,19 +246,13 @@ class EdaraDashboard(models.TransientModel):
     @api.model_create_multi
     def create(self, vals_list):
         today = fields.Date.context_today(self)
-        month_start = today.replace(day=1)
         for vals in vals_list:
             preset = vals.get('period_preset', 'this_month')
-            if preset == 'this_year':
-                if 'date_from' not in vals:
-                    vals['date_from'] = date(today.year, 1, 1)
-                if 'date_to' not in vals:
-                    vals['date_to'] = date(today.year, 12, 31)
-            elif preset == 'this_month':
-                if 'date_from' not in vals:
-                    vals['date_from'] = month_start
-                if 'date_to' not in vals:
-                    vals['date_to'] = _next_month_start(month_start) - timedelta(days=1)
+            d_from, d_to = _preset_dates(preset, today)
+            if d_from and 'date_from' not in vals:
+                vals['date_from'] = d_from
+            if d_to and 'date_to' not in vals:
+                vals['date_to'] = d_to
         return super().create(vals_list)
 
     @api.depends('branch_id', 'period_preset', 'date_from', 'date_to')

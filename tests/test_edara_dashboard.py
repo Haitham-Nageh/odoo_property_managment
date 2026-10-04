@@ -7,6 +7,8 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
 from odoo.tools.safe_eval import safe_eval
 
+from odoo.addons.property_managment.models.edara_dashboard import _preset_dates
+
 
 @tagged('post_install', '-at_install')
 class TestEdaraDashboard(TransactionCase):
@@ -499,17 +501,95 @@ class TestEdaraDashboard(TransactionCase):
         next_m_start = month_start.replace(month=month_start.month + 1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1)
         month_end = next_m_start - timedelta(days=1)
 
-        # 1. This Month preset
+        # 1. Deterministic boundary tests for _preset_dates with hardcoded constants
+        # Case 1: Last Month year rollover (January -> December previous year)
+        self.assertEqual(
+            _preset_dates('last_month', date(2026, 1, 15)),
+            (date(2025, 12, 1), date(2025, 12, 31)),
+        )
+        # Case 2: Leap-year February (March in leap year -> Feb 29)
+        self.assertEqual(
+            _preset_dates('last_month', date(2028, 3, 15)),
+            (date(2028, 2, 1), date(2028, 2, 29)),
+        )
+        # Non-leap February comparison (March in non-leap year -> Feb 28)
+        self.assertEqual(
+            _preset_dates('last_month', date(2026, 3, 15)),
+            (date(2026, 2, 1), date(2026, 2, 28)),
+        )
+        # Case 3: This Quarter (Q1, Q2, Q3, Q4 deterministic boundaries)
+        self.assertEqual(
+            _preset_dates('this_quarter', date(2026, 1, 15)),
+            (date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        self.assertEqual(
+            _preset_dates('this_quarter', date(2026, 5, 15)),
+            (date(2026, 4, 1), date(2026, 6, 30)),
+        )
+        self.assertEqual(
+            _preset_dates('this_quarter', date(2026, 8, 20)),
+            (date(2026, 7, 1), date(2026, 9, 30)),
+        )
+        self.assertEqual(
+            _preset_dates('this_quarter', date(2026, 11, 10)),
+            (date(2026, 10, 1), date(2026, 12, 31)),
+        )
+        # Deterministic This Month and This Year tests
+        self.assertEqual(
+            _preset_dates('this_month', date(2026, 10, 15)),
+            (date(2026, 10, 1), date(2026, 10, 31)),
+        )
+        self.assertEqual(
+            _preset_dates('this_year', date(2026, 7, 4)),
+            (date(2026, 1, 1), date(2026, 12, 31)),
+        )
+
+        # 2. Model record creation presets
         dash_month = self.env['edara.dashboard'].with_user(self.dash_admin).create({'period_preset': 'this_month'})
         self.assertEqual(dash_month.date_from, month_start)
         self.assertEqual(dash_month.date_to, month_end)
 
-        # 2. This Year preset
         dash_year = self.env['edara.dashboard'].with_user(self.dash_admin).create({'period_preset': 'this_year'})
         self.assertEqual(dash_year.date_from, date(today.year, 1, 1))
         self.assertEqual(dash_year.date_to, date(today.year, 12, 31))
 
-        # 3. Custom preset
+        # 3. Last Month preset
+        last_m_start = today.replace(month=today.month - 1, day=1) if today.month > 1 else today.replace(year=today.year - 1, month=12, day=1)
+        last_m_end = month_start - timedelta(days=1)
+        dash_last_month = self.env['edara.dashboard'].with_user(self.dash_admin).create({'period_preset': 'last_month'})
+        self.assertEqual(dash_last_month.date_from, last_m_start)
+        self.assertEqual(dash_last_month.date_to, last_m_end)
+
+        # 4. This Quarter preset
+        q_start_month = ((today.month - 1) // 3) * 3 + 1
+        q_start = today.replace(month=q_start_month, day=1)
+        q_end_month = q_start_month + 2
+        next_q_start = today.replace(month=q_end_month + 1, day=1) if q_end_month < 12 else today.replace(year=today.year + 1, month=1, day=1)
+        q_end = next_q_start - timedelta(days=1)
+        dash_quarter = self.env['edara.dashboard'].with_user(self.dash_admin).create({'period_preset': 'this_quarter'})
+        self.assertEqual(dash_quarter.date_from, q_start)
+        self.assertEqual(dash_quarter.date_to, q_end)
+
+        # Onchange verification for new presets
+        dash_onchange = self.env['edara.dashboard'].new({'period_preset': 'last_month'})
+        dash_onchange._onchange_period_preset()
+        self.assertEqual(dash_onchange.date_from, last_m_start)
+        self.assertEqual(dash_onchange.date_to, last_m_end)
+        dash_onchange.period_preset = 'this_quarter'
+        dash_onchange._onchange_period_preset()
+        self.assertEqual(dash_onchange.date_from, q_start)
+        self.assertEqual(dash_onchange.date_to, q_end)
+
+        # Drilldown consistency verification with preset
+        dash_acct = self.env['edara.dashboard'].create({'period_preset': 'this_quarter'})
+        rev_action = dash_acct.action_view_monthly_revenue()
+        self.assertIn(('invoice_date', '>=', q_start), rev_action['domain'])
+        self.assertIn(('invoice_date', '<=', q_end), rev_action['domain'])
+        sched_action = dash_acct.action_view_schedule_due_this_month()
+        self.assertIn(('due_date', '>=', q_start), sched_action['domain'])
+        self.assertIn(('due_date', '<=', q_end), sched_action['domain'])
+
+        # 5. Custom preset
         custom_from = date(2025, 1, 1)
         custom_to = date(2025, 6, 30)
         dash_custom = self.env['edara.dashboard'].with_user(self.dash_admin).create({
@@ -520,7 +600,7 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(dash_custom.date_from, custom_from)
         self.assertEqual(dash_custom.date_to, custom_to)
 
-        # 4. Invalid date range raises ValidationError
+        # 6. Invalid date range raises ValidationError
         with self.assertRaises(ValidationError):
             self.env['edara.dashboard'].with_user(self.dash_admin).create({
                 'period_preset': 'custom',

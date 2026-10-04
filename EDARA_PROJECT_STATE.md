@@ -20,6 +20,7 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 - Phase 12.9 — Service Charge Area Validation: CLOSED
 - Phase 12.10 — Mixed-Currency Overdue UX & Security Deposit Mutability: CLOSED
 - Phase 12 Audit Stream: CLOSED (all findings addressed; wkhtmltopdf environment configuration RESOLVED & verified)
+- Ticket 1 — Dashboard Context Filter Redesign: IMPLEMENTED (Correction pass applied, ready for final audit)
 
 ## Completed Phases
 - Phase 0 — Environment & Architecture Verification
@@ -3162,3 +3163,62 @@ Closure:
   - Owner-facing portal/surface.
   - Co-tenancy / multiple tenants per lease.
   - Archived partner with live lease behavior.
+
+## Current Workstream Roadmap (registered 2026-10-04)
+
+Dashboard phases (C1-C9, Theme Hardening, D1, D2) are CLOSED and not reopened by this roadmap. The following is the active execution order, registered here so it is not lost between sessions:
+
+```text
+CURRENT WORKSTREAM
+│
+├── 1. Dashboard Context Filter Redesign
+│     └── Section-level contextual date filters
+│
+├── 2. Navbar / Parent Menus
+│
+├── 3. res.partner Smart Buttons
+│
+└── 4. Payment Schedule Status Buttons
+      ├── State-based colors
+      ├── State count
+      └── Preserve existing filtering
+│
+└── DEFERRED
+      ├── Branch Removal
+      └── Property Renaming
+            ↓
+         BEFORE Owner Portal
+```
+
+- Status of 1-4:
+  - **Item 1 (Dashboard Context Filter Redesign)**: IMPLEMENTED (2026-10-04) — see details below.
+  - **Items 2-4**: NOT STARTED (preliminary-scope audit only).
+- **Branch Removal** and **Property Renaming** are explicitly DEFERRED architectural changes. They must NOT be mixed into items 1-4 above.
+- **Owner Portal is BLOCKED** until items 1-4 are complete AND Branch Removal AND Property Renaming are both addressed. This supersedes the earlier Phase D3 product-gap analysis's P1 recommendation ("Owner Visibility") as the *next* thing to build — Owner Visibility/Portal remains the identified highest-value gap, but its scheduling is now explicitly gated behind this roadmap, not immediate.
+- Recommended execution order (confirmed, see analysis below): Dashboard Context Filter Redesign → Navbar/Parent Menus → res.partner Smart Buttons → Payment Schedule Status Buttons → Branch Removal → Property Renaming → Owner Portal.
+
+### Ticket 1 — Dashboard Context Filter Redesign (2026-10-04)
+
+- **Status**: IMPLEMENTED (Audit correction pass applied; pending final audit)
+- **Scope & Objectives**:
+  - Transformed the EDARA Dashboard into an Operational Command Center by removing temporal date controls from the top Global Context Bar (`period_preset`, `date_from`, `date_to`).
+  - Branch filter (`branch_id`) remains global and untouched as the sole operational scope filter.
+  - Financial Overview now owns the contextual period selector (`period_preset`, default `This Month`), cleanly positioned inline within the section header.
+  - Supported Presets:
+    - `This Month` (default)
+    - `Last Month` (new — 1st to last day of previous month; handles Jan → Dec previous year rollover)
+    - `This Quarter` (new — 1st to last day of current quarter across Q1–Q4)
+    - `This Year` (Jan 1 to Dec 31 of current calendar year)
+    - `Custom` (progressively reveals inline `date_from` and `date_to` datepickers with existing `@api.constrains` validation).
+  - Single shared date context (`_get_reporting_period_dates()`) preserved; drives:
+    - Revenue (Period) (`action_view_monthly_revenue`)
+    - Payments Recorded (`action_view_payments_this_month`)
+    - Maintenance Expenses (`action_view_maintenance_cost_this_month`)
+    - Due in Period (`action_view_schedule_due_this_month`)
+  - Current-state and operational metrics remain unaffected (Attention Required, Portfolio & Occupancy, Lease Lifecycle, Due Today, Paid, Overdue, Security Deposits, Service Charges, Maintenance Overview, SLA Risk, Recent Activity, and fixed 6-month trailing Revenue Trend chart).
+  - Drilldown consistency preserved across all 4 periodic actions (`invoice_date` and `due_date` domains match `_get_reporting_period_dates()`).
+  - **Audit Blockers Addressed (Correction Pass)**:
+    1. Added visible section heading `<separator string="Schedule &amp; Collections"/>` before the Schedule & Collections KPI row to eliminate visual ambiguity with the period-scoped Financial Overview.
+    2. Strengthened preset tests in `tests/test_edara_dashboard.py` with deterministic fixed-date boundary tests (`_preset_dates`) and hardcoded expected constants (Last Month year rollover, leap-year February 29, non-leap February 28, and all four quarter boundaries).
+    3. Documented Ticket 1 completion status in `EDARA_PROJECT_STATE.md`.
+
