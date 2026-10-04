@@ -20,13 +20,79 @@ import { registry } from "@web/core/registry";
 import { listView } from "@web/views/list/list_view";
 import { ListController } from "@web/views/list/list_controller";
 import { useBus } from "@web/core/utils/hooks";
+import { useState, onWillStart } from "@odoo/owl";
 
 const SHORTCUT_FILTER_NAMES = ["paid", "overdue", "draft"];
+
+const STATE_COLOR_MAP = {
+    draft: "secondary",
+    paid: "success",
+    overdue: "danger",
+};
 
 export class EdaraPaymentScheduleFilterShortcutsController extends ListController {
     setup() {
         super.setup();
-        useBus(this.env.searchModel, "update", this.render);
+        this.state = useState({
+            counts: {
+                draft: 0,
+                paid: 0,
+                overdue: 0,
+            },
+        });
+        this._loadingCounts = false;
+        this._needsReloadCounts = false;
+
+        onWillStart(async () => {
+            await this.loadStateCounts();
+        });
+
+        useBus(this.env.searchModel, "update", async () => {
+            await this.loadStateCounts();
+            this.render();
+        });
+    }
+
+    async loadStateCounts() {
+        if (this._loadingCounts) {
+            this._needsReloadCounts = true;
+            return;
+        }
+        this._loadingCounts = true;
+        this._needsReloadCounts = false;
+        try {
+            let groups;
+            if (this.orm.webReadGroup) {
+                const res = await this.orm.webReadGroup(
+                    "edara.payment.schedule.line",
+                    [],
+                    ["state"],
+                    ["__count"]
+                );
+                groups = res && res.groups ? res.groups : res;
+            } else {
+                groups = await this.orm.call(
+                    "edara.payment.schedule.line",
+                    "read_group",
+                    [],
+                    { domain: [], fields: ["state"], groupby: ["state"] }
+                );
+            }
+            const counts = { draft: 0, paid: 0, overdue: 0 };
+            for (const group of groups || []) {
+                if (group.state in counts) {
+                    counts[group.state] = group.__count ?? group.state_count ?? 0;
+                }
+            }
+            Object.assign(this.state.counts, counts);
+        } catch (e) {
+            console.error("Failed to load payment schedule state counts", e);
+        } finally {
+            this._loadingCounts = false;
+            if (this._needsReloadCounts) {
+                this.loadStateCounts();
+            }
+        }
     }
 
     get edaraFilterShortcuts() {
@@ -37,7 +103,10 @@ export class EdaraPaymentScheduleFilterShortcutsController extends ListControlle
             .filter(Boolean)
             .map((item) => ({
                 id: item.id,
+                name: item.name,
                 description: item.description,
+                color: STATE_COLOR_MAP[item.name] || "primary",
+                count: this.state.counts[item.name] ?? 0,
                 isActive: this.env.searchModel.query.some((q) => q.searchItemId === item.id),
             }));
     }

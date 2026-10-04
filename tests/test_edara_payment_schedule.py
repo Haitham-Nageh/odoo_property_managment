@@ -3,8 +3,9 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from lxml import etree
 
+import os
 from odoo.exceptions import UserError
-from odoo.tests import TransactionCase, tagged
+from odoo.tests import TransactionCase, new_test_user, tagged
 
 
 @tagged('post_install', '-at_install')
@@ -330,3 +331,114 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
         itself."""
         views = self.env['ir.ui.view'].search([('arch_db', 'like', 'edara_payment_schedule_filter_shortcuts')])
         self.assertEqual(views.mapped('name'), ['edara.payment.schedule.line.list'])
+
+    def test_shortcut_buttons_color_mapping_and_semantic_classes(self):
+        """Ticket 4: buttons must use semantic Bootstrap classes (draft -> secondary,
+        paid -> success, overdue -> danger) and must not regress to uniform btn-primary."""
+        base_dir = os.path.dirname(__file__)
+        js_path = os.path.normpath(os.path.join(
+            base_dir, '..', 'static', 'src', 'js', 'payment_schedule_filter_shortcuts.js'))
+        with open(js_path, 'r', encoding='utf-8') as f:
+            js_source = f.read()
+        xml_path = os.path.normpath(os.path.join(
+            base_dir, '..', 'static', 'src', 'js', 'payment_schedule_filter_shortcuts.xml'))
+        with open(xml_path, 'r', encoding='utf-8') as f:
+            xml_source = f.read()
+
+        # JS mapping contains all 3 states mapped to their required semantic classes
+        self.assertIn('draft: "secondary"', js_source)
+        self.assertIn('paid: "success"', js_source)
+        self.assertIn('overdue: "danger"', js_source)
+
+        # XML template uses dynamic semantic class binding, not hardcoded btn-primary
+        self.assertIn("'btn-' + item.color", xml_source)
+        self.assertIn("'btn-outline-' + item.color", xml_source)
+        self.assertNotIn("'btn-primary' : 'btn-outline-primary'", xml_source)
+
+    def test_payment_schedule_counts_respect_branch_security_rules(self):
+        """Ticket 4: Payment schedule grouped state counts must strictly respect
+        user ACLs and record rules (branch visibility). A branch-scoped viewer must
+        only see and count records in their permitted branch, while a company manager
+        sees the broader population."""
+        branch_a = self.env['edara.branch'].create({'name': 'Security Branch A', 'code': 'SBA'})
+        branch_b = self.env['edara.branch'].create({'name': 'Security Branch B', 'code': 'SBB'})
+
+        prop_a = self.env['edara.property'].create({'name': 'Prop A', 'code': 'PA', 'branch_id': branch_a.id})
+        prop_b = self.env['edara.property'].create({'name': 'Prop B', 'code': 'PB', 'branch_id': branch_b.id})
+
+        bld_a = self.env['edara.building'].create({'name': 'Bld A', 'code': 'BA', 'property_id': prop_a.id})
+        bld_b = self.env['edara.building'].create({'name': 'Bld B', 'code': 'BB', 'property_id': prop_b.id})
+
+        unit_a = self.env['edara.unit'].create({'name': 'Unit A', 'code': 'UA', 'building_id': bld_a.id})
+        unit_b = self.env['edara.unit'].create({'name': 'Unit B', 'code': 'UB', 'building_id': bld_b.id})
+
+        tenant_a = self.env['res.partner'].create({'name': 'Sec Tenant A'})
+        tenant_b = self.env['res.partner'].create({'name': 'Sec Tenant B'})
+
+        contract_a = self.env['edara.lease.contract'].create({
+            'unit_id': unit_a.id, 'tenant_id': tenant_a.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_b = self.env['edara.lease.contract'].create({
+            'unit_id': unit_b.id, 'tenant_id': tenant_b.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_a.action_activate()
+        contract_b.action_activate()
+
+        lines_a = contract_a.schedule_line_ids
+        lines_b = contract_b.schedule_line_ids
+        self.assertEqual(len(lines_a), 3)
+        self.assertEqual(len(lines_b), 3)
+
+        # Distribute states deterministically
+        lines_a[0].state = 'paid'
+        lines_a[1].state = 'overdue'
+        lines_a[2].state = 'draft'
+
+        lines_b[0].state = 'paid'
+        lines_b[1].state = 'paid'
+        lines_b[2].state = 'overdue'
+
+        viewer = new_test_user(
+            self.env, login='edara_sec_viewer', groups='property_managment.group_edara_viewer')
+        branch_a.user_ids = [(4, viewer.id)]
+
+        manager = new_test_user(
+            self.env, login='edara_sec_manager', groups='property_managment.group_edara_company_manager')
+
+        # 1. Branch-scoped viewer isolation
+        viewer_model = self.env['edara.payment.schedule.line'].with_user(viewer)
+        viewer_visible = viewer_model.search([])
+        # Viewer sees branch A records only, none of branch B
+        self.assertTrue(all(line.branch_id == branch_a for line in viewer_visible))
+        self.assertFalse(any(line.branch_id == branch_b for line in viewer_visible))
+
+        # Grouped counts via read_group respect record rules
+        viewer_grouped = viewer_model.read_group([], ['state'], ['state'])
+        viewer_counts = {g['state']: g['state_count'] for g in viewer_grouped}
+        self.assertEqual(viewer_counts.get('paid', 0), 1)
+        self.assertEqual(viewer_counts.get('overdue', 0), 1)
+        self.assertEqual(viewer_counts.get('draft', 0), 1)
+
+        # Grouped counts via web_read_group (used by client ORM) also respect record rules
+        viewer_web_groups = viewer_model.web_read_group([], ['state'], ['__count'])['groups']
+        viewer_web_counts = {g['state']: g['__count'] for g in viewer_web_groups}
+        self.assertEqual(viewer_web_counts.get('paid', 0), 1)
+        self.assertEqual(viewer_web_counts.get('overdue', 0), 1)
+        self.assertEqual(viewer_web_counts.get('draft', 0), 1)
+
+        # 2. Company manager sees records from all branches
+        manager_model = self.env['edara.payment.schedule.line'].with_user(manager)
+        test_line_ids = (lines_a + lines_b).ids
+        manager_test_lines = manager_model.search([('id', 'in', test_line_ids)])
+        self.assertEqual(len(manager_test_lines), 6)
+
+        manager_grouped = manager_model.read_group([('id', 'in', test_line_ids)], ['state'], ['state'])
+        manager_counts = {g['state']: g['state_count'] for g in manager_grouped}
+        self.assertEqual(manager_counts.get('paid', 0), 3)    # 1 from A + 2 from B
+        self.assertEqual(manager_counts.get('overdue', 0), 2) # 1 from A + 1 from B
+        self.assertEqual(manager_counts.get('draft', 0), 1)   # 1 from A + 0 from B
+

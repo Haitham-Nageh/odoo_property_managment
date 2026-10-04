@@ -11,9 +11,10 @@
             <div class="o_edara_schedule_filter_shortcuts" t-if="edaraFilterShortcuts.length">
                 <button t-foreach="edaraFilterShortcuts" t-as="item" t-key="item.id"
                         type="button"
-                        t-attf-class="btn btn-sm o_edara_schedule_filter_shortcut {{ item.isActive ? 'btn-primary' : 'btn-outline-primary' }}"
+                        t-attf-class="btn btn-sm o_edara_schedule_filter_shortcut {{ item.isActive ? ('btn-' + item.color) : ('btn-outline-' + item.color) }}"
                         t-on-click="() => this.onEdaraFilterShortcutClick(item.id)">
-                    <t t-esc="item.description"/>
+                    <span class="o_edara_schedule_filter_shortcut_label" t-esc="item.description"/>
+                    <span class="badge rounded-pill ms-1" t-attf-class="{{ item.isActive ? 'bg-light text-dark' : ('bg-' + item.color + ' text-white') }}" t-esc="item.count"/>
                 </button>
             </div>
         </xpath>
