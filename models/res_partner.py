@@ -12,6 +12,10 @@ class ResPartner(models.Model):
     is_edara_owner = fields.Boolean(string='EDARA Owner', compute='_compute_is_edara_owner', store=True)
 
     edara_lease_contract_ids = fields.One2many('edara.lease.contract', 'tenant_id', string='EDARA Lease Contracts')
+    edara_lease_contract_count = fields.Integer(
+        compute='_compute_edara_lease_contract_count',
+        store=True,
+    )
     is_edara_tenant = fields.Boolean(string='EDARA Tenant', compute='_compute_is_edara_tenant', store=True)
     edara_national_id = fields.Char(string='National ID / Registration No.')
 
@@ -44,6 +48,11 @@ class ResPartner(models.Model):
     def _compute_is_edara_tenant(self):
         for partner in self:
             partner.is_edara_tenant = bool(partner.edara_lease_contract_ids)
+
+    @api.depends('edara_lease_contract_ids')
+    def _compute_edara_lease_contract_count(self):
+        for partner in self:
+            partner.edara_lease_contract_count = len(partner.edara_lease_contract_ids)
 
     @api.depends('edara_maintenance_request_ids')
     def _compute_is_edara_vendor(self):
@@ -206,3 +215,15 @@ class ResPartner(models.Model):
             ('partner_id', '=', partner.id),
         ])
         return len(moves.currency_id) <= 1
+
+    def action_view_edara_lease_contracts(self):
+        self.ensure_one()
+
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'property_managment.action_edara_lease_contract'
+        )
+
+        action['domain'] = [('tenant_id', '=', self.id)]
+        action['context'] = {'default_tenant_id': self.id}
+
+        return action
