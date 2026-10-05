@@ -1,8 +1,10 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from odoo import Command
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import TransactionCase, new_test_user, tagged
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -284,3 +286,63 @@ class TestEdaraPhase7Hardening(TransactionCase):
         created, skipped, errors = line._process_due_invoices()
         self.assertEqual((created, skipped, errors), (0, 1, 0))
         self.assertFalse(line.invoice_id)
+
+    def test_process_due_invoices_db_failure_isolated_by_savepoint(self):
+        """Ticket 7: A genuine SQL uniqueness constraint failure on line B
+        must roll back line B only via savepoint and not poison cursor for line C."""
+        unit_x = self.env['edara.unit'].create({
+            'name': 'P7-UnitX', 'code': 'P7UX', 'building_id': self.building.id,
+        })
+        unit_a = self.env['edara.unit'].create({
+            'name': 'P7-UnitA', 'code': 'P7UA', 'building_id': self.building.id,
+        })
+        unit_b = self.env['edara.unit'].create({
+            'name': 'P7-UnitB', 'code': 'P7UB', 'building_id': self.building.id,
+        })
+        unit_c = self.env['edara.unit'].create({
+            'name': 'P7-UnitC', 'code': 'P7UC', 'building_id': self.building.id,
+        })
+
+        contract_x = self._contract(unit=unit_x)
+        contract_x.action_activate()
+        line_x = contract_x.schedule_line_ids[0]
+        prior_invoice = line_x._create_invoice()
+        self.assertTrue(prior_invoice)
+        self.assertEqual(line_x.invoice_id, prior_invoice)
+
+        contract_a = self._contract(unit=unit_a)
+        contract_a.action_activate()
+        line_a = contract_a.schedule_line_ids[0]
+
+        contract_b = self._contract(unit=unit_b)
+        contract_b.action_activate()
+        line_b = contract_b.schedule_line_ids[0]
+
+        contract_c = self._contract(unit=unit_c)
+        contract_c.action_activate()
+        line_c = contract_c.schedule_line_ids[0]
+
+        Model = type(line_b)
+        original_write = Model.write
+
+        def patched_write(self, vals):
+            if 'invoice_id' in vals and line_b.id in self.ids:
+                vals = dict(vals, invoice_id=prior_invoice.id)
+            return original_write(self, vals)
+
+        candidates = line_a + line_b + line_c
+
+        with mute_logger('odoo.sql_db'), patch.object(Model, 'write', patched_write):
+            created, skipped, errors = candidates._process_due_invoices(auto_commit=False)
+
+        self.assertEqual((created, skipped, errors), (2, 0, 1))
+
+        self.assertTrue(line_a.invoice_id)
+        self.assertNotEqual(line_a.invoice_id, prior_invoice)
+        self.assertEqual(line_a.invoice_id.state, 'posted')
+
+        self.assertFalse(line_b.invoice_id)
+
+        self.assertTrue(line_c.invoice_id)
+        self.assertNotEqual(line_c.invoice_id, prior_invoice)
+        self.assertEqual(line_c.invoice_id.state, 'posted')

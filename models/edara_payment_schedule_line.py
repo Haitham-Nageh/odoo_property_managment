@@ -289,12 +289,14 @@ class EdaraPaymentScheduleLine(models.Model):
                 skipped_not_overdue += 1
                 continue
             try:
-                line.action_charge_late_fee()
+                with self.env.cr.savepoint():
+                    line.action_charge_late_fee()
                 charged += 1
             except AccessError:
                 raise
             except Exception:
                 errors += 1
+                line.invalidate_recordset(['late_fee_invoice_id'])
                 _logger.exception("EDARA: failed to charge late fee for payment schedule line %s", line.id)
 
         if errors:
@@ -349,7 +351,8 @@ class EdaraPaymentScheduleLine(models.Model):
                 ):
                     skipped += 1
                     continue
-                line._create_invoice()
+                with self.env.cr.savepoint():
+                    line._create_invoice()
                 created += 1
                 if auto_commit:
                     self.env.cr.commit()
@@ -362,6 +365,7 @@ class EdaraPaymentScheduleLine(models.Model):
                 raise
             except Exception:
                 errors += 1
+                line.invalidate_recordset(['invoice_id'])
                 _logger.exception("EDARA: failed to generate invoice for payment schedule line %s", line.id)
                 if auto_commit:
                     self.env.cr.rollback()

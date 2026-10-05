@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 import os
+from unittest.mock import patch
 
 from dateutil.relativedelta import relativedelta
 from lxml import etree
@@ -494,6 +495,69 @@ class TestEdaraPaymentSchedule(TransactionCase):
         with mute_logger('odoo.sql_db'), self.assertRaises(Exception):
             with self.env.cr.savepoint():
                 line2.sudo().late_fee_invoice_id = invoice.id
+
+    def test_late_fee_bulk_db_failure_isolated_by_savepoint(self):
+        """Ticket 7: A genuine SQL uniqueness constraint failure on line B
+        must roll back line B only via savepoint and not poison cursor for line C."""
+        late_fee_account = self.env['account.account'].create({
+            'name': 'Late Fee Income (Savepoint Test)',
+            'code': '400210',
+            'account_type': 'income',
+        })
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+
+        unit_x = self.env['edara.unit'].create({'name': 'Unit X', 'code': 'UX_SP', 'building_id': self.building.id})
+        unit_a = self.env['edara.unit'].create({'name': 'Unit A', 'code': 'UA_SP', 'building_id': self.building.id})
+        unit_b = self.env['edara.unit'].create({'name': 'Unit B', 'code': 'UB_SP', 'building_id': self.building.id})
+        unit_c = self.env['edara.unit'].create({'name': 'Unit C', 'code': 'UC_SP', 'building_id': self.building.id})
+
+        contract_x = self._make_contract(unit_id=unit_x.id)
+        contract_x.action_activate()
+        line_x = contract_x.schedule_line_ids[0]
+        prior_invoice = line_x.action_charge_late_fee()
+
+        contract_a = self._make_contract(unit_id=unit_a.id)
+        contract_a.action_activate()
+        line_a = contract_a.schedule_line_ids[0]
+
+        contract_b = self._make_contract(unit_id=unit_b.id)
+        contract_b.action_activate()
+        line_b = contract_b.schedule_line_ids[0]
+
+        contract_c = self._make_contract(unit_id=unit_c.id)
+        contract_c.action_activate()
+        line_c = contract_c.schedule_line_ids[0]
+
+        Model = type(line_b)
+        original_write = Model.write
+
+        def patched_write(self, vals):
+            if 'late_fee_invoice_id' in vals and line_b.id in self.ids:
+                vals = dict(vals, late_fee_invoice_id=prior_invoice.id)
+            return original_write(self, vals)
+
+        selection = line_a + line_b + line_c
+
+        with mute_logger('odoo.sql_db'), patch.object(Model, 'write', patched_write):
+            res = selection.action_charge_late_fee_bulk()
+
+        self.assertTrue(line_a.late_fee_invoice_id)
+        self.assertNotEqual(line_a.late_fee_invoice_id, prior_invoice)
+        self.assertEqual(line_a.late_fee_invoice_id.state, 'posted')
+
+        self.assertFalse(line_b.late_fee_invoice_id)
+
+        self.assertTrue(line_c.late_fee_invoice_id)
+        self.assertNotEqual(line_c.late_fee_invoice_id, prior_invoice)
+        self.assertEqual(line_c.late_fee_invoice_id.state, 'posted')
+
+        # Verify notification reports exactly 1 error and 2 charged
+        self.assertEqual(res['type'], 'ir.actions.client')
+        self.assertEqual(res['tag'], 'display_notification')
+        self.assertEqual(res['params']['type'], 'warning')
+        self.assertIn("1 error(s)", res['params']['message'])
+        self.assertIn("2 late fee(s) charged", res['params']['message'])
 
     def test_list_view_invoice_id_is_readonly(self):
         """invoice_id is system-managed (only ever set by _create_invoice()) -
