@@ -74,10 +74,28 @@
         </field>
     </record>
 
+    <record id="view_edara_deposit_search" model="ir.ui.view">
+        <field name="name">edara.deposit.search</field>
+        <field name="model">edara.deposit</field>
+        <field name="arch" type="xml">
+            <search string="Security Deposits">
+                <field name="contract_id"/>
+                <field name="tenant_id"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Held" name="held" domain="[('state', '=', 'held')]"/>
+                <filter string="Closed" name="closed" domain="[('state', '=', 'closed')]"/>
+                <group>
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_edara_deposit" model="ir.actions.act_window">
         <field name="name">Security Deposits</field>
         <field name="res_model">edara.deposit</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_edara_deposit_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">
                 No security deposits yet

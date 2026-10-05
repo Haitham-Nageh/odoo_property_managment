@@ -1,5 +1,7 @@
 from datetime import date
 
+from lxml import etree
+
 from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
@@ -355,3 +357,37 @@ class TestEdaraServiceCharge(TransactionCase):
         self.assertEqual(len(charge_fx.line_ids), 2)
         for line in charge_fx.line_ids:
             self.assertAlmostEqual(line.amount, 80.0)
+
+    def test_search_view_exists_and_has_state_filters(self):
+        """Ticket 5: Native search view for edara.service.charge exists, model is edara.service.charge,
+        has Draft, Allocated, Invoiced filters with exact domains, and Group By State."""
+        search_view = self.env.ref('property_managment.view_edara_service_charge_search')
+        self.assertTrue(search_view, "Search view view_edara_service_charge_search must exist")
+        self.assertEqual(search_view.model, 'edara.service.charge')
+
+        arch = self.env['edara.service.charge'].get_view(view_id=search_view.id)['arch']
+        tree = etree.fromstring(arch)
+
+        for name, expected_domain in (
+                ('draft', "[('state', '=', 'draft')]"),
+                ('allocated', "[('state', '=', 'allocated')]"),
+                ('invoiced', "[('state', '=', 'invoiced')]")):
+            filters = tree.xpath("//filter[@name='%s']" % name)
+            self.assertTrue(filters, "missing filter: %s" % name)
+            self.assertEqual(filters[0].get('domain'), expected_domain, name)
+
+        group_by_filters = tree.xpath("//filter[@name='group_by_state']")
+        self.assertTrue(group_by_filters, "missing group by state filter")
+        self.assertEqual(group_by_filters[0].get('context'), "{'group_by': 'state'}")
+
+    def test_action_edara_service_charge_references_search_view_and_no_new_action(self):
+        """Ticket 5: existing action_edara_service_charge references the search view,
+        and no new window action was created."""
+        actions = self.env['ir.actions.act_window'].search([('res_model', '=', 'edara.service.charge')])
+        self.assertEqual(len(actions), 1, "Expected exactly 1 window action for edara.service.charge")
+        action = self.env.ref('property_managment.action_edara_service_charge')
+        self.assertEqual(actions.id, action.id)
+        self.assertEqual(
+            action.search_view_id.id,
+            self.env.ref('property_managment.view_edara_service_charge_search').id,
+        )

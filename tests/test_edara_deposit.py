@@ -1,5 +1,7 @@
 from datetime import date
 
+from lxml import etree
+
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import Form, TransactionCase, new_test_user, tagged
 
@@ -508,3 +510,37 @@ class TestEdaraDeposit(TransactionCase):
         txns_after = sorted([(t.id, t.transaction_type, t.amount, t.payment_id.id) for t in deposit.transaction_ids])
         self.assertEqual(txns_before, txns_after)
         self.assertEqual(sorted([t.amount for t in deposit.transaction_ids]), [500.0, 1000.0, 1000.0])
+
+    def test_search_view_exists_and_has_state_filters(self):
+        """Ticket 5: Native search view for edara.deposit exists, model is edara.deposit,
+        has Draft, Held, Closed filters with exact domains, and Group By State."""
+        search_view = self.env.ref('property_managment.view_edara_deposit_search')
+        self.assertTrue(search_view, "Search view view_edara_deposit_search must exist")
+        self.assertEqual(search_view.model, 'edara.deposit')
+
+        arch = self.env['edara.deposit'].get_view(view_id=search_view.id)['arch']
+        tree = etree.fromstring(arch)
+
+        for name, expected_domain in (
+                ('draft', "[('state', '=', 'draft')]"),
+                ('held', "[('state', '=', 'held')]"),
+                ('closed', "[('state', '=', 'closed')]")):
+            filters = tree.xpath("//filter[@name='%s']" % name)
+            self.assertTrue(filters, "missing filter: %s" % name)
+            self.assertEqual(filters[0].get('domain'), expected_domain, name)
+
+        group_by_filters = tree.xpath("//filter[@name='group_by_state']")
+        self.assertTrue(group_by_filters, "missing group by state filter")
+        self.assertEqual(group_by_filters[0].get('context'), "{'group_by': 'state'}")
+
+    def test_action_edara_deposit_references_search_view_and_no_new_action(self):
+        """Ticket 5: existing action_edara_deposit references the search view,
+        and no new window action was created."""
+        actions = self.env['ir.actions.act_window'].search([('res_model', '=', 'edara.deposit')])
+        self.assertEqual(len(actions), 1, "Expected exactly 1 window action for edara.deposit")
+        action = self.env.ref('property_managment.action_edara_deposit')
+        self.assertEqual(actions.id, action.id)
+        self.assertEqual(
+            action.search_view_id.id,
+            self.env.ref('property_managment.view_edara_deposit_search').id,
+        )

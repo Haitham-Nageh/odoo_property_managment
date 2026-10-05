@@ -83,10 +83,28 @@
         </field>
     </record>
 
+    <record id="view_edara_renewal_request_search" model="ir.ui.view">
+        <field name="name">edara.renewal.request.search</field>
+        <field name="model">edara.renewal.request</field>
+        <field name="arch" type="xml">
+            <search string="Renewal Requests">
+                <field name="contract_id"/>
+                <field name="tenant_id"/>
+                <filter string="Submitted" name="submitted" domain="[('state', '=', 'submitted')]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Rejected" name="rejected" domain="[('state', '=', 'rejected')]"/>
+                <group>
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_edara_renewal_request" model="ir.actions.act_window">
         <field name="name">Renewal Requests</field>
         <field name="res_model">edara.renewal.request</field>
         <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_edara_renewal_request_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">
                 No renewal requests yet

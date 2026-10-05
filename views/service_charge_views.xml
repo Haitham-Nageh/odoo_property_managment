@@ -67,10 +67,28 @@
         </field>
     </record>
 
+    <record id="view_edara_service_charge_search" model="ir.ui.view">
+        <field name="name">edara.service.charge.search</field>
+        <field name="model">edara.service.charge</field>
+        <field name="arch" type="xml">
+            <search string="Service Charges">
+                <field name="name"/>
+                <field name="building_id"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Allocated" name="allocated" domain="[('state', '=', 'allocated')]"/>
+                <filter string="Invoiced" name="invoiced" domain="[('state', '=', 'invoiced')]"/>
+                <group>
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_edara_service_charge" model="ir.actions.act_window">
         <field name="name">Service Charges</field>
         <field name="res_model">edara.service.charge</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_edara_service_charge_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smart_action">
                 Create your first service charge

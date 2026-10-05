@@ -1,5 +1,7 @@
 from datetime import date
 
+from lxml import etree
+
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
@@ -129,6 +131,40 @@ class TestEdaraRenewalRequest(TransactionCase):
             contract.action_renew(date(2027, 1, 1), date(2027, 12, 31), 0)
         with self.assertRaises(ValidationError):
             contract.action_renew(date(2027, 1, 1), date(2027, 12, 31), -100)
+
+    def test_search_view_exists_and_has_state_filters(self):
+        """Ticket 5: Native search view for edara.renewal.request exists, model is edara.renewal.request,
+        has Submitted, Approved, Rejected filters with exact domains, and Group By State."""
+        search_view = self.env.ref('property_managment.view_edara_renewal_request_search')
+        self.assertTrue(search_view, "Search view view_edara_renewal_request_search must exist")
+        self.assertEqual(search_view.model, 'edara.renewal.request')
+
+        arch = self.env['edara.renewal.request'].get_view(view_id=search_view.id)['arch']
+        tree = etree.fromstring(arch)
+
+        for name, expected_domain in (
+                ('submitted', "[('state', '=', 'submitted')]"),
+                ('approved', "[('state', '=', 'approved')]"),
+                ('rejected', "[('state', '=', 'rejected')]")):
+            filters = tree.xpath("//filter[@name='%s']" % name)
+            self.assertTrue(filters, "missing filter: %s" % name)
+            self.assertEqual(filters[0].get('domain'), expected_domain, name)
+
+        group_by_filters = tree.xpath("//filter[@name='group_by_state']")
+        self.assertTrue(group_by_filters, "missing group by state filter")
+        self.assertEqual(group_by_filters[0].get('context'), "{'group_by': 'state'}")
+
+    def test_action_edara_renewal_request_references_search_view_and_no_new_action(self):
+        """Ticket 5: existing action_edara_renewal_request references the search view,
+        and no new window action was created."""
+        actions = self.env['ir.actions.act_window'].search([('res_model', '=', 'edara.renewal.request')])
+        self.assertEqual(len(actions), 1, "Expected exactly 1 window action for edara.renewal.request")
+        action = self.env.ref('property_managment.action_edara_renewal_request')
+        self.assertEqual(actions.id, action.id)
+        self.assertEqual(
+            action.search_view_id.id,
+            self.env.ref('property_managment.view_edara_renewal_request_search').id,
+        )
 
 
 @tagged('post_install', '-at_install')
