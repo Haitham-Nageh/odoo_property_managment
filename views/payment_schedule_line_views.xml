@@ -41,6 +41,9 @@
             <list string="Payment Schedule" editable="bottom" create="0"
                   js_class="edara_payment_schedule_filter_shortcuts"
                   decoration-danger="state == 'overdue'" decoration-success="state == 'paid'">
+                <header>
+                    <button name="action_charge_late_fee_bulk" type="object" string="Charge Late Fee"/>
+                </header>
                 <field name="sequence" widget="handle"/>
                 <field name="contract_id" column_invisible="1"/>
                 <field name="due_date"/>
@@ -81,6 +84,7 @@
                         <field name="currency_id" invisible="1"/>
                         <field name="description"/>
                         <field name="invoice_id" readonly="1"/>
+                        <field name="late_fee_invoice_id" readonly="1" invisible="not late_fee_invoice_id"/>
                         <field name="state" widget="badge"/>
                     </group>
                 </sheet>

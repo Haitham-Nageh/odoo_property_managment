@@ -74,11 +74,22 @@ class EdaraPaymentScheduleLine(models.Model):
     description = fields.Char()
 
     invoice_id = fields.Many2one('account.move', string='Invoice', readonly=True, copy=False, index=True)
+    late_fee_invoice_id = fields.Many2one(
+        'account.move',
+        string='Late Fee Invoice',
+        readonly=True,
+        copy=False,
+        index=True,
+    )
     state = fields.Selection(STATES, compute='_compute_state', store=True)
 
     _invoice_id_uniq = models.Constraint(
         'unique(invoice_id)',
         'An invoice cannot be linked to more than one payment schedule line.',
+    )
+    _late_fee_invoice_id_uniq = models.Constraint(
+        'unique(late_fee_invoice_id)',
+        'A late fee invoice cannot be linked to more than one payment schedule line.',
     )
 
     @api.depends('period_end')
@@ -212,6 +223,8 @@ class EdaraPaymentScheduleLine(models.Model):
         self.check_access('write')
         if self.state != 'overdue':
             raise UserError(_("A late fee can only be charged on an overdue payment schedule line."))
+        if self.late_fee_invoice_id:
+            raise UserError(_("A late fee has already been charged for this payment schedule line."))
         company = self.company_id
         income_account = company.edara_late_fee_income_account_id
         if not income_account:
@@ -255,7 +268,63 @@ class EdaraPaymentScheduleLine(models.Model):
             })],
         })
         invoice.action_post()
+        self.sudo().late_fee_invoice_id = invoice.id
         return self.env['account.move'].browse(invoice.id)
+
+    def action_charge_late_fee_bulk(self):
+        """Ticket 6: Bulk late fee charging action for selected payment schedule lines.
+        Safely iterates over eligible lines, skips non-overdue and already-charged lines,
+        preserves record-rule authorization, and reports results via native display_notification.
+        """
+        charged = 0
+        skipped_not_overdue = 0
+        skipped_already_charged = 0
+        errors = 0
+
+        for line in self:
+            if line.late_fee_invoice_id:
+                skipped_already_charged += 1
+                continue
+            if line.state != 'overdue':
+                skipped_not_overdue += 1
+                continue
+            try:
+                line.action_charge_late_fee()
+                charged += 1
+            except AccessError:
+                raise
+            except Exception:
+                errors += 1
+                _logger.exception("EDARA: failed to charge late fee for payment schedule line %s", line.id)
+
+        if errors:
+            message = _(
+                "%(charged)d late fee(s) charged, %(skipped_already)d already charged, %(skipped_not_overdue)d not overdue, %(errors)d error(s).",
+                charged=charged,
+                skipped_already=skipped_already_charged,
+                skipped_not_overdue=skipped_not_overdue,
+                errors=errors,
+            )
+            notif_type = 'warning'
+        else:
+            message = _(
+                "%(charged)d late fee(s) charged, %(skipped_already)d already charged, %(skipped_not_overdue)d not overdue.",
+                charged=charged,
+                skipped_already=skipped_already_charged,
+                skipped_not_overdue=skipped_not_overdue,
+            )
+            notif_type = 'success'
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Charge Late Fee"),
+                'message': message,
+                'type': notif_type,
+                'sticky': False,
+            },
+        }
 
     def _process_due_invoices(self, auto_commit=False):
         """MAT-FIND-007 (2026-09-22): the shared business logic behind BOTH

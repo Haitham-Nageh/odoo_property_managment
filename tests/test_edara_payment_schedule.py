@@ -1,11 +1,12 @@
 from datetime import date, timedelta
+import os
 
 from dateutil.relativedelta import relativedelta
 from lxml import etree
 
-import os
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -211,6 +212,7 @@ class TestEdaraPaymentSchedule(TransactionCase):
             line.action_charge_late_fee()
 
     def test_late_fee_blocked_without_amount_configured(self):
+        self.env.company.edara_late_fee_amount = 0
         late_fee_account = self.env['account.account'].create(
             {'name': 'Late Fee Income (Test)', 'code': '400200', 'account_type': 'income'})
         self.env.company.edara_late_fee_income_account_id = late_fee_account.id
@@ -236,6 +238,262 @@ class TestEdaraPaymentSchedule(TransactionCase):
         invoice_line = late_fee_invoice.invoice_line_ids[0]
         self.assertEqual(invoice_line.account_id, late_fee_account)
         self.assertEqual(invoice_line.price_unit, 25)
+        # Ticket 6: Test 1 coverage
+        self.assertTrue(line.late_fee_invoice_id)
+        self.assertEqual(line.late_fee_invoice_id, late_fee_invoice)
+        self.assertTrue(line.late_fee_invoice_id.exists())
+        self.assertEqual(line.late_fee_invoice_id.state, 'posted')
+        self.assertEqual(line.late_fee_invoice_id.edara_invoice_type, 'late_fee')
+
+    def test_late_fee_second_charge_attempt_raises_user_error(self):
+        """Ticket 6: Test 2 - Calling action_charge_late_fee() twice on the same line
+        must raise UserError and produce no duplicate invoice."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 2)', 'code': '400201', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+        contract = self._make_contract()
+        contract.action_activate()
+        line = contract.schedule_line_ids[0]
+
+        invoice1 = line.action_charge_late_fee()
+        self.assertTrue(invoice1)
+        self.assertEqual(line.late_fee_invoice_id, invoice1)
+
+        with self.assertRaises(UserError):
+            line.action_charge_late_fee()
+
+        late_invoices = self.env['account.move'].search([
+            ('edara_contract_id', '=', contract.id),
+            ('edara_invoice_type', '=', 'late_fee'),
+        ])
+        self.assertEqual(len(late_invoices), 1)
+        self.assertEqual(late_invoices, invoice1)
+
+    def test_late_fee_persistence_and_attributes(self):
+        """Ticket 6: Tests 3, 4, 5 - Verify late_fee_invoice_id persists upon reload,
+        has edara_invoice_type == 'late_fee', and state == 'posted'."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 3)', 'code': '400202', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+        contract = self._make_contract()
+        contract.action_activate()
+        line = contract.schedule_line_ids[0]
+
+        invoice = line.action_charge_late_fee()
+        reloaded_line = self.env['edara.payment.schedule.line'].browse(line.id)
+        # Test 3: Persistence
+        self.assertTrue(reloaded_line.late_fee_invoice_id)
+        self.assertEqual(reloaded_line.late_fee_invoice_id.id, invoice.id)
+        # Test 4: Invoice type
+        self.assertEqual(reloaded_line.late_fee_invoice_id.edara_invoice_type, 'late_fee')
+        # Test 5: Posted state
+        self.assertEqual(reloaded_line.late_fee_invoice_id.state, 'posted')
+
+    def test_late_fee_bulk_mixed_selection(self):
+        """Ticket 6: Test 6 - Bulk action charges eligible lines, skips already-charged,
+        skips non-overdue, and avoids duplicate invoices."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 6)', 'code': '400203', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+
+        contract_overdue = self._make_contract()
+        contract_overdue.action_activate()
+        line_eligible = contract_overdue.schedule_line_ids[0]
+        line_already = contract_overdue.schedule_line_ids[1]
+
+        # Pre-charge line_already
+        prev_inv = line_already.action_charge_late_fee()
+        self.assertTrue(line_already.late_fee_invoice_id)
+
+        # Future non-overdue line
+        contract_future = self._make_contract(
+            start_date=date.today() + timedelta(days=30),
+            end_date=date.today() + relativedelta(years=1),
+        )
+        contract_future.action_activate()
+        line_future = contract_future.schedule_line_ids[0]
+        self.assertEqual(line_future.state, 'draft')
+
+        invoices_before = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+
+        selection = line_eligible + line_already + line_future
+        res = selection.action_charge_late_fee_bulk()
+
+        # Check line_eligible was charged
+        self.assertTrue(line_eligible.late_fee_invoice_id)
+        self.assertEqual(line_eligible.late_fee_invoice_id.state, 'posted')
+
+        # Check line_already was skipped without duplicate invoice
+        self.assertEqual(line_already.late_fee_invoice_id, prev_inv)
+
+        # Check line_future was skipped
+        self.assertFalse(line_future.late_fee_invoice_id)
+
+        invoices_after = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+        self.assertEqual(invoices_after, invoices_before + 1)
+
+        # Notification action returned
+        self.assertEqual(res['type'], 'ir.actions.client')
+        self.assertEqual(res['tag'], 'display_notification')
+        self.assertEqual(res['params']['type'], 'success')
+
+    def test_late_fee_bulk_skip_already_charged(self):
+        """Ticket 6: Test 7 - Bulk action does not create a second invoice for already-charged line."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 7)', 'code': '400204', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+        contract = self._make_contract()
+        contract.action_activate()
+        line = contract.schedule_line_ids[0]
+        first_invoice = line.action_charge_late_fee()
+
+        count_before = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+        res = line.action_charge_late_fee_bulk()
+        count_after = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+
+        self.assertEqual(count_before, count_after)
+        self.assertEqual(line.late_fee_invoice_id, first_invoice)
+        self.assertEqual(res['tag'], 'display_notification')
+
+    def test_late_fee_bulk_skip_non_overdue(self):
+        """Ticket 6: Test 8 - Bulk action does not create late-fee invoice for non-overdue line."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 8)', 'code': '400205', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+        contract = self._make_contract(
+            start_date=date.today() + timedelta(days=30),
+            end_date=date.today() + relativedelta(years=1),
+        )
+        contract.action_activate()
+        line = contract.schedule_line_ids[0]
+        self.assertEqual(line.state, 'draft')
+
+        count_before = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+        res = line.action_charge_late_fee_bulk()
+        count_after = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+
+        self.assertEqual(count_before, count_after)
+        self.assertFalse(line.late_fee_invoice_id)
+        self.assertEqual(res['tag'], 'display_notification')
+
+    def test_late_fee_bulk_zero_eligible_selection(self):
+        """Ticket 6: Test 9 - Bulk action on only ineligible records produces no side-effects and returns feedback."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 9)', 'code': '400206', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+
+        contract_overdue = self._make_contract()
+        contract_overdue.action_activate()
+        line_overdue = contract_overdue.schedule_line_ids[0]
+        line_overdue.action_charge_late_fee()
+
+        contract_future = self._make_contract(
+            start_date=date.today() + timedelta(days=30),
+            end_date=date.today() + relativedelta(years=1),
+        )
+        contract_future.action_activate()
+        line_future = contract_future.schedule_line_ids[0]
+
+        ineligible_selection = line_overdue + line_future
+        count_before = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+        res = ineligible_selection.action_charge_late_fee_bulk()
+        count_after = self.env['account.move'].search_count([('edara_invoice_type', '=', 'late_fee')])
+
+        self.assertEqual(count_before, count_after)
+        self.assertEqual(res['type'], 'ir.actions.client')
+        self.assertEqual(res['tag'], 'display_notification')
+
+    def test_late_fee_single_record_form_action_regression(self):
+        """Ticket 6: Test 10 - Existing form single-record action still works for eligible overdue line."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 10)', 'code': '400207', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+        contract = self._make_contract()
+        contract.action_activate()
+        line = contract.schedule_line_ids[0]
+        self.assertEqual(line.state, 'overdue')
+        self.assertFalse(line.late_fee_invoice_id)
+
+        inv = line.action_charge_late_fee()
+        self.assertTrue(inv)
+        self.assertEqual(inv._name, 'account.move')
+        self.assertEqual(inv.state, 'posted')
+        self.assertEqual(inv.edara_invoice_type, 'late_fee')
+        self.assertEqual(line.late_fee_invoice_id, inv)
+
+    def test_late_fee_security_branch_isolation(self):
+        """Ticket 6: Test 11 - Branch-scoped user cannot charge late fees outside permitted branch."""
+        branch_a = self.env['edara.branch'].create({'name': 'Sec Branch A', 'code': 'SBA6'})
+        branch_b = self.env['edara.branch'].create({'name': 'Sec Branch B', 'code': 'SBB6'})
+
+        prop_a = self.env['edara.property'].create({'name': 'Sec Prop A', 'code': 'SPA6', 'branch_id': branch_a.id})
+        prop_b = self.env['edara.property'].create({'name': 'Sec Prop B', 'code': 'SPB6', 'branch_id': branch_b.id})
+
+        bld_a = self.env['edara.building'].create({'name': 'Sec Bld A', 'code': 'SBA_6', 'property_id': prop_a.id})
+        bld_b = self.env['edara.building'].create({'name': 'Sec Bld B', 'code': 'SBB_6', 'property_id': prop_b.id})
+
+        unit_a = self.env['edara.unit'].create({'name': 'Unit Sec A', 'code': 'UA6', 'building_id': bld_a.id})
+        unit_b = self.env['edara.unit'].create({'name': 'Unit Sec B', 'code': 'UB6', 'building_id': bld_b.id})
+
+        tenant_a = self.env['res.partner'].create({'name': 'Sec Tenant A6'})
+        tenant_b = self.env['res.partner'].create({'name': 'Sec Tenant B6'})
+
+        contract_a = self.env['edara.lease.contract'].create({
+            'unit_id': unit_a.id, 'tenant_id': tenant_a.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_b = self.env['edara.lease.contract'].create({
+            'unit_id': unit_b.id, 'tenant_id': tenant_b.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_a.action_activate()
+        contract_b.action_activate()
+
+        line_b = contract_b.schedule_line_ids[0]
+
+        pm_user = new_test_user(
+            self.env, login='edara_sec_pm_a', groups='property_managment.group_edara_property_manager')
+        branch_a.user_ids = [(4, pm_user.id)]
+
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Sec Test)', 'code': '400299', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+
+        # Single action outside visible scope raises AccessError
+        with self.assertRaises(AccessError):
+            line_b.with_user(pm_user).action_charge_late_fee()
+
+        # Bulk action outside visible scope re-raises AccessError
+        with self.assertRaises(AccessError):
+            line_b.with_user(pm_user).action_charge_late_fee_bulk()
+
+    def test_late_fee_sql_uniqueness_constraint(self):
+        """Ticket 6: Test 12 - SQL uniqueness constraint prevents linking the same invoice to two lines."""
+        late_fee_account = self.env['account.account'].create(
+            {'name': 'Late Fee Income (Test 12)', 'code': '400208', 'account_type': 'income'})
+        self.env.company.edara_late_fee_income_account_id = late_fee_account.id
+        self.env.company.edara_late_fee_amount = 25
+        contract = self._make_contract()
+        contract.action_activate()
+        line1 = contract.schedule_line_ids[0]
+        line2 = contract.schedule_line_ids[1]
+
+        invoice = line1.action_charge_late_fee()
+        self.assertEqual(line1.late_fee_invoice_id, invoice)
+
+        with mute_logger('odoo.sql_db'), self.assertRaises(Exception):
+            with self.env.cr.savepoint():
+                line2.sudo().late_fee_invoice_id = invoice.id
 
     def test_list_view_invoice_id_is_readonly(self):
         """invoice_id is system-managed (only ever set by _create_invoice()) -

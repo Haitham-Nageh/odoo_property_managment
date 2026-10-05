@@ -58,6 +58,26 @@ msgstr "تم إنشاء %(count)d طلب (طلبات) صيانة."
 
 #. module: property_managment
 #. odoo-python
+#: code:addons/property_managment/models/edara_payment_schedule_line.py:0
+msgid ""
+"%(charged)d late fee(s) charged, %(skipped_already)d already charged, "
+"%(skipped_not_overdue)d not overdue."
+msgstr ""
+"تم فرض %(charged)d غرامة (غرامات) تأخير، وتم تخطي %(skipped_already)d تم فرضها مسبقاً، "
+"و%(skipped_not_overdue)d ليست متأخرة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_payment_schedule_line.py:0
+msgid ""
+"%(charged)d late fee(s) charged, %(skipped_already)d already charged, "
+"%(skipped_not_overdue)d not overdue, %(errors)d error(s)."
+msgstr ""
+"تم فرض %(charged)d غرامة (غرامات) تأخير، وتم تخطي %(skipped_already)d تم فرضها مسبقاً، "
+"و%(skipped_not_overdue)d ليست متأخرة، وحدث %(errors)d خطأ (أخطاء)."
+
+#. module: property_managment
+#. odoo-python
 #: code:addons/property_managment/models/edara_dashboard.py:0
 msgid ""
 "%(created)d invoice(s) created, %(skipped)d skipped, %(errors)d error(s)."
@@ -469,6 +489,17 @@ msgid ""
 " the same occurrence date."
 msgstr ""
 "لا يمكن لتعريف الصيانة الدورية إنشاء أكثر من طلب واحد لنفس تاريخ الاستحقاق."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_payment_schedule_line.py:0
+msgid "A late fee has already been charged for this payment schedule line."
+msgstr "تم بالفعل فرض غرامة تأخير لبند جدول الدفعات هذا."
+
+#. module: property_managment
+#: model:ir.model.constraint,message:property_managment.constraint_edara_payment_schedule_line_late_fee_invoice_id_uniq
+msgid "A late fee invoice cannot be linked to more than one payment schedule line."
+msgstr "لا يمكن ربط فاتورة غرامة التأخير بأكثر من بند واحد في جدول الدفعات."
 
 #. module: property_managment
 #. odoo-python
@@ -2419,6 +2450,11 @@ msgstr "مبلغ غرامة التأخير"
 #: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_late_fee_income_account_id
 msgid "Late Fee Income Account"
 msgstr "حساب إيرادات غرامات التأخير"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_payment_schedule_line__late_fee_invoice_id
+msgid "Late Fee Invoice"
+msgstr "فاتورة غرامة التأخير"
 
 #. module: property_managment
 #. odoo-python
