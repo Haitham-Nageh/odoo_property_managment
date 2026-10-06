@@ -69,7 +69,12 @@ for _model, _fields in (
     ('edara.lease.contract', ('state', 'successor_contract_id', 'predecessor_contract_id')),
     ('edara.payment.schedule.line', ('invoice_id',)),
     ('edara.deposit', ()),
-    ('edara.deposit.transaction', ()),
+    ('edara.deposit.transaction', (
+        'amount',
+        'transaction_type',
+        'payment_id',
+        'move_id',
+    )),
     ('edara.service.charge', ()),
     ('edara.service.charge.line', ()),
     ('edara.maintenance.request', ('vendor_bill_id',)),

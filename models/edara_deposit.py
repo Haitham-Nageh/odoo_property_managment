@@ -104,7 +104,7 @@ class EdaraDeposit(models.Model):
                 total=self.amount_held + amount,
                 configured=self.amount,
             ))
-        transaction = self.env['edara.deposit.transaction'].create({
+        transaction = self.env['edara.deposit.transaction'].sudo().create({
             'deposit_id': self.id,
             'transaction_type': 'held',
             'amount': amount,
@@ -123,7 +123,7 @@ class EdaraDeposit(models.Model):
             raise UserError(_("There is no deposit balance left to refund."))
         if amount > self.balance:
             raise UserError(_("Cannot refund more than the remaining deposit balance."))
-        transaction = self.env['edara.deposit.transaction'].create({
+        transaction = self.env['edara.deposit.transaction'].sudo().create({
             'deposit_id': self.id,
             'transaction_type': 'refund',
             'amount': amount,
@@ -156,7 +156,7 @@ class EdaraDeposit(models.Model):
                 "(Settings > EDARA Property Management) before recording a deduction.",
                 company=company.display_name,
             ))
-        transaction = self.env['edara.deposit.transaction'].create({
+        transaction = self.env['edara.deposit.transaction'].sudo().create({
             'deposit_id': self.id,
             'transaction_type': 'deduction',
             'amount': amount,

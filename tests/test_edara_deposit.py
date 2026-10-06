@@ -43,6 +43,11 @@ class TestEdaraDeposit(TransactionCase):
         cls.deduction_income_account = cls.env['account.account'].create({
             'name': 'Damage Recovery Income (Test)', 'code': '401900', 'account_type': 'income_other',
         })
+        cls.branch_manager = new_test_user(
+            cls.env, login='edara_dep_bm_guard', groups='property_managment.group_edara_branch_manager')
+        cls.accountant = new_test_user(
+            cls.env, login='edara_dep_acct_guard', groups='property_managment.group_edara_accountant')
+        cls.branch.user_ids = [(4, cls.branch_manager.id), (4, cls.accountant.id)]
 
     def _make_deposit(self):
         return self.contract.action_view_deposit() and self.env['edara.deposit'].search(
@@ -544,3 +549,142 @@ class TestEdaraDeposit(TransactionCase):
             action.search_view_id.id,
             self.env.ref('property_managment.view_edara_deposit_search').id,
         )
+
+    # ============ Q2.1 System Field Guard: edara.deposit.transaction ============
+
+    def _setup_deposit_transactions(self):
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        self.env.company.edara_deposit_deduction_income_account_id = self.deduction_income_account.id
+        deposit = self._make_deposit()
+        deposit.action_collect(self.cash_journal.id, 300)
+        collect_txn = deposit.transaction_ids.filtered(lambda t: t.transaction_type == 'held')
+        deposit.action_deduct(50, 'Initial damage deduction')
+        deduct_txn = deposit.transaction_ids.filtered(lambda t: t.transaction_type == 'deduction')
+        return deposit, collect_txn, deduct_txn
+
+    def test_guard_branch_manager_cannot_write_amount(self):
+        """Negative security: Branch Manager cannot directly write transaction amount."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        self.assertEqual(collect_txn.amount, 300.0)
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.branch_manager).write({'amount': 999.0})
+        self.assertEqual(collect_txn.amount, 300.0)
+
+    def test_guard_accountant_cannot_write_amount(self):
+        """Negative security: Accountant cannot directly write transaction amount."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        self.assertEqual(collect_txn.amount, 300.0)
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.accountant).write({'amount': 999.0})
+        self.assertEqual(collect_txn.amount, 300.0)
+
+    def test_guard_branch_manager_cannot_write_transaction_type(self):
+        """Negative security: Branch Manager cannot directly write transaction_type."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        self.assertEqual(collect_txn.transaction_type, 'held')
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.branch_manager).write({'transaction_type': 'refund'})
+        self.assertEqual(collect_txn.transaction_type, 'held')
+
+    def test_guard_accountant_cannot_write_transaction_type(self):
+        """Negative security: Accountant cannot directly write transaction_type."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        self.assertEqual(collect_txn.transaction_type, 'held')
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.accountant).write({'transaction_type': 'refund'})
+        self.assertEqual(collect_txn.transaction_type, 'held')
+
+    def test_guard_payment_id_cannot_be_changed(self):
+        """Negative security: payment_id cannot be changed by Branch Manager or Accountant."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        orig_payment_id = collect_txn.payment_id.id
+        self.assertTrue(orig_payment_id)
+        other_payment = deposit.action_refund(self.cash_journal.id, 50)
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.branch_manager).write({'payment_id': other_payment.id})
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.accountant).write({'payment_id': other_payment.id})
+        self.assertEqual(collect_txn.payment_id.id, orig_payment_id)
+
+    def test_guard_move_id_cannot_be_changed(self):
+        """Negative security: move_id cannot be changed by Branch Manager or Accountant."""
+        deposit, _, deduct_txn = self._setup_deposit_transactions()
+        orig_move_id = deduct_txn.move_id.id
+        self.assertTrue(orig_move_id)
+        other_move = deposit.action_deduct(50, 'Second damage deduction')
+        with self.assertRaises(AccessError):
+            deduct_txn.with_user(self.branch_manager).write({'move_id': other_move.id})
+        with self.assertRaises(AccessError):
+            deduct_txn.with_user(self.accountant).write({'move_id': other_move.id})
+        self.assertEqual(deduct_txn.move_id.id, orig_move_id)
+
+    def test_guard_payment_id_cannot_be_cleared_with_false(self):
+        """Negative security: payment_id cannot be cleared with False."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        orig_payment_id = collect_txn.payment_id.id
+        self.assertTrue(orig_payment_id)
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.branch_manager).write({'payment_id': False})
+        with self.assertRaises(AccessError):
+            collect_txn.with_user(self.accountant).write({'payment_id': False})
+        self.assertEqual(collect_txn.payment_id.id, orig_payment_id)
+
+    def test_guard_move_id_cannot_be_cleared_with_false(self):
+        """Negative security: move_id cannot be cleared with False."""
+        deposit, _, deduct_txn = self._setup_deposit_transactions()
+        orig_move_id = deduct_txn.move_id.id
+        self.assertTrue(orig_move_id)
+        with self.assertRaises(AccessError):
+            deduct_txn.with_user(self.branch_manager).write({'move_id': False})
+        with self.assertRaises(AccessError):
+            deduct_txn.with_user(self.accountant).write({'move_id': False})
+        self.assertEqual(deduct_txn.move_id.id, orig_move_id)
+
+    def test_guard_multirecord_write_containing_protected_field_rejected_atomically(self):
+        """Negative security: multi-record write containing a protected field is rejected atomically
+        and neither transaction row is modified."""
+        deposit, collect_txn, deduct_txn = self._setup_deposit_transactions()
+        txns = collect_txn | deduct_txn
+        initial_amounts = {t.id: t.amount for t in txns}
+        initial_types = {t.id: t.transaction_type for t in txns}
+        with self.assertRaises(AccessError):
+            txns.with_user(self.branch_manager).write({'amount': 999.0})
+        with self.assertRaises(AccessError):
+            txns.with_user(self.accountant).write({'amount': 999.0})
+        with self.assertRaises(AccessError):
+            txns.with_user(self.branch_manager).write({'transaction_type': 'refund'})
+        with self.assertRaises(AccessError):
+            txns.with_user(self.accountant).write({'transaction_type': 'refund'})
+        for t in txns:
+            self.assertEqual(t.amount, initial_amounts[t.id])
+            self.assertEqual(t.transaction_type, initial_types[t.id])
+
+    def test_guard_unprotected_field_description_writable_by_branch_manager(self):
+        """Positive security: unprotected fields like description remain writable by Branch Manager."""
+        deposit, collect_txn, _ = self._setup_deposit_transactions()
+        collect_txn.with_user(self.branch_manager).write({'description': 'Updated collection note'})
+        self.assertEqual(collect_txn.description, 'Updated collection note')
+
+    def test_guard_branch_manager_can_execute_deposit_business_actions(self):
+        """Positive workflow: Branch Manager executing legitimate action_collect, action_refund,
+        and action_deduct successfully creates transactions with all fields intact."""
+        self.env.company.edara_deposit_liability_account_id = self.liability_account.id
+        self.env.company.edara_deposit_deduction_income_account_id = self.deduction_income_account.id
+        deposit = self._make_deposit()
+        payment = deposit.with_user(self.branch_manager).action_collect(self.cash_journal.id, 300)
+        self.assertTrue(payment)
+        collect_txn = deposit.transaction_ids.filtered(lambda t: t.transaction_type == 'held')
+        self.assertEqual(collect_txn.amount, 300.0)
+        self.assertEqual(collect_txn.payment_id, payment)
+
+        refund_pmt = deposit.with_user(self.branch_manager).action_refund(self.cash_journal.id, 50)
+        self.assertTrue(refund_pmt)
+        refund_txn = deposit.transaction_ids.filtered(lambda t: t.transaction_type == 'refund')
+        self.assertEqual(refund_txn.amount, 50.0)
+        self.assertEqual(refund_txn.payment_id, refund_pmt)
+
+        move = deposit.with_user(self.branch_manager).action_deduct(50, 'Broken fixture')
+        self.assertTrue(move)
+        deduct_txn = deposit.transaction_ids.filtered(lambda t: t.transaction_type == 'deduction')
+        self.assertEqual(deduct_txn.amount, 50.0)
+        self.assertEqual(deduct_txn.move_id, move)
