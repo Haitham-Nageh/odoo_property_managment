@@ -4,15 +4,17 @@ Project: EDARA Property Management (Odoo 19)
 Module: `property_managment`
 Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 
-## Current Status (2026-10-05) — Authoritative
+## Current Status (2026-10-06) — Authoritative
 
-This section is the current source of truth. Sections further down (e.g. "Current Phase" below the Phase 0-15 program, and the old "Tests (final counts, all 16 files)" section) describe earlier points in the project's history and are preserved for historical record, not as current status — see the "HISTORICAL" labels added to them.
+This section is the current source of truth. Sections further down (e.g. "Current Phase" below the Phase 0-15 program, and the old "Tests (final counts, all 16 files)" section) describe earlier points in the project's history and are preserved for historical record, not as current status — see the "HISTORICAL" labels added to them. This section supersedes the prior "Current Status (2026-10-05)" snapshot.
 
-- **Git**: branch `main`, HEAD `eab44581290352ffad83da154cbb293883a48e77` ("[Payment Schedule] Harden Per-Record Transaction Isolation"), in sync with `origin/main`, working tree clean.
-- **Tickets 1-7**: all COMPLETE and committed. See "## Current Ticket Status (2026-10-05)" below for per-ticket detail and commit hashes.
-- **Tests**: 27 Python test files (28 including `tests/__init__.py`) containing 678 discovered test methods, including the two Ticket 7 regression tests. See "## Tests (current, 2026-10-05)" below — this replaces the old "78 tests / 16 files" figure, which is historical and must not be read as current.
-- **EDARA PMS development through Ticket 7 is complete.** This does NOT mean the project is fully finished — while Branch Removal architecture is resolved (decision: KEEP BOTH; removal is not planned; see ADR-001), Property Terminology and Owner Portal remain explicitly DEFERRED and have not been started. See "## Deferred Architecture Decisions (2026-10-05)" below.
-- **Final Project Quality Gate**: recorded as a mandatory future review (see "# Final Project Quality Gate" near the end of this file) — **NOT YET RUN**. It is intentionally scheduled to run only after Branch Removal, Property Terminology, and Owner Portal are all resolved.
+- **Git**: branch `main`, HEAD `5a763e358956e54f672e1978510f140f96d0ed5e` ("[Security] Freeze Core Terms on Historical Lease Contracts"), in sync with `origin/main`, working tree clean.
+- **Tickets 1-7**: all COMPLETE and committed (unchanged from 2026-10-05). See "## Current Ticket Status" below for per-ticket detail and commit hashes.
+- **P1 — System Field Guard Coverage**: COMPLETE and committed (`820228f78bb052903471e6f065ae24376981235c`, "[Security] Harden System Field Guard Coverage"). Closed the write-protection gap on `edara.renewal.request.state`/`new_contract_id` and `edara.maintenance.request.vendor_bill_id`.
+- **P2 — Closed Contract Core-Term Freeze**: COMPLETE and committed (`5a763e358956e54f672e1978510f140f96d0ed5e`, "[Security] Freeze Core Terms on Historical Lease Contracts"). Freezes `start_date`/`end_date`/`rent_amount`/`tenant_id` on `edara.lease.contract` once a contract reaches a historical state (`terminated`/`expired`/`cancelled`/`renewed`); `draft`/`scheduled`/`active` remain fully editable.
+- **Tests**: 27 Python test files (28 including `tests/__init__.py`) containing 685 discovered test methods (678 baseline as of Ticket 7, +7 added by P1/P2). See "## Tests (current, 2026-10-06)" below.
+- **EDARA PMS development through P2 is complete.** This does NOT mean the project is fully finished — while Branch Removal architecture is resolved (decision: KEEP BOTH; removal is not planned; see ADR-001), Property Terminology and Owner Portal remain explicitly DEFERRED and have not been started. See "## Deferred Architecture Decisions (2026-10-05)" below.
+- **Quality Roadmap (Q1-Q4)**: registered 2026-10-06, status **PLANNED**, not yet started. See "## Quality Roadmap — Q1-Q4 (2026-10-06)" below. This operationalizes and supersedes the previous open-ended timing on the "# Final Project Quality Gate" section (which had been scheduled to wait for Property Terminology/Owner Portal); Q1 is now the next planned step, independent of those two deferred decisions.
 
 ## Current Phase
 - Phase 11.1 — Native Lease Timeline: functionally completed
@@ -107,9 +109,9 @@ Native `account.move` (out_invoice) creation from payment schedule lines (Phase 
 ## Portal Status
 Implemented (Phase 9): tenant-facing website portal for My Lease (+ renewal request submission) and My Maintenance Requests, plus native `account`/`portal` "My Invoices" reused as-is for invoices/payments/outstanding balance. See "Portal Routes" above and the Phase 9 summary for exact scope and the deliberate cuts (no custom chatter widget on portal pages, no separate My Unit/Documents/Notifications pages - all reuse native infrastructure).
 
-## Tests (current, 2026-10-05)
+## Tests (current, 2026-10-06)
 
-**27 Python test files (28 including `tests/__init__.py`) containing 678 discovered test methods**, including the two Ticket 7 regression tests (independently counted via `grep -c "^    def test_" tests/*.py` against commit `eab4458`). This is the authoritative count — see "## Current Status" at the top of this file. Per-file counts (test methods per file): `test_edara_branch.py` 3, `test_edara_dashboard.py` 107, `test_edara_deposit.py` 40, `test_edara_hardening.py` 5, `test_edara_lease_billing.py` 23, `test_edara_lease_contract.py` 42, `test_edara_maintenance_phase2.py` 37, `test_edara_maintenance_request.py` 12, `test_edara_maintenance_vendor_bill.py` 23, `test_edara_mat015_scoped_accounting.py` 19, `test_edara_multicompany.py` 2, `test_edara_notifications.py` 36, `test_edara_payment_schedule.py` 35, `test_edara_phase10_lease_engine.py` 51, `test_edara_phase1011_fixes.py` 16, `test_edara_phase1012_hardening.py` 16, `test_edara_phase1013_occupancy_self_healing.py` 4, `test_edara_phase7_hardening.py` 18, `test_edara_phase8_currency.py` 10, `test_edara_portal.py` 45, `test_edara_portal_provisioning.py` 16, `test_edara_property.py` 30, `test_edara_renewal_request.py` 16, `test_edara_reporting_phase2.py` 33, `test_edara_reports.py` 5, `test_edara_security_isolation.py` 15, `test_edara_service_charge.py` 19.
+**27 Python test files (28 including `tests/__init__.py`) containing 685 discovered test methods** (678 baseline as of Ticket 7, +7 added by the P1/P2 security-hardening tickets: +1 `test_edara_renewal_request.py`, +1 `test_edara_maintenance_vendor_bill.py`, +5 `test_edara_lease_contract.py`), independently counted via `grep -c "^    def test_" tests/*.py` against commit `5a763e3`. This is the authoritative count — see "## Current Status" at the top of this file. Per-file counts (test methods per file): `test_edara_branch.py` 3, `test_edara_dashboard.py` 107, `test_edara_deposit.py` 40, `test_edara_hardening.py` 5, `test_edara_lease_billing.py` 23, `test_edara_lease_contract.py` 47, `test_edara_maintenance_phase2.py` 37, `test_edara_maintenance_request.py` 12, `test_edara_maintenance_vendor_bill.py` 24, `test_edara_mat015_scoped_accounting.py` 19, `test_edara_multicompany.py` 2, `test_edara_notifications.py` 36, `test_edara_payment_schedule.py` 35, `test_edara_phase10_lease_engine.py` 51, `test_edara_phase1011_fixes.py` 16, `test_edara_phase1012_hardening.py` 16, `test_edara_phase1013_occupancy_self_healing.py` 4, `test_edara_phase7_hardening.py` 18, `test_edara_phase8_currency.py` 10, `test_edara_portal.py` 45, `test_edara_portal_provisioning.py` 16, `test_edara_property.py` 30, `test_edara_renewal_request.py` 17, `test_edara_reporting_phase2.py` 33, `test_edara_reports.py` 5, `test_edara_security_isolation.py` 15, `test_edara_service_charge.py` 19.
 
 This is a source-inventory count (test methods discovered in the current tree), not a single CI execution's pass/fail total — the project does not currently record a standing CI run total in this file, so none should be implied.
 
@@ -3248,6 +3250,19 @@ CURRENT WORKSTREAM
 
 **Ticket 7 detail**: closed the one non-blocking transaction-safety finding carried forward from Ticket 6. `action_charge_late_fee_bulk()` and `_process_due_invoices()` both now wrap their per-record risky operation (`line.action_charge_late_fee()` / `line._create_invoice()`) in `with self.env.cr.savepoint():`, scoped to exactly that call (not the surrounding skip-checks, counters, or notification construction). `AccessError` still propagates unconditionally and uncounted in both methods, unchanged. `_process_due_invoices()`'s existing `auto_commit=True` commit/rollback semantics are completely unchanged — the savepoint is additive, not a replacement. A defensive `line.invalidate_recordset([...])` call was added in each method's generic-exception branch, matching the project's existing `edara_lease_contract.py` `_activate_scheduled()` precedent. Two new regression tests (`test_late_fee_bulk_db_failure_isolated_by_savepoint` in `tests/test_edara_payment_schedule.py`, `test_process_due_invoices_db_failure_isolated_by_savepoint` in `tests/test_edara_phase7_hardening.py`) each prove a genuine PostgreSQL unique-constraint violation (via a test-only `write()` patch redirecting one record's Many2one value to an already-linked invoice id — not a mocked/synthetic exception) on a middle record is isolated by the savepoint: record A succeeds, record B's DB-level failure rolls back cleanly with no persisted link, and record C still succeeds afterward. Final Claude audit verdict: **APPROVE**. Commit completed.
 
+### Security Hardening Tickets (P1-P2, 2026-10-06)
+
+Discovered during the Full Product Quality & Gap Audit (2026-10-06) as confirmed P1/P2 data-integrity findings, analyzed and implemented one at a time following the same Claude-analysis → Gemini-implementation → Claude-final-audit workflow as Tickets 1-7.
+
+| Ticket | Name | Commit | Status |
+|---|---|---|---|
+| P1 | System Field Guard Coverage | `820228f78bb052903471e6f065ae24376981235c` | COMPLETE |
+| P2 | Closed Contract Core-Term Freeze | `5a763e358956e54f672e1978510f140f96d0ed5e` | COMPLETE |
+
+**P1 detail**: the `edara.system.field.guard` mixin (Phase 7) registered `edara.renewal.request` and `edara.maintenance.request` with an empty protected-fields tuple, leaving `new_contract_id`/`state` (renewal) and `vendor_bill_id` (maintenance) protected only by UI `readonly=True` — not a security boundary. Fix spanned 5 files, not the 1-file guard-only change initially assumed: the guard registration (`models/edara_system_field_guard.py`) now protects `('state', 'new_contract_id')` on `edara.renewal.request` and `('vendor_bill_id',)` on `edara.maintenance.request`; `action_approve()`/`action_reject()` (`models/edara_renewal_request.py`) and `action_create_vendor_bill()` (`models/edara_maintenance_request.py`) were updated to the established `check_access('write')` → scoped `.sudo()` write pattern so the newly-guarded fields remain writable through the legitimate business methods. Two new regression tests prove a branch-manager-level user (real ACL write access, not a Viewer) cannot forge either field directly via `AccessError`, while existing approve/reject/vendor-bill-creation tests continue to pass unmodified. Final Claude audit verdict: **APPROVE**. Commit completed.
+
+**P2 detail**: `edara.lease.contract.write()` only ever restricted shortening `end_date` while `scheduled`/`active`; `start_date`, `rent_amount`, and `tenant_id` were editable in every state, including long after a contract became `terminated`/`expired`/`cancelled`/`renewed`. Investigation found `tenant_id` specifically cascades through `edara.deposit.tenant_id`/`edara.payment.schedule.line.tenant_id` (stored related fields) and is the sole key of `rule_edara_lease_contract_portal_own`'s portal-tenant record rule — so editing a closed contract's tenant could silently corrupt financial-record attribution and leak unit/lease visibility to the wrong portal user. Fix added `HISTORICAL_STATES`/`CORE_TERM_FIELDS` constants and a `write()`-time check (`models/edara_lease_contract.py`) that raises `UserError` whenever any of the four core fields is modified and the record's *effective post-write state* (`vals.get('state', contract.state)`, correctly catching a combined state-transition-plus-field-edit in one call) is historical — enforced unconditionally, with no `sudo()` bypass, since no legitimate internal flow ever needs to touch these fields on an existing record (verified by exhaustive repo-wide writer search). Five new tests cover all 4 states × 4 fields (16 combinations), no-sudo-bypass, the combined-write edge case, live-state (`draft`/`scheduled`/`active`) non-regression, and atomic multi-record blocking. The pre-existing end_date-shortening guard is unchanged. Final Claude audit verdict: **APPROVE**. Commit completed.
+
 **Functional Area Status (2026-10-05)**
 
 | Area | Status |
@@ -3284,8 +3299,33 @@ CURRENT WORKSTREAM
 ### Owner Portal
 **Status: GAP / DEFERRED.** No owner portal implementation currently exists (verified: zero `owner_portal`/`owner.portal` matches anywhere in the repository). Owner Portal is **not** waiting for a future Branch-vs-Property architecture decision anymore — that architecture question is resolved by **ADR-001** (scoping is confirmed to follow `res.partner → edara.ownership → edara.property → edara.building → edara.unit → edara.lease.contract`). Owner Portal remains deferred because: (1) Property terminology is still an open business/UX decision; (2) UX/navigation architecture is still being finalized; and (3) Owner Portal implementation itself has not started.
 
-## Remaining Roadmap (2026-10-05)
+## Remaining Roadmap (2026-10-06 update — supersedes the 2026-10-05 tree below)
 
+```text
+CURRENT
+  │
+  ├── ✅ Tickets 1-7
+  │
+  ├── ✅ Branch Removal — Architecture / Scoping: COMPLETE (Outcome: KEEP BOTH Branch and Property; see ADR-001; no Branch removal implementation planned)
+  │
+  ├── ✅ P1 — System Field Guard Coverage (2026-10-06, commit `820228f`)
+  │
+  ├── ✅ P2 — Closed Contract Core-Term Freeze (2026-10-06, commit `5a763e3`)
+  │
+  ├── 🔵 Q1 — Final Code Review (PLANNED — see "## Quality Roadmap — Q1-Q4 (2026-10-06)" below)
+  │
+  ├── 🔵 Q2 — Quality Findings Remediation (PLANNED)
+  │
+  ├── 🔵 Q3 — Final Regression & Quality Gate (PLANNED)
+  │
+  ├── 🔵 Q4 — User Manual (PLANNED)
+  │
+  ├── 🔵 Property Terminology — Business Decision (independent of Q1-Q4; still deferred)
+  │
+  └── 🔵 Owner Portal (independent of Q1-Q4; still deferred)
+```
+
+*(2026-10-05 tree, preserved for history):*
 ```text
 CURRENT
   │
@@ -3335,11 +3375,13 @@ Ticket 7 transaction hardening is **not** listed as remaining work — it is COM
 
 # Final Project Quality Gate
 
-This is **not** a normal ticket. It is a mandatory final review to be performed **after all planned product/architecture work is finished** (i.e. after Branch Removal, Property Terminology, and Owner Portal are all resolved) and **before the project is declared production-ready/final**.
+This is **not** a normal ticket. It was originally recorded as a mandatory final review to be performed **after all planned product/architecture work is finished** (i.e. after Branch Removal, Property Terminology, and Owner Portal are all resolved) and **before the project is declared production-ready/final**.
 
-**The Final Project Quality Gate is NOT YET RUN.** It is intentionally not performed now — running it before the remaining architecture/product work is complete would require repeating it afterward, duplicating effort. Do not treat anything in this file as implying the gate has passed.
+**Status update (2026-10-06): this gate is now operationalized as "Q1 — Final Code Review" in the "## Quality Roadmap — Q1-Q4 (2026-10-06)" section immediately below**, which supersedes the original timing constraint — Q1 is scheduled to run next, independently of Property Terminology/Owner Portal (both remain separately deferred; see "## Deferred Architecture Decisions"). The seven areas below are preserved unchanged and are fully included within Q1's broader review scope.
 
-The gate contains exactly seven areas:
+**The gate (Q1) is NOT YET RUN.** Do not treat anything in this file as implying it has passed.
+
+The gate's original seven areas (carried forward unchanged into Q1):
 1. Secrets
 2. Error Handling
 3. Edge Cases
@@ -3347,4 +3389,55 @@ The gate contains exactly seven areas:
 5. Test Coverage
 6. Logging
 7. Hallucinated Imports / Odoo API Verification
+
+## Quality Roadmap — Q1-Q4 (2026-10-06)
+
+Registered 2026-10-06, following the close of P1 and P2. **All four tickets are PLANNED — none has started.** Authoritative execution order:
+
+```text
+Q1 — Final Code Review
+  ↓
+Q2 — Quality Findings Remediation
+  ↓
+Q3 — Final Regression & Quality Gate
+  ↓
+Q4 — User Manual
+  ↓
+Final Product Readiness
+```
+
+### Q1 — Final Code Review
+**Status: PLANNED.**
+
+Read-only production-readiness review of the complete EDARA PMS codebase (Claude analysis / Senior Analyst workflow). No fixes are performed as part of Q1 itself.
+
+Review areas:
+1. Secrets — API keys, passwords, tokens, credentials, hardcoded secrets.
+2. Error Handling — database failures, ORM failures, file errors, external/integration failures, unsafe exception handling.
+3. Edge Cases — empty inputs, null/False values, zero amounts, duplicate records, boundary dates, special characters, unusual state combinations.
+4. Input Validation — invalid dates, invalid amounts, invalid relationships, invalid state transitions, user-provided input, RPC/ORM entry points.
+5. Test Coverage — critical workflows, negative/security tests, lifecycle transitions, accounting/financial flows, transaction safety, portal isolation.
+6. Logging — diagnosability of important failures, appropriate logger usage, missing or excessive logging, swallowed exceptions.
+7. Hallucinated / Invalid Imports — nonexistent imports, suspicious dependencies, unused or misleading imports, incorrect Odoo APIs.
+
+Odoo-specific review areas also in scope: ACLs and record rules, `sudo()` usage, company/branch isolation, portal security, accounting integrity, lifecycle integrity, idempotency, transaction/savepoint safety, data integrity constraints, Arabic/RTL/i18n, dead code / TODO / FIXME, architectural inconsistencies.
+
+Expected output: a categorized review report with findings classified P0 / P1 / P2 / P3 / Informational.
+
+### Q2 — Quality Findings Remediation
+**Status: PLANNED.**
+
+Addresses *validated* findings from Q1 — Q2 does not mean blindly fixing every finding; each Q1 finding is reviewed and approved before any implementation. Only validated findings become implementation tickets.
+
+Workflow: Claude Analysis → ChatGPT Review → Gemini Implementation → Tests → Claude Final Audit → Commit → Push (same per-ticket discipline already used for P1/P2 and Tickets 1-7).
+
+### Q3 — Final Regression & Quality Gate
+**Status: PLANNED.**
+
+Final regression verification after Q2 remediation, confirming the complete PMS remains stable after all quality fixes. This is the final *technical* quality gate before user-facing documentation (Q4). Areas: Security/access isolation, Company/Branch isolation, Properties/Buildings/Units, Tenants/Contacts, Lease lifecycle, Renewal, Payment Schedules, Late Fees, Security Deposits, Service Charges, Maintenance, SLA, Dashboard, Search/Filters, Portal, Accounting/financial integrity, Arabic/RTL, Transaction safety.
+
+### Q4 — User Manual
+**Status: PLANNED.**
+
+A concise, Arabic-friendly PDF User Manual for end users (user workflows, not developer documentation), covering: Introduction, Login/Getting Started, Navigation, Properties, Buildings, Units, Tenants/Contacts, Lease Contracts, Lease Lifecycle, Renewal Requests, Payment Schedule, Late Fees, Security Deposits, Service Charges, Maintenance, SLA, Dashboard, Search/Filters, User Roles, FAQ/Common Questions — what each area does, when to use it, important statuses/business rules, common questions, common mistakes/expected behavior. Concise, practical, non-technical, Arabic-first where appropriate, screenshots where useful, exportable as a simple PDF. Not created now — recorded as planned only.
 
