@@ -1,10 +1,12 @@
 from datetime import date
+from unittest.mock import patch
 
 from dateutil.relativedelta import relativedelta
 
 from odoo.exceptions import AccessError
 from odoo.fields import Date
 from odoo.tests import HttpCase, TransactionCase, tagged
+from odoo.tools import mute_logger
 
 
 class TestEdaraMaintenancePhase2Base(TransactionCase):
@@ -319,6 +321,185 @@ class TestEdaraRecurringMaintenance(TestEdaraMaintenancePhase2Base):
         self.branch.user_ids = [(4, manager.id)]
         visible = self.env['edara.recurring.maintenance'].with_user(manager).search([])
         self.assertNotIn(other_definition.id, visible.ids)
+
+    # ============ Q2.3 Batch Isolation: _cron_generate_recurring_maintenance ============
+
+    def test_recurring_batch_all_definitions_succeed(self):
+        """Batch isolation: When all definitions succeed, all requests are created
+        and next_date is advanced for all."""
+        today = Date.today()
+        unit_b = self.env['edara.unit'].create({
+            'name': 'A-202', 'code': '202', 'building_id': self.building.id,
+        })
+        unit_c = self.env['edara.unit'].create({
+            'name': 'A-203', 'code': '203', 'building_id': self.building.id,
+        })
+        def_a = self._make_recurring(name='Job A', unit_id=self.unit.id, next_date=today, frequency='monthly')
+        def_b = self._make_recurring(name='Job B', unit_id=unit_b.id, next_date=today, frequency='quarterly')
+        def_c = self._make_recurring(name='Job C', unit_id=unit_c.id, next_date=today, frequency='yearly')
+
+        created = self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
+
+        self.assertEqual(created, 3)
+        self.assertEqual(len(def_a.generated_request_ids), 1)
+        self.assertEqual(len(def_b.generated_request_ids), 1)
+        self.assertEqual(len(def_c.generated_request_ids), 1)
+
+        self.assertEqual(def_a.next_date, today + relativedelta(months=1))
+        self.assertEqual(def_b.next_date, today + relativedelta(months=3))
+        self.assertEqual(def_c.next_date, today + relativedelta(years=1))
+
+    def test_recurring_batch_one_failure_does_not_roll_back_siblings(self):
+        """Batch isolation: One definition encountering a genuine database constraint failure
+        rolls back via savepoint only and does not roll back or prevent sibling definitions."""
+        today = Date.today()
+        unit_b = self.env['edara.unit'].create({
+            'name': 'A-202', 'code': '202', 'building_id': self.building.id,
+        })
+        unit_c = self.env['edara.unit'].create({
+            'name': 'A-203', 'code': '203', 'building_id': self.building.id,
+        })
+        def_a = self._make_recurring(name='Batch Iso A', unit_id=self.unit.id, next_date=today, frequency='monthly')
+        def_b = self._make_recurring(name='Batch Iso B', unit_id=unit_b.id, next_date=today, frequency='quarterly')
+        def_c = self._make_recurring(name='Batch Iso C', unit_id=unit_c.id, next_date=today, frequency='yearly')
+
+        # Existing record to collide with _recurring_occurrence_uniq:
+        prior_def = self._make_recurring(
+            name='Prior Collide Def', unit_id=self.unit.id, next_date=today + relativedelta(days=10))
+        self.env['edara.maintenance.request'].create({
+            'title': 'Prior Occurrence', 'unit_id': self.unit.id,
+            'edara_recurring_id': prior_def.id, 'occurrence_date': today,
+        })
+
+        Model = type(self.env['edara.maintenance.request'])
+        original_create = Model.create
+
+        def patched_create(self_record, vals_list, *args, **kwargs):
+            is_single = isinstance(vals_list, dict)
+            batch = [vals_list] if is_single else list(vals_list)
+            new_batch = []
+            for vals in batch:
+                if vals.get('edara_recurring_id') == def_b.id:
+                    # Collide on genuine PostgreSQL _recurring_occurrence_uniq constraint
+                    vals = dict(vals, edara_recurring_id=prior_def.id, occurrence_date=today)
+                new_batch.append(vals)
+            return original_create(self_record, new_batch[0] if is_single else new_batch, *args, **kwargs)
+
+        with mute_logger('odoo.sql_db'), mute_logger('odoo.addons.property_managment.models.edara_recurring_maintenance'), \
+             patch.object(Model, 'create', patched_create):
+            created = self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
+
+        self.assertEqual(created, 2)
+        # Definition A succeeded
+        self.assertEqual(len(def_a.generated_request_ids), 1)
+        self.assertEqual(def_a.next_date, today + relativedelta(months=1))
+        # Definition B failed in savepoint
+        self.assertEqual(len(def_b.generated_request_ids), 0)
+        self.assertEqual(def_b.next_date, today)
+        # Definition C succeeded
+        self.assertEqual(len(def_c.generated_request_ids), 1)
+        self.assertEqual(def_c.next_date, today + relativedelta(years=1))
+
+    def test_recurring_batch_failed_definition_leaves_no_partial_state(self):
+        """Batch isolation: When a definition fails, no orphan generated request is created
+        and next_date remains untouched (proving Request.create and next_date are in the same savepoint)."""
+        today = Date.today()
+        def_x = self._make_recurring(name='Partial Test Def', unit_id=self.unit.id, next_date=today)
+
+        prior_def = self._make_recurring(
+            name='Prior Def X', unit_id=self.unit.id, next_date=today + relativedelta(days=10))
+        self.env['edara.maintenance.request'].create({
+            'title': 'Prior Occurrence X', 'unit_id': self.unit.id,
+            'edara_recurring_id': prior_def.id, 'occurrence_date': today,
+        })
+
+        Model = type(self.env['edara.maintenance.request'])
+        original_create = Model.create
+
+        def patched_create(self_record, vals_list, *args, **kwargs):
+            is_single = isinstance(vals_list, dict)
+            batch = [vals_list] if is_single else list(vals_list)
+            new_batch = []
+            for vals in batch:
+                if vals.get('edara_recurring_id') == def_x.id:
+                    vals = dict(vals, edara_recurring_id=prior_def.id, occurrence_date=today)
+                new_batch.append(vals)
+            return original_create(self_record, new_batch[0] if is_single else new_batch, *args, **kwargs)
+
+        with mute_logger('odoo.sql_db'), mute_logger('odoo.addons.property_managment.models.edara_recurring_maintenance'), \
+             patch.object(Model, 'create', patched_create):
+            created = self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
+
+        self.assertEqual(created, 0)
+        self.assertEqual(len(def_x.generated_request_ids), 0)
+        self.assertEqual(def_x.next_date, today)
+        self.assertEqual(self.env['edara.maintenance.request'].search_count(
+            [('edara_recurring_id', '=', def_x.id)]), 0)
+
+    def test_recurring_batch_retry_after_failure_is_idempotent(self):
+        """Batch isolation: Retrying after an isolated failure generates the missing request
+        without duplicating previously successful definitions."""
+        today = Date.today()
+        unit_b = self.env['edara.unit'].create({
+            'name': 'A-202', 'code': '202', 'building_id': self.building.id,
+        })
+        def_a = self._make_recurring(name='Retry Def A', unit_id=self.unit.id, next_date=today, frequency='monthly')
+        def_b = self._make_recurring(name='Retry Def B', unit_id=unit_b.id, next_date=today, frequency='quarterly')
+
+        prior_def = self._make_recurring(
+            name='Prior Def Retry', unit_id=self.unit.id, next_date=today + relativedelta(days=10))
+        self.env['edara.maintenance.request'].create({
+            'title': 'Prior Occurrence Retry', 'unit_id': self.unit.id,
+            'edara_recurring_id': prior_def.id, 'occurrence_date': today,
+        })
+
+        Model = type(self.env['edara.maintenance.request'])
+        original_create = Model.create
+
+        def patched_create(self_record, vals_list, *args, **kwargs):
+            is_single = isinstance(vals_list, dict)
+            batch = [vals_list] if is_single else list(vals_list)
+            new_batch = []
+            for vals in batch:
+                if vals.get('edara_recurring_id') == def_b.id:
+                    vals = dict(vals, edara_recurring_id=prior_def.id, occurrence_date=today)
+                new_batch.append(vals)
+            return original_create(self_record, new_batch[0] if is_single else new_batch, *args, **kwargs)
+
+        # First run: B fails, A succeeds
+        with mute_logger('odoo.sql_db'), mute_logger('odoo.addons.property_managment.models.edara_recurring_maintenance'), \
+             patch.object(Model, 'create', patched_create):
+            created_run1 = self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
+
+        self.assertEqual(created_run1, 1)
+        self.assertEqual(len(def_a.generated_request_ids), 1)
+        self.assertEqual(len(def_b.generated_request_ids), 0)
+
+        # Second run: blocker removed, cron runs again
+        created_run2 = self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
+
+        self.assertEqual(created_run2, 1)
+        # Definition A was not duplicated
+        self.assertEqual(len(def_a.generated_request_ids), 1)
+        # Definition B now succeeded
+        self.assertEqual(len(def_b.generated_request_ids), 1)
+        self.assertEqual(def_b.next_date, today + relativedelta(months=3))
+        self.assertEqual(def_b.generated_request_ids.occurrence_date, today)
+
+    def test_recurring_batch_access_error_propagates_not_isolated(self):
+        """Exception policy: AccessError is not swallowed or isolated; it propagates immediately."""
+        today = Date.today()
+        self._make_recurring(name='Security Def', unit_id=self.unit.id, next_date=today)
+
+        Model = type(self.env['edara.maintenance.request'])
+
+        def access_denied_create(self_record, vals_list):
+            raise AccessError("Simulated unauthorized maintenance request creation")
+
+        with patch.object(Model, 'create', access_denied_create):
+            with self.assertRaises(AccessError):
+                self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
+
 
 
 @tagged('post_install', '-at_install')

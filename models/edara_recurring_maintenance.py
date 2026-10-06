@@ -1,9 +1,12 @@
+import logging
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 from .edara_maintenance_request import MAINTENANCE_CATEGORIES
+
+_logger = logging.getLogger(__name__)
 
 # Maintenance Phase 2 (2026-09-23), ticket §20: minimum required set,
 # followed exactly since the spec defines no recurring-maintenance concept
@@ -82,11 +85,13 @@ class EdaraRecurringMaintenance(models.Model):
         twice for the same definition before next_date changes, the second
         create() would violate that constraint rather than silently
         duplicate the work item. Bounded domain (active, due today) - never
-        a full-table scan of definitions or requests."""
+        a full-table scan of definitions or requests. Each new occurrence is
+        isolated with a savepoint so one definition's failure does not roll back siblings."""
         today = fields.Date.context_today(self)
         definitions = self.search([('active', '=', True), ('next_date', '<=', today)])
         Request = self.env['edara.maintenance.request']
         created = 0
+        errors = 0
         for definition in definitions:
             occurrence_date = definition.next_date
             if Request.search_count([
@@ -97,18 +102,29 @@ class EdaraRecurringMaintenance(models.Model):
                 # constraint as an error.
                 definition.next_date = occurrence_date + relativedelta(months=FREQUENCY_MONTHS[definition.frequency])
                 continue
-            Request.create({
-                'title': _("Recurring: %(name)s", name=definition.name),
-                'description': definition.description,
-                'unit_id': definition.unit_id.id,
-                'category': definition.category,
-                'vendor_id': definition.vendor_id.id,
-                'priority': definition.priority,
-                'edara_recurring_id': definition.id,
-                'occurrence_date': occurrence_date,
-            })
-            definition.next_date = occurrence_date + relativedelta(months=FREQUENCY_MONTHS[definition.frequency])
-            created += 1
+            try:
+                with self.env.cr.savepoint():
+                    Request.create({
+                        'title': _("Recurring: %(name)s", name=definition.name),
+                        'description': definition.description,
+                        'unit_id': definition.unit_id.id,
+                        'category': definition.category,
+                        'vendor_id': definition.vendor_id.id,
+                        'priority': definition.priority,
+                        'edara_recurring_id': definition.id,
+                        'occurrence_date': occurrence_date,
+                    })
+                    definition.next_date = occurrence_date + relativedelta(months=FREQUENCY_MONTHS[definition.frequency])
+                created += 1
+            except AccessError:
+                raise
+            except Exception:
+                errors += 1
+                definition.invalidate_recordset(['next_date'])
+                _logger.exception(
+                    "EDARA: failed to generate recurring maintenance for definition %s",
+                    definition.id,
+                )
         return created
 
     @api.constrains('unit_id', 'company_id')
