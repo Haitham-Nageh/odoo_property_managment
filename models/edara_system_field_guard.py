@@ -72,8 +72,8 @@ for _model, _fields in (
     ('edara.deposit.transaction', ()),
     ('edara.service.charge', ()),
     ('edara.service.charge.line', ()),
-    ('edara.maintenance.request', ()),
+    ('edara.maintenance.request', ('vendor_bill_id',)),
     ('edara.recurring.maintenance', ()),
-    ('edara.renewal.request', ()),
+    ('edara.renewal.request', ('state', 'new_contract_id')),
 ):
     _guard(_model, _fields)

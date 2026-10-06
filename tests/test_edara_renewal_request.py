@@ -241,3 +241,29 @@ class TestEdaraRenewalRequestNoteField(TransactionCase):
             request.with_user(self.tenant_user).write({'decision_note': 'Self-approved'})
         with self.assertRaises(AccessError):
             request.with_user(self.tenant_user).write({'state': 'approved'})
+
+    def test_renewal_request_system_fields_guarded(self):
+        """P1 hardening: state and new_contract_id are system-managed fields
+        guarded by edara.system.field.guard. Direct ORM writes by a branch
+        manager must raise AccessError."""
+        request = self.env['edara.renewal.request'].create({
+            'contract_id': self.contract.id,
+            'requested_start_date': date(2027, 1, 1),
+            'requested_end_date': date(2027, 12, 31),
+            'requested_rent_amount': 1050,
+        })
+        other_contract = self.env['edara.lease.contract'].create({
+            'unit_id': self.unit.id,
+            'tenant_id': self.tenant_partner.id,
+            'start_date': date(2028, 1, 1),
+            'end_date': date(2028, 12, 31),
+            'rent_amount': 1200,
+            'deposit_required': False,
+        })
+        with self.assertRaises(AccessError):
+            request.with_user(self.branch_manager).write({
+                'state': 'approved',
+                'new_contract_id': other_contract.id,
+            })
+        self.assertEqual(request.state, 'submitted')
+        self.assertFalse(request.new_contract_id)

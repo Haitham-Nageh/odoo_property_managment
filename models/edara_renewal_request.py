@@ -73,12 +73,13 @@ class EdaraRenewalRequest(models.Model):
                 raise ValidationError(_("The requested rent must be a positive amount."))
 
     def action_approve(self):
+        self.check_access('write')
         for request in self:
             if request.state != 'submitted':
                 raise UserError(_("Only a submitted request can be approved."))
             new_contract = request.contract_id.action_renew(
                 request.requested_start_date, request.requested_end_date, request.requested_rent_amount)
-            request.write({'state': 'approved', 'new_contract_id': new_contract.id})
+            request.sudo().write({'state': 'approved', 'new_contract_id': new_contract.id})
             if request.tenant_id:
                 # Tenant Portal Expansion (2026-09-22): closes the loop for a
                 # tenant-submitted renewal request - same partner_ids
@@ -101,13 +102,14 @@ class EdaraRenewalRequest(models.Model):
         whatever the user has already typed into decision_note on the form
         (see renewal_request_views.xml, now editable while submitted) is
         accepted; empty/whitespace-only is rejected either way."""
+        self.check_access('write')
         for request in self:
             if request.state != 'submitted':
                 raise UserError(_("Only a submitted request can be rejected."))
             decision_note = reason if reason is not None else request.decision_note
             if not (decision_note and decision_note.strip()):
                 raise UserError(_("Please provide a reason before rejecting this renewal request."))
-            request.write({'state': 'rejected', 'decision_note': decision_note})
+            request.sudo().write({'state': 'rejected', 'decision_note': decision_note})
             if request.tenant_id:
                 request.message_post(
                     body=_(

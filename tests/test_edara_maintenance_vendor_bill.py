@@ -222,3 +222,19 @@ class TestEdaraMaintenanceVendorBill(TransactionCase):
         self.assertEqual(bill.state, 'posted')
         debit_line = bill.line_ids.filtered(lambda l: l.account_id == self.expense_account)
         self.assertAlmostEqual(debit_line.debit, 500)
+
+    def test_maintenance_request_vendor_bill_id_guarded(self):
+        """P1 hardening: vendor_bill_id is a system-managed field guarded by
+        edara.system.field.guard. Direct ORM writes by a branch manager must
+        raise AccessError."""
+        request = self._make_request(cost=500, vendor_id=self.vendor.id)
+        unrelated_move = self.env['account.move'].create({
+            'move_type': 'in_invoice',
+            'partner_id': self.vendor.id,
+            'company_id': self.env.company.id,
+        })
+        with self.assertRaises(AccessError):
+            request.with_user(self.branch_manager).write({
+                'vendor_bill_id': unrelated_move.id,
+            })
+        self.assertFalse(request.vendor_bill_id)

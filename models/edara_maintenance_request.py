@@ -344,7 +344,7 @@ class EdaraMaintenanceRequest(models.Model):
                 'analytic_distribution': {str(analytic_account.id): 100.0},
             })],
         })
-        self.vendor_bill_id = bill.id
+        self.sudo().vendor_bill_id = bill.id
         return self.vendor_bill_id
 
     def action_view_vendor_bill(self):
