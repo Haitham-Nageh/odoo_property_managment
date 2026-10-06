@@ -37,6 +37,21 @@ EXPIRY_REMINDER_WINDOWS_DAYS = (30, 7)
 # States in which a lease holds its unit (overlap protection); only 'active' occupies it today.
 LIVE_STATES = ['scheduled', 'active']
 
+# Terminal/historical lease states whose core terms are permanently immutable.
+HISTORICAL_STATES = (
+    'terminated',
+    'expired',
+    'cancelled',
+    'renewed',
+)
+
+CORE_TERM_FIELDS = {
+    'start_date',
+    'end_date',
+    'rent_amount',
+    'tenant_id',
+}
+
 
 class EdaraLeaseContract(models.Model):
     _name = 'edara.lease.contract'
@@ -304,6 +319,16 @@ class EdaraLeaseContract(models.Model):
     def write(self, vals):
         """The end date of a confirmed lease only ever moves LATER (an extension); shortening is
         Terminate. A later end date creates the missing schedule lines and nothing else."""
+        modified_core_fields = CORE_TERM_FIELDS & set(vals)
+        if modified_core_fields:
+            for contract in self:
+                effective_state = vals.get('state', contract.state)
+                if effective_state in HISTORICAL_STATES:
+                    raise UserError(_(
+                        "Historical lease contract %(name)s cannot modify core terms: %(fields)s.",
+                        name=contract.display_name or contract.name,
+                        fields=', '.join(sorted(modified_core_fields)),
+                    ))
         if 'end_date' in vals:
             new_end = fields.Date.to_date(vals['end_date'])
             live = self.filtered(lambda c: c.state in LIVE_STATES)

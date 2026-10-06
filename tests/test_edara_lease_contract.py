@@ -563,3 +563,217 @@ class TestEdaraLeaseContract(TransactionCase):
         contract = contract_form.save()
 
         self.assertEqual(contract.rent_amount, 3200.0)
+
+    # ============ P2: Closed Contract Core-Term Freeze ============
+
+    def test_historical_contracts_core_terms_frozen(self):
+        """P2 Test A: In terminated, expired, cancelled, and renewed states,
+        core terms (start_date, end_date, rent_amount, tenant_id) are immutable."""
+        other_tenant = self.env['res.partner'].create({'name': 'P2 Other Tenant'})
+        today = date.today()
+
+        # 1. Terminated contract (separate unit to avoid date collision)
+        unit_term = self.env['edara.unit'].create({
+            'name': 'P2-Term', 'code': 'P2T', 'building_id': self.building.id,
+        })
+        c_term = self._make_contract(unit_id=unit_term.id)
+        c_term.action_activate()
+        c_term.action_terminate(reason='End of lease')
+
+        # 2. Expired contract (separate unit)
+        unit_exp = self.env['edara.unit'].create({
+            'name': 'P2-Exp', 'code': 'P2E', 'building_id': self.building.id,
+        })
+        c_exp = self._make_contract(
+            unit_id=unit_exp.id,
+            start_date=today - timedelta(days=400),
+            end_date=today - timedelta(days=1),
+        )
+        c_exp.action_activate()
+        self.env['edara.lease.contract']._cron_expire_contracts()
+
+        # 3. Cancelled contract (separate unit)
+        unit_canc = self.env['edara.unit'].create({
+            'name': 'P2-Canc', 'code': 'P2C', 'building_id': self.building.id,
+        })
+        c_canc = self._make_contract(
+            unit_id=unit_canc.id,
+            start_date=today + timedelta(days=10),
+            end_date=today + timedelta(days=375),
+        )
+        c_canc.action_activate()
+        c_canc.action_cancel()
+
+        # 4. Renewed contract (predecessor of a renewal, separate unit)
+        unit_ren = self.env['edara.unit'].create({
+            'name': 'P2-Ren', 'code': 'P2R', 'building_id': self.building.id,
+        })
+        c_ren = self._make_contract(
+            unit_id=unit_ren.id,
+            start_date=today - timedelta(days=400),
+            end_date=today - timedelta(days=1),
+        )
+        c_ren.action_activate()
+        c_ren.action_renew(today, today + timedelta(days=365), 1800)
+        self.env['edara.lease.contract']._cron_expire_contracts()
+
+        historical_cases = [
+            (c_term, 'terminated'),
+            (c_exp, 'expired'),
+            (c_canc, 'cancelled'),
+            (c_ren, 'renewed'),
+        ]
+
+        for contract, expected_state in historical_cases:
+            self.assertEqual(contract.state, expected_state)
+            orig_start = contract.start_date
+            orig_end = contract.end_date
+            orig_rent = contract.rent_amount
+            orig_tenant = contract.tenant_id
+
+            # start_date frozen
+            with self.assertRaises(UserError):
+                contract.write({'start_date': date(2020, 1, 1)})
+            self.assertEqual(contract.start_date, orig_start)
+
+            # end_date frozen
+            with self.assertRaises(UserError):
+                contract.write({'end_date': date(2030, 12, 31)})
+            self.assertEqual(contract.end_date, orig_end)
+
+            # rent_amount frozen
+            with self.assertRaises(UserError):
+                contract.write({'rent_amount': 9999.0})
+            self.assertEqual(contract.rent_amount, orig_rent)
+
+            # tenant_id frozen
+            with self.assertRaises(UserError):
+                contract.write({'tenant_id': other_tenant.id})
+            self.assertEqual(contract.tenant_id, orig_tenant)
+
+    def test_historical_freeze_no_sudo_bypass(self):
+        """P2 Test B: The historical core-term freeze applies even through sudo()."""
+        unit = self.env['edara.unit'].create({
+            'name': 'P2-Sudo', 'code': 'P2SUDO', 'building_id': self.building.id,
+        })
+        contract = self._make_contract(unit_id=unit.id)
+        contract.action_activate()
+        contract.action_terminate(reason='Termination test')
+        self.assertEqual(contract.state, 'terminated')
+        orig_rent = contract.rent_amount
+
+        with self.assertRaises(UserError):
+            contract.sudo().write({'rent_amount': 999.0})
+        self.assertEqual(contract.rent_amount, orig_rent)
+
+    def test_combined_state_and_core_term_write_blocked(self):
+        """P2 Test C: Writing core terms together with a transition to historical state
+        is blocked by checking effective state."""
+        unit = self.env['edara.unit'].create({
+            'name': 'P2-Comb', 'code': 'P2COMB', 'building_id': self.building.id,
+        })
+        contract = self._make_contract(unit_id=unit.id)
+        contract.action_activate()
+        self.assertEqual(contract.state, 'active')
+        orig_rent = contract.rent_amount
+
+        with self.assertRaises(UserError):
+            contract.sudo().write({
+                'state': 'terminated',
+                'rent_amount': 999.0,
+            })
+        self.assertEqual(contract.state, 'active')
+        self.assertEqual(contract.rent_amount, orig_rent)
+
+    def test_live_contracts_core_terms_remain_editable(self):
+        """P2 Test D: Live contracts (draft, scheduled, active) allow editing core terms."""
+        other_tenant = self.env['res.partner'].create({'name': 'P2 Live Tenant'})
+        today = date.today()
+
+        # 1. Draft
+        unit_draft = self.env['edara.unit'].create({
+            'name': 'P2-Draft', 'code': 'P2DRF', 'building_id': self.building.id,
+        })
+        c_draft = self._make_contract(
+            unit_id=unit_draft.id,
+            start_date=today,
+            end_date=today + timedelta(days=100),
+            rent_amount=1000,
+        )
+        c_draft.write({
+            'start_date': today + timedelta(days=1),
+            'end_date': today + timedelta(days=200),
+            'rent_amount': 1200,
+            'tenant_id': other_tenant.id,
+        })
+        self.assertEqual(c_draft.start_date, today + timedelta(days=1))
+        self.assertEqual(c_draft.end_date, today + timedelta(days=200))
+        self.assertEqual(c_draft.rent_amount, 1200)
+        self.assertEqual(c_draft.tenant_id, other_tenant)
+
+        # 2. Scheduled
+        unit_sched = self.env['edara.unit'].create({
+            'name': 'P2-Sched', 'code': 'P2SCH', 'building_id': self.building.id,
+        })
+        c_sched = self._make_contract(
+            unit_id=unit_sched.id,
+            start_date=today + timedelta(days=10),
+            end_date=today + timedelta(days=100),
+            rent_amount=1000,
+        )
+        c_sched.action_activate()
+        self.assertEqual(c_sched.state, 'scheduled')
+        c_sched.write({
+            'start_date': today + timedelta(days=15),
+            'end_date': today + timedelta(days=150),
+            'rent_amount': 1300,
+            'tenant_id': other_tenant.id,
+        })
+        self.assertEqual(c_sched.start_date, today + timedelta(days=15))
+        self.assertEqual(c_sched.end_date, today + timedelta(days=150))
+        self.assertEqual(c_sched.rent_amount, 1300)
+        self.assertEqual(c_sched.tenant_id, other_tenant)
+
+        # 3. Active
+        unit_act = self.env['edara.unit'].create({
+            'name': 'P2-Act', 'code': 'P2ACT', 'building_id': self.building.id,
+        })
+        c_act = self._make_contract(
+            unit_id=unit_act.id,
+            start_date=today - timedelta(days=10),
+            end_date=today + timedelta(days=100),
+            rent_amount=1000,
+        )
+        c_act.action_activate()
+        self.assertEqual(c_act.state, 'active')
+        c_act.write({
+            'start_date': today - timedelta(days=5),
+            'end_date': today + timedelta(days=150),
+            'rent_amount': 1400,
+            'tenant_id': other_tenant.id,
+        })
+        self.assertEqual(c_act.start_date, today - timedelta(days=5))
+        self.assertEqual(c_act.end_date, today + timedelta(days=150))
+        self.assertEqual(c_act.rent_amount, 1400)
+        self.assertEqual(c_act.tenant_id, other_tenant)
+
+    def test_multi_record_write_historical_blocks_all(self):
+        """P2 Multi-record: A mixed recordset of active and historical contracts blocks core term write."""
+        unit_1 = self.env['edara.unit'].create({
+            'name': 'P2-Mix1', 'code': 'P2M1', 'building_id': self.building.id,
+        })
+        unit_2 = self.env['edara.unit'].create({
+            'name': 'P2-Mix2', 'code': 'P2M2', 'building_id': self.building.id,
+        })
+        c_active = self._make_contract(unit_id=unit_1.id, rent_amount=1500)
+        c_active.action_activate()
+
+        c_term = self._make_contract(unit_id=unit_2.id, rent_amount=1500)
+        c_term.action_activate()
+        c_term.action_terminate(reason='Moving out')
+
+        mixed = c_active | c_term
+        with self.assertRaises(UserError):
+            mixed.write({'rent_amount': 5000})
+        self.assertEqual(c_active.rent_amount, 1500)
+        self.assertEqual(c_term.rent_amount, 1500)
