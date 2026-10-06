@@ -76,5 +76,5 @@ class EdaraServiceChargeLine(models.Model):
             })],
         })
         invoice.action_post()
-        self.invoice_id = invoice.id
+        self.sudo().invoice_id = invoice.id
         return self.invoice_id

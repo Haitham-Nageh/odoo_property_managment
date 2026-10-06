@@ -76,7 +76,9 @@ for _model, _fields in (
         'move_id',
     )),
     ('edara.service.charge', ()),
-    ('edara.service.charge.line', ()),
+    ('edara.service.charge.line', (
+        'invoice_id',
+    )),
     ('edara.maintenance.request', ('vendor_bill_id',)),
     ('edara.recurring.maintenance', ()),
     ('edara.renewal.request', ('state', 'new_contract_id')),

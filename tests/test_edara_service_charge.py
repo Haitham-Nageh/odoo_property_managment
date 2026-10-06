@@ -2,8 +2,8 @@ from datetime import date
 
 from lxml import etree
 
-from odoo.exceptions import UserError
-from odoo.tests import TransactionCase, tagged
+from odoo.exceptions import AccessError, UserError
+from odoo.tests import TransactionCase, new_test_user, tagged
 
 
 @tagged('post_install', '-at_install')
@@ -42,6 +42,11 @@ class TestEdaraServiceCharge(TransactionCase):
         cls.income_account = cls.env['account.account'].create({
             'name': 'Service Charge Income (Test)', 'code': '401800', 'account_type': 'income',
         })
+        cls.property_manager = new_test_user(
+            cls.env, login='edara_sc_pm_guard', groups='property_managment.group_edara_property_manager')
+        cls.branch_manager = new_test_user(
+            cls.env, login='edara_sc_bm_guard', groups='property_managment.group_edara_branch_manager')
+        cls.branch.user_ids = [(4, cls.property_manager.id), (4, cls.branch_manager.id)]
 
     def _amounts_by_unit(self, charge):
         return {line.unit_id: line.amount for line in charge.line_ids}
@@ -391,3 +396,136 @@ class TestEdaraServiceCharge(TransactionCase):
             action.search_view_id.id,
             self.env.ref('property_managment.view_edara_service_charge_search').id,
         )
+
+    # ============ Q2.2 System Field Guard: edara.service.charge.line.invoice_id ============
+
+    def _create_allocated_charge_with_invoices(self):
+        self.env.company.edara_service_charge_income_account_id = self.income_account.id
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        charge.action_generate_allocation()
+        charge.action_invoice_lines()
+        return charge
+
+    def test_guard_property_manager_cannot_reassign_invoice(self):
+        """Negative security: Property Manager cannot reassign invoice_id to another invoice."""
+        charge = self._create_allocated_charge_with_invoices()
+        line = charge.line_ids[0]
+        orig_invoice_id = line.invoice_id.id
+        self.assertTrue(orig_invoice_id)
+        other_invoice = charge.line_ids[1].invoice_id
+        with self.assertRaises(AccessError):
+            line.with_user(self.property_manager).write({'invoice_id': other_invoice.id})
+        self.assertEqual(line.invoice_id.id, orig_invoice_id)
+
+    def test_guard_branch_manager_cannot_reassign_invoice(self):
+        """Negative security: Branch Manager cannot reassign invoice_id to another invoice."""
+        charge = self._create_allocated_charge_with_invoices()
+        line = charge.line_ids[0]
+        orig_invoice_id = line.invoice_id.id
+        self.assertTrue(orig_invoice_id)
+        other_invoice = charge.line_ids[1].invoice_id
+        with self.assertRaises(AccessError):
+            line.with_user(self.branch_manager).write({'invoice_id': other_invoice.id})
+        self.assertEqual(line.invoice_id.id, orig_invoice_id)
+
+    def test_guard_property_manager_cannot_clear_invoice(self):
+        """Negative security: Property Manager cannot clear invoice_id with False."""
+        charge = self._create_allocated_charge_with_invoices()
+        line = charge.line_ids[0]
+        orig_invoice_id = line.invoice_id.id
+        self.assertTrue(orig_invoice_id)
+        with self.assertRaises(AccessError):
+            line.with_user(self.property_manager).write({'invoice_id': False})
+        self.assertEqual(line.invoice_id.id, orig_invoice_id)
+
+    def test_guard_branch_manager_cannot_clear_invoice(self):
+        """Negative security: Branch Manager cannot clear invoice_id with False."""
+        charge = self._create_allocated_charge_with_invoices()
+        line = charge.line_ids[0]
+        orig_invoice_id = line.invoice_id.id
+        self.assertTrue(orig_invoice_id)
+        with self.assertRaises(AccessError):
+            line.with_user(self.branch_manager).write({'invoice_id': False})
+        self.assertEqual(line.invoice_id.id, orig_invoice_id)
+
+    def test_guard_reassignment_to_unrelated_invoice_blocked_by_guard(self):
+        """Negative security: Reassignment to an unlinked, unrelated valid invoice is blocked
+        by the system field guard AccessError, proving guard operates before database uniqueness."""
+        charge = self._create_allocated_charge_with_invoices()
+        line = charge.line_ids[0]
+        orig_invoice_id = line.invoice_id.id
+        unrelated_invoice = self.env['account.move'].sudo().create({
+            'move_type': 'out_invoice',
+            'partner_id': self.tenant1.id,
+            'invoice_date': date(2026, 1, 1),
+            'company_id': self.env.company.id,
+        })
+        with self.assertRaises(AccessError):
+            line.with_user(self.property_manager).write({'invoice_id': unrelated_invoice.id})
+        with self.assertRaises(AccessError):
+            line.with_user(self.branch_manager).write({'invoice_id': unrelated_invoice.id})
+        self.assertEqual(line.invoice_id.id, orig_invoice_id)
+
+    def test_guard_multirecord_write_containing_protected_field_rejected_atomically(self):
+        """Negative security: Multi-record write containing protected invoice_id is rejected atomically
+        and neither line record is modified."""
+        charge = self._create_allocated_charge_with_invoices()
+        lines = charge.line_ids
+        initial_invoices = {l.id: l.invoice_id.id for l in lines}
+        some_invoice = lines[0].invoice_id
+        with self.assertRaises(AccessError):
+            lines.with_user(self.property_manager).write({'invoice_id': some_invoice.id})
+        with self.assertRaises(AccessError):
+            lines.with_user(self.branch_manager).write({'invoice_id': some_invoice.id})
+        with self.assertRaises(AccessError):
+            lines.with_user(self.property_manager).write({'invoice_id': False})
+        with self.assertRaises(AccessError):
+            lines.with_user(self.branch_manager).write({'invoice_id': False})
+        for l in lines:
+            self.assertEqual(l.invoice_id.id, initial_invoices[l.id])
+
+    def test_guard_property_manager_can_execute_invoicing_workflow(self):
+        """Positive workflow: Property Manager executing legitimate _create_invoice succeeds
+        and assigns invoice_id correctly."""
+        self.env.company.edara_service_charge_income_account_id = self.income_account.id
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        charge.action_generate_allocation()
+        line = charge.line_ids[0]
+        self.assertFalse(line.invoice_id)
+        invoice = line.with_user(self.property_manager)._create_invoice()
+        self.assertTrue(invoice)
+        self.assertEqual(line.invoice_id.id, invoice.id)
+        self.assertEqual(invoice.state, 'posted')
+        self.assertEqual(invoice.edara_invoice_type, 'service_charge')
+
+    def test_guard_branch_manager_can_execute_invoicing_workflow(self):
+        """Positive workflow: Branch Manager executing legitimate _create_invoice succeeds
+        and assigns invoice_id correctly."""
+        self.env.company.edara_service_charge_income_account_id = self.income_account.id
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        charge.action_generate_allocation()
+        line = charge.line_ids[0]
+        self.assertFalse(line.invoice_id)
+        invoice = line.with_user(self.branch_manager)._create_invoice()
+        self.assertTrue(invoice)
+        self.assertEqual(line.invoice_id.id, invoice.id)
+        self.assertEqual(invoice.state, 'posted')
+        self.assertEqual(invoice.edara_invoice_type, 'service_charge')
+
+    def test_guard_unprotected_field_amount_remains_writable_on_uninvoiced_line(self):
+        """Positive security: Unprotected fields like amount remain writable by Property Manager
+        when the line is not invoiced."""
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        charge.action_generate_allocation()
+        line = charge.line_ids[0]
+        line.with_user(self.property_manager).write({'amount': 175.0})
+        self.assertEqual(line.amount, 175.0)
+
