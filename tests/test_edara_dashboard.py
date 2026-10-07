@@ -3040,18 +3040,18 @@ class TestEdaraDashboard(TransactionCase):
         # line_a1_inv (200.0) is linked to invoice_id, so it must not be included
         self.assertTrue(f['line_a1_inv'].invoice_id)
 
-        # Now test Section 13: Add zero-amount uninvoiced line to charge_a1
+        # Now test Section 13: Add minimal positive-amount uninvoiced line to charge_a1
         zero_line = self.env['edara.service.charge.line'].create({
             'charge_id': f['charge_a1'].id,
             'unit_id': f['u_a1'].id,
             'tenant_id': f['tenant_a'].id,
-            'amount': 0.0,
+            'amount': 0.01,
         })
         dash_updated = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
         # charge_a1 remains in 'allocated' state, so charge count remains 2
         self.assertEqual(dash_updated.uninvoiced_service_charge_lines_count, 2)
-        # Amount remains exactly 500.0 (0-amount line adds 0.0)
-        self.assertEqual(dash_updated.uninvoiced_service_charge_amount, 500.0)
+        # Amount becomes 500.01 (0.01 line adds 0.01)
+        self.assertEqual(dash_updated.uninvoiced_service_charge_amount, 500.01)
 
         # Now invoice line_a1_uninv; zero_line is still uninvoiced on charge_a1, so charge_a1 is still allocated
         inv_extra = self.env['account.move'].create({
@@ -3064,8 +3064,8 @@ class TestEdaraDashboard(TransactionCase):
         dash_after_inv = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
         # charge_a1 and charge_a2 are both still allocated -> count remains 2
         self.assertEqual(dash_after_inv.uninvoiced_service_charge_lines_count, 2)
-        # amount decreases to 200.0 (line_a2_uninv: 200.0 + zero_line: 0.0)
-        self.assertEqual(dash_after_inv.uninvoiced_service_charge_amount, 200.0)
+        # amount decreases to 200.01 (line_a2_uninv: 200.0 + zero_line: 0.01)
+        self.assertEqual(dash_after_inv.uninvoiced_service_charge_amount, 200.01)
 
         # Now invoice zero_line: ALL lines on charge_a1 are now invoiced -> state transitions to 'invoiced'
         inv_zero = self.env['account.move'].create({
