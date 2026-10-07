@@ -8,13 +8,13 @@ Odoo Version: 19.0 Community (confirmed from `odoo/release.py`)
 
 This section is the current source of truth. Sections further down (e.g. "Current Phase" below the Phase 0-15 program, and the old "Tests (final counts, all 16 files)" section) describe earlier points in the project's history and are preserved for historical record, not as current status — see the "HISTORICAL" labels added to them. This section supersedes the prior "Current Status (2026-10-05)" snapshot.
 
-- **Git**: branch `main`, HEAD `5a763e358956e54f672e1978510f140f96d0ed5e` ("[Security] Freeze Core Terms on Historical Lease Contracts"), in sync with `origin/main`, working tree clean.
+- **Git**: branch `main`, HEAD `ae823cabe98712ffad98c16382bdc9c6fd01a641` ("[Maintenance] Isolate Recurring Maintenance Batch Failures"), in sync with `origin/main`, working tree clean except for the new untracked `docs/EDARA_Property_Management_User_Manual.pdf` (Q4 final artifact — see line 17 below and "### Q4 — User Manual" further down).
 - **Tickets 1-7**: all COMPLETE and committed (unchanged from 2026-10-05). See "## Current Ticket Status" below for per-ticket detail and commit hashes.
 - **P1 — System Field Guard Coverage**: COMPLETE and committed (`820228f78bb052903471e6f065ae24376981235c`, "[Security] Harden System Field Guard Coverage"). Closed the write-protection gap on `edara.renewal.request.state`/`new_contract_id` and `edara.maintenance.request.vendor_bill_id`.
 - **P2 — Closed Contract Core-Term Freeze**: COMPLETE and committed (`5a763e358956e54f672e1978510f140f96d0ed5e`, "[Security] Freeze Core Terms on Historical Lease Contracts"). Freezes `start_date`/`end_date`/`rent_amount`/`tenant_id` on `edara.lease.contract` once a contract reaches a historical state (`terminated`/`expired`/`cancelled`/`renewed`); `draft`/`scheduled`/`active` remain fully editable.
 - **Tests**: 27 Python test files (28 including `tests/__init__.py`) containing 685 discovered test methods (678 baseline as of Ticket 7, +7 added by P1/P2). See "## Tests (current, 2026-10-06)" below.
 - **EDARA PMS development through P2 is complete.** This does NOT mean the project is fully finished — while Branch Removal architecture is resolved (decision: KEEP BOTH; removal is not planned; see ADR-001), Property Terminology and Owner Portal remain explicitly DEFERRED and have not been started. See "## Deferred Architecture Decisions (2026-10-05)" below.
-- **Quality Roadmap (Q1-Q4)**: registered 2026-10-06, status **PLANNED**, not yet started. See "## Quality Roadmap — Q1-Q4 (2026-10-06)" below. This operationalizes and supersedes the previous open-ended timing on the "# Final Project Quality Gate" section (which had been scheduled to wait for Property Terminology/Owner Portal); Q1 is now the next planned step, independent of those two deferred decisions.
+- **Quality Roadmap (Q1-Q4)**: registered 2026-10-06. **Status update (2026-10-07): Q1, Q2, Q3, and Q4 are all now COMPLETE/CLOSED.** Q1 — Final Code Review ran and produced a categorized findings report; Q2 — Quality Findings Remediation addressed the validated P1/P2 findings (P1-01 deposit transaction guard, P1-02 service-charge-line invoice guard, P2-01 recurring-maintenance batch isolation), each analyzed, implemented, and finally audited per-ticket; Q3 — Final Regression & Quality Gate PASSED (verdict: READY WITH NON-BLOCKING FINDINGS; no P0/P1/P2 regressions, all closed fixes re-verified intact at HEAD `ae823ca`); **Q4 — User Manual is CLOSED** (see "### Q4 — User Manual" below for full detail). The Quality Roadmap pipeline (Q1→Q2→Q3→Q4→Final Product Readiness) has reached its last step; the project is now ready for the **Final Product Readiness** decision/review. This operationalized and superseded the previous open-ended timing on the "# Final Project Quality Gate" section (which had been scheduled to wait for Property Terminology/Owner Portal); those two items remain separately deferred business/architecture decisions, independent of the now-complete Q1-Q4 pipeline.
 
 ## Current Phase
 - Phase 11.1 — Native Lease Timeline: functionally completed
@@ -3312,13 +3312,15 @@ CURRENT
   │
   ├── ✅ P2 — Closed Contract Core-Term Freeze (2026-10-06, commit `5a763e3`)
   │
-  ├── 🔵 Q1 — Final Code Review (PLANNED — see "## Quality Roadmap — Q1-Q4 (2026-10-06)" below)
+  ├── ✅ Q1 — Final Code Review (CLOSED — see "## Quality Roadmap — Q1-Q4 (2026-10-06)" below)
   │
-  ├── 🔵 Q2 — Quality Findings Remediation (PLANNED)
+  ├── ✅ Q2 — Quality Findings Remediation (CLOSED — P1-01, P1-02, P2-01 all analyzed, implemented, and audited)
   │
-  ├── 🔵 Q3 — Final Regression & Quality Gate (PLANNED)
+  ├── ✅ Q3 — Final Regression & Quality Gate (CLOSED — PASSED, READY WITH NON-BLOCKING FINDINGS)
   │
-  ├── 🔵 Q4 — User Manual (PLANNED)
+  ├── ✅ Q4 — User Manual (CLOSED — see "### Q4 — User Manual" below)
+  │
+  ├── 🔵 Final Product Readiness (NEXT — Q1-Q4 pipeline complete; awaiting this final decision/review)
   │
   ├── 🔵 Property Terminology — Business Decision (independent of Q1-Q4; still deferred)
   │
@@ -3392,7 +3394,7 @@ The gate's original seven areas (carried forward unchanged into Q1):
 
 ## Quality Roadmap — Q1-Q4 (2026-10-06)
 
-Registered 2026-10-06, following the close of P1 and P2. **All four tickets are PLANNED — none has started.** Authoritative execution order:
+Registered 2026-10-06, following the close of P1 and P2. **Status update (2026-10-07): all four tickets (Q1, Q2, Q3, Q4) are now COMPLETE/CLOSED.** The project has reached the end of this pipeline and is ready for the Final Product Readiness decision/review. Authoritative execution order:
 
 ```text
 Q1 — Final Code Review
@@ -3407,7 +3409,7 @@ Final Product Readiness
 ```
 
 ### Q1 — Final Code Review
-**Status: PLANNED.**
+**Status: CLOSED (COMPLETE).** Ran as a read-only 17-dimension production-readiness audit; produced a categorized findings report that fed directly into Q2. See Q2 below for the validated findings that were remediated.
 
 Read-only production-readiness review of the complete EDARA PMS codebase (Claude analysis / Senior Analyst workflow). No fixes are performed as part of Q1 itself.
 
@@ -3425,19 +3427,34 @@ Odoo-specific review areas also in scope: ACLs and record rules, `sudo()` usage,
 Expected output: a categorized review report with findings classified P0 / P1 / P2 / P3 / Informational.
 
 ### Q2 — Quality Findings Remediation
-**Status: PLANNED.**
+**Status: CLOSED (COMPLETE).** Three validated P1/P2 findings from Q1 were remediated, each via its own analysis → implementation → final-audit → commit cycle: **P1-01** (deposit transaction field guard, `edara.deposit.transaction`), **P1-02** (service-charge-line `invoice_id` write protection), and **P2-01** (recurring-maintenance batch isolation via per-record savepoints). All three passed their final audits with no blocking findings.
 
 Addresses *validated* findings from Q1 — Q2 does not mean blindly fixing every finding; each Q1 finding is reviewed and approved before any implementation. Only validated findings become implementation tickets.
 
 Workflow: Claude Analysis → ChatGPT Review → Gemini Implementation → Tests → Claude Final Audit → Commit → Push (same per-ticket discipline already used for P1/P2 and Tickets 1-7).
 
 ### Q3 — Final Regression & Quality Gate
-**Status: PLANNED.**
+**Status: CLOSED (COMPLETE). Verdict: READY WITH NON-BLOCKING FINDINGS.** Final regression audit at HEAD `ae823ca` confirmed no P0/P1/P2 findings remain open, all three Q2 fixes are intact and unreverted, and the module was declared ready to proceed to Q4 — User Manual.
 
 Final regression verification after Q2 remediation, confirming the complete PMS remains stable after all quality fixes. This is the final *technical* quality gate before user-facing documentation (Q4). Areas: Security/access isolation, Company/Branch isolation, Properties/Buildings/Units, Tenants/Contacts, Lease lifecycle, Renewal, Payment Schedules, Late Fees, Security Deposits, Service Charges, Maintenance, SLA, Dashboard, Search/Filters, Portal, Accounting/financial integrity, Arabic/RTL, Transaction safety.
 
 ### Q4 — User Manual
-**Status: PLANNED.**
+**Status: CLOSED (COMPLETE).**
 
-A concise, Arabic-friendly PDF User Manual for end users (user workflows, not developer documentation), covering: Introduction, Login/Getting Started, Navigation, Properties, Buildings, Units, Tenants/Contacts, Lease Contracts, Lease Lifecycle, Renewal Requests, Payment Schedule, Late Fees, Security Deposits, Service Charges, Maintenance, SLA, Dashboard, Search/Filters, User Roles, FAQ/Common Questions — what each area does, when to use it, important statuses/business rules, common questions, common mistakes/expected behavior. Concise, practical, non-technical, Arabic-first where appropriate, screenshots where useful, exportable as a simple PDF. Not created now — recorded as planned only.
+Final artifact: **`docs/EDARA_Property_Management_User_Manual.pdf`** — a complete, Arabic-first (RTL) end-user manual covering all 15 planned parts (Introduction; Getting Started; Property Setup; Tenants & Contacts; Lease Management; Renewals; Payment Schedules & Collections; Security Deposits; Service Charges; Maintenance incl. Recurring Maintenance; Reports & Dashboard; Tenant Portal; Administration & Configuration; Common Workflows — 21 scenarios; Troubleshooting/FAQ) plus a Terminology appendix.
+
+Q4 passed both of its gates:
+- **Q4 — User Manual Documentation Analysis**: PASSED (`Q4 Documentation Analysis PASSED — Ready for Manual Authoring`), confirming the manual's blueprint was grounded in the actual current product (menus, models, security, portal routes, dashboard, reports) rather than invented functionality.
+- **Q4 — Final Documentation QA**: PASSED (`APPROVE — Q4 READY TO CLOSE`), an independent read-only audit of the actual generated PDF (not just the generation report), confirming structure, content accuracy, RTL/typography, layout, and completeness, with no P0/P1/P2 documentation findings.
+
+Final PDF characteristics (independently verified against the actual file, not assumed):
+- 36 pages, ~640 KB (655,122 bytes), A4 layout, page-numbered footer.
+- Generated via a Playwright + Chromium HTML→PDF pipeline (`printBackground` enabled), built from the same HTML source as the manual's Claude Artifact, run entirely outside the project (scratchpad) — no build tooling left inside `docs/`.
+- Cairo (Arabic) and Manrope (Latin/English) fonts embedded as real, subsetted font files — confirmed via the PDF's own font table, not assumed from config.
+- RTL rendering, mixed Arabic/English ordering, tables, callouts, numbered procedures, status-flow diagrams, and all 12 screenshot placeholders (no fabricated screenshots) visually verified across representative pages spanning the whole document.
+- A real font-fallback defect (several CSS rules forcing the Latin-only Manrope font onto Arabic-bearing elements — status badges, the TOC heading, menu-restriction notes, scenario labels — causing silent fallback to Windows system fonts) was found during QA, fixed at the shared HTML source, and the PDF regenerated and re-verified clean before final approval.
+- Portal documentation is conservative as required: no custom online-payment capability is claimed (wording defers to native Odoo portal/payment configuration), and tenant-side editing/cancelling of an existing maintenance request is explicitly documented as unsupported.
+- No implementation internals (record rules, `sudo()`, ORM internals, savepoints, security-guard mechanics) are exposed anywhere in the manual.
+
+**Related environment finding closed out alongside Q4**: a module-upgrade `SerializationFailure` encountered during this phase was forensically investigated (read-only) and confirmed to be an **environment/concurrency conflict**, not a defect in `security/edara_security.xml` (unchanged since the module's original commit) or any other code. After the controlled recovery procedure — NSSM service `Odoo19EnterpriseDev` confirmed `Stopped`/`Disabled`, port 8070 confirmed free, no independent `python`/`odoo-bin` process running, exactly one VS Code F5 Odoo instance started — the module upgrade was retried and **completed successfully**. No application code change was required or made.
 
