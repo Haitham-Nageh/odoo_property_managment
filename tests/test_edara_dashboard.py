@@ -2902,7 +2902,7 @@ class TestEdaraDashboard(TransactionCase):
         company = self.dash_company
         today = fields.Date.context_today(self)
 
-        other_cur = self.env['res.currency'].search([
+        other_cur = self.env['res.currency'].with_context(active_test=False).search([
             ('id', '!=', company.currency_id.id),
             ('name', 'in', ('USD', 'EUR', 'ILS', 'JOD'))
         ], limit=1)

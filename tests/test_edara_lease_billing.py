@@ -14,7 +14,7 @@ class TestEdaraLeaseBilling(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.branch = cls.env['edara.branch'].create({'name': 'Nablus Branch', 'code': 'NAB'})
+        cls.branch = cls.env['edara.branch'].create({'name': 'Nablus Branch', 'code': 'LB01'})
         cls.property = cls.env['edara.property'].create(
             {'name': 'Rafidia Towers', 'code': 'RAF', 'branch_id': cls.branch.id})
         cls.building = cls.env['edara.building'].create(

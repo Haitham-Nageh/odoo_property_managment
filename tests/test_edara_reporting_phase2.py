@@ -308,7 +308,7 @@ class TestEdaraInvoiceTypeReportFilter(TestEdaraReportingPhase2Base):
         self._make_maintenance_with_bill(cost=275)
         action = self.env.ref('property_managment.action_edara_expense_report')
         moves = self.env['account.move'].search(
-            safe_eval(action.domain) + [('edara_invoice_type', '=', 'maintenance')])
+            safe_eval(action.domain) + [('edara_invoice_type', '=', 'maintenance'), ('partner_id', '=', self.vendor.id)])
         self.assertEqual(len(moves), 1)
         self.assertAlmostEqual(moves.amount_untaxed, 275)
 

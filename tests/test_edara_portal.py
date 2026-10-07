@@ -551,7 +551,8 @@ class TestEdaraPortal(HttpCase):
 
     def test_overdue_single_currency_pay_all_visible(self):
         """Case A: Tenant has overdue invoice in a single currency -> Pay overdue button is visible."""
-        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils.active = True
         inv = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0)
         self.assertTrue(self.partner_a._has_single_overdue_currency())
 
@@ -563,7 +564,8 @@ class TestEdaraPortal(HttpCase):
 
     def test_overdue_multiple_invoices_same_currency_pay_all_visible(self):
         """Case A: Multiple overdue invoices in the same currency -> Pay overdue button is visible."""
-        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils.active = True
         inv1 = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='Rent Part 1')
         inv2 = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=700.0, ref='Rent Part 2')
         self.assertTrue(self.partner_a._has_single_overdue_currency())
@@ -578,7 +580,8 @@ class TestEdaraPortal(HttpCase):
     def test_overdue_mixed_currency_pay_all_hidden_and_individual_invoices_visible(self):
         """Case B: Multiple overdue currencies (ILS + USD) -> Pay All Overdue action is hidden,
         while each invoice remains visible in the list."""
-        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils.active = True
         curr_usd = self.env['res.currency'].search([('name', '=', 'USD')], limit=1)
         self.assertTrue(curr_usd, "USD currency must exist")
 
@@ -597,9 +600,11 @@ class TestEdaraPortal(HttpCase):
 
     def test_overdue_triple_mixed_currency_pay_all_hidden(self):
         """Case B: Multiple overdue currencies (ILS + USD + JOD) -> Pay All Overdue action is hidden."""
-        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils.active = True
         curr_usd = self.env['res.currency'].search([('name', '=', 'USD')], limit=1)
-        curr_jod = self.env['res.currency'].search([('name', '=', 'JOD')], limit=1)
+        curr_jod = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'JOD')], limit=1)
+        curr_jod.active = True
         self.assertTrue(curr_usd and curr_jod, "USD and JOD currencies must exist")
 
         self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='ILS Overdue')
@@ -615,7 +620,8 @@ class TestEdaraPortal(HttpCase):
     def test_overdue_individual_invoice_payment_accessible_for_mixed_currency(self):
         """Case B: Individual invoice detail pages and native payment flows remain accessible
         when multiple overdue currencies exist."""
-        curr_ils = self.env['res.currency'].search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'ILS')], limit=1) or self.env.company.currency_id
+        curr_ils.active = True
         curr_usd = self.env['res.currency'].search([('name', '=', 'USD')], limit=1)
 
         inv_ils = self._post_overdue_invoice(self.partner_a, currency=curr_ils, amount=500.0, ref='ILS Rent')
