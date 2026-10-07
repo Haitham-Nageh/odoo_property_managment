@@ -35,7 +35,7 @@
                             <canvas t-ref="canvas"/>
                             <div class="o_edara_doughnut_center text-center">
                                 <span class="fs-4 fw-bold text-dark"><t t-esc="chartData.total"/></span>
-                                <span class="text-muted small d-block">Total Units</span>
+                                <span class="text-muted small d-block"><t t-esc="totalUnitsLabel"/></span>
                             </div>
                         </div>
                     </div>

@@ -1946,6 +1946,11 @@ msgid "Files attached to your lease, unit or requests"
 msgstr "الملفات المرفقة بعقد الإيجار أو الوحدة أو الطلبات"
 
 #. module: property_managment
+#: model:ir.ui.menu,name:property_managment.menu_edara_finance
+msgid "Finance"
+msgstr "المالية"
+
+#. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_branch_form
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_property_form
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_form
@@ -3942,6 +3947,11 @@ msgid "Schedule"
 msgstr "الجدول الزمني"
 
 #. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Schedule & Collections"
+msgstr "الجدولة والتحصيل"
+
+#. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__schedule_due_this_month_count
 msgid "Schedule Due This Month Count"
 msgstr "عدد المستحق هذا الشهر في الجدول"
@@ -4542,6 +4552,8 @@ msgid "Total Revenue"
 msgstr "إجمالي الإيرادات"
 
 #. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.js:0
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__total_units
 msgid "Total Units"
 msgstr "إجمالي الوحدات"

@@ -79,6 +79,10 @@ export class EdaraOccupancyChartField extends Component {
         return _t("View %s units", slice.label);
     }
 
+    get totalUnitsLabel() {
+        return _t("Total Units");
+    }
+
     renderChart() {
         if (this.chart) {
             this.chart.destroy();
