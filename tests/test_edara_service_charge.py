@@ -2,7 +2,7 @@ from datetime import date
 
 from lxml import etree
 
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
 
 
@@ -528,4 +528,86 @@ class TestEdaraServiceCharge(TransactionCase):
         line = charge.line_ids[0]
         line.with_user(self.property_manager).write({'amount': 175.0})
         self.assertEqual(line.amount, 175.0)
+
+    def test_equal_allocation_reconciles_with_rounding_remainder(self):
+        """P3-01: Equal allocation reconciles rounding remainder back to total_amount."""
+        building = self.env['edara.building'].create({
+            'name': 'Building Equal Rounding', 'code': 'BER', 'property_id': self.property.id,
+        })
+        units = self.env['edara.unit'].create([
+            {'name': f'U-{i}', 'code': f'U{i}', 'building_id': building.id, 'area': 100}
+            for i in range(1, 4)
+        ])
+        for unit in units:
+            contract = self.env['edara.lease.contract'].create({
+                'unit_id': unit.id, 'tenant_id': self.tenant1.id,
+                'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31),
+                'rent_amount': 1000, 'deposit_required': False,
+            })
+            contract.action_activate()
+
+        charge = self.env['edara.service.charge'].create({
+            'building_id': building.id, 'allocation_method': 'equal', 'total_amount': 100.0,
+        })
+        charge.action_generate_allocation()
+        amounts = [line.amount for line in charge.line_ids]
+        self.assertEqual(amounts, [33.33, 33.33, 33.34])
+        self.assertEqual(sum(amounts), 100.0)
+
+    def test_proportional_allocation_reconciles_with_rounding_remainder(self):
+        """P3-01: Proportional allocation reconciles rounding remainder back to total_amount."""
+        building = self.env['edara.building'].create({
+            'name': 'Building Prop Rounding', 'code': 'BPR', 'property_id': self.property.id,
+        })
+        units = self.env['edara.unit'].create([
+            {'name': f'U-{i}', 'code': f'U{i}', 'building_id': building.id, 'area': 1.0}
+            for i in range(1, 4)
+        ])
+        for unit in units:
+            contract = self.env['edara.lease.contract'].create({
+                'unit_id': unit.id, 'tenant_id': self.tenant1.id,
+                'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31),
+                'rent_amount': 1000, 'deposit_required': False,
+            })
+            contract.action_activate()
+
+        charge = self.env['edara.service.charge'].create({
+            'building_id': building.id, 'allocation_method': 'proportional', 'total_amount': 100.0,
+        })
+        charge.action_generate_allocation()
+        amounts = [line.amount for line in charge.line_ids]
+        self.assertEqual(amounts, [33.33, 33.33, 33.34])
+        self.assertEqual(sum(amounts), 100.0)
+
+    def test_negative_amount_blocked_on_create(self):
+        """P3-02: Negative or zero service charge line amount is rejected on create."""
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        with self.assertRaises(ValidationError):
+            self.env['edara.service.charge.line'].with_user(self.property_manager).create({
+                'charge_id': charge.id,
+                'unit_id': self.unit1.id,
+                'tenant_id': self.tenant1.id,
+                'amount': -10.0,
+            })
+        with self.assertRaises(ValidationError):
+            self.env['edara.service.charge.line'].with_user(self.property_manager).create({
+                'charge_id': charge.id,
+                'unit_id': self.unit1.id,
+                'tenant_id': self.tenant1.id,
+                'amount': 0.0,
+            })
+
+    def test_negative_amount_blocked_on_write(self):
+        """P3-02: Negative or zero service charge line amount is rejected on write."""
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        charge.action_generate_allocation()
+        line = charge.line_ids[0]
+        with self.assertRaises(ValidationError):
+            line.with_user(self.property_manager).write({'amount': -5.0})
+        with self.assertRaises(ValidationError):
+            line.with_user(self.property_manager).write({'amount': 0.0})
 

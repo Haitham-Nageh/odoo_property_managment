@@ -1,5 +1,5 @@
-from odoo import _, fields, models
-from odoo.exceptions import UserError
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError, ValidationError
 
 
 class EdaraServiceChargeLine(models.Model):
@@ -24,6 +24,14 @@ class EdaraServiceChargeLine(models.Model):
         'unique(invoice_id)',
         'An invoice cannot be linked to more than one service charge line.',
     )
+
+    @api.constrains('amount')
+    def _check_amount(self):
+        for line in self:
+            if line.amount <= 0:
+                raise ValidationError(
+                    _("Service charge line amount must be positive.")
+                )
 
     def unlink(self):
         """See edara.payment.schedule.line.unlink - same audit-trail rationale."""

@@ -83,11 +83,26 @@ class EdaraServiceCharge(models.Model):
 
     def _compute_allocation(self, units):
         self.ensure_one()
+
+        def _reconcile_shares(raw_shares):
+            rounded_shares = {}
+            previous_total = 0.0
+            for index, unit in enumerate(units):
+                if index < len(units) - 1:
+                    amount = self.currency_id.round(raw_shares[unit])
+                    rounded_shares[unit] = amount
+                    previous_total += amount
+                else:
+                    rounded_shares[unit] = (
+                        self.currency_id.round(self.total_amount)
+                        - previous_total
+                    )
+            return rounded_shares
+
         if self.allocation_method == 'equal':
             if self.total_amount <= 0:
                 raise UserError(_("Please set the total amount to allocate."))
-            share = self.total_amount / len(units)
-            return {unit: share for unit in units}
+            return _reconcile_shares({unit: self.total_amount / len(units) for unit in units})
         if self.allocation_method == 'proportional':
             if self.total_amount <= 0:
                 raise UserError(_("Please set the total amount to allocate."))
@@ -102,7 +117,7 @@ class EdaraServiceCharge(models.Model):
                     "The following units have no valid area (sqm) configured: %s. "
                     "Every eligible unit must have an area greater than zero for proportional allocation.",
                     unit_names))
-            return {unit: self.total_amount * (unit.area / total_area) for unit in units}
+            return _reconcile_shares({unit: self.total_amount * (unit.area / total_area) for unit in units})
         if self.allocation_method == 'per_sqm':
             if self.rate_per_sqm <= 0:
                 raise UserError(_("Please set the rate per square meter."))
