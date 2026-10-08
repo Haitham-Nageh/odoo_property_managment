@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class EdaraBuilding(models.Model):
@@ -30,6 +31,25 @@ class EdaraBuilding(models.Model):
         'unique(property_id, code)',
         'Building code must be unique within a property.',
     )
+
+    @api.constrains('floor_count')
+    def _check_floor_count_against_units(self):
+        unit_model = self.env['edara.unit']
+        for building in self:
+            if building.floor_count <= 0:
+                continue
+            for unit in building.unit_ids:
+                numeric_floor = unit_model._parse_numeric_floor(unit.floor)
+                if numeric_floor is None:
+                    continue
+                if numeric_floor > building.floor_count:
+                    raise ValidationError(self.env._(
+                        'Building "%(building)s" cannot be reduced to %(count)d floors because unit "%(unit)s" is on floor %(floor)s.',
+                        building=building.display_name,
+                        count=building.floor_count,
+                        unit=unit.display_name,
+                        floor=unit.floor,
+                    ))
 
     @api.depends('unit_ids')
     def _compute_unit_count(self):

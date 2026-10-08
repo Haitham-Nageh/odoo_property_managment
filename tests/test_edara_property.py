@@ -222,6 +222,234 @@ class TestEdaraProperty(TransactionCase):
         Dashboard's/crons'/quick-actions' most-filtered column on this model."""
         self.assertTrue(self.env['edara.unit']._fields['occupancy_status'].index)
 
+    # =========================================================================
+    # Ticket D: Floor Validation Tests
+    # =========================================================================
+
+    def test_floor_parse_numeric_helper(self):
+        """Test _parse_numeric_floor behavior across numeric, non-numeric, and empty values."""
+        parse = self.env['edara.unit']._parse_numeric_floor
+        self.assertEqual(parse('3'), 3)
+        self.assertEqual(parse('5'), 5)
+        self.assertEqual(parse('05'), 5)
+        self.assertEqual(parse(' 5 '), 5)
+        self.assertEqual(parse('005'), 5)
+        self.assertEqual(parse('0'), 0)
+        self.assertIsNone(parse('Ground'))
+        self.assertIsNone(parse('G'))
+        self.assertIsNone(parse('B1'))
+        self.assertIsNone(parse('B2'))
+        self.assertIsNone(parse('Mezzanine'))
+        self.assertIsNone(parse('12A'))
+        self.assertIsNone(parse('Floor 3'))
+        self.assertIsNone(parse('3rd'))
+        self.assertIsNone(parse('2.5'))
+        self.assertIsNone(parse('-1'))
+        self.assertIsNone(parse(False))
+        self.assertIsNone(parse(''))
+        self.assertIsNone(parse('   '))
+
+    def test_floor_validation_unit_numeric_within_limit(self):
+        """1. Numeric floor within limit passes (floor='3', floor_count=5)."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Floor-5', 'code': 'BF5', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        unit = self.env['edara.unit'].create({
+            'name': 'U-Floor-3', 'code': 'UF3', 'building_id': b.id, 'floor': '3',
+        })
+        self.assertEqual(unit.floor, '3')
+
+    def test_floor_validation_unit_exact_boundary(self):
+        """2. Exact boundary passes (floor='5', floor_count=5)."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Floor-Bound', 'code': 'BFB', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        unit = self.env['edara.unit'].create({
+            'name': 'U-Floor-5', 'code': 'UF5', 'building_id': b.id, 'floor': '5',
+        })
+        self.assertEqual(unit.floor, '5')
+
+    def test_floor_validation_unit_above_limit_raises(self):
+        """3. Numeric floor above limit raises ValidationError (floor='6', floor_count=5)."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Floor-Limit', 'code': 'BFL', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        with self.assertRaises(ValidationError):
+            self.env['edara.unit'].create({
+                'name': 'U-Floor-6', 'code': 'UF6', 'building_id': b.id, 'floor': '6',
+            })
+
+    def test_floor_validation_unit_non_numeric_labels_allowed(self):
+        """4-8. Real-world non-numeric floor labels pass regardless of floor_count."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Floor-Labels', 'code': 'BFLBL', 'property_id': self.property_a.id, 'floor_count': 3,
+        })
+        labels = ['Ground', 'G', 'B1', 'B2', 'Mezzanine', '12A', 'Floor 3', '3rd', '2.5', '-1']
+        for idx, label in enumerate(labels):
+            unit = self.env['edara.unit'].create({
+                'name': f'U-Label-{idx}', 'code': f'UL{idx}', 'building_id': b.id, 'floor': label,
+            })
+            self.assertEqual(unit.floor, label)
+
+    def test_floor_validation_unit_empty_floors_allowed(self):
+        """9. Empty floor values (False, '') pass."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Floor-Empty', 'code': 'BFEMP', 'property_id': self.property_a.id, 'floor_count': 3,
+        })
+        u1 = self.env['edara.unit'].create({
+            'name': 'U-Empty-1', 'code': 'UEMP1', 'building_id': b.id, 'floor': False,
+        })
+        u2 = self.env['edara.unit'].create({
+            'name': 'U-Empty-2', 'code': 'UEMP2', 'building_id': b.id, 'floor': '',
+        })
+        self.assertFalse(u1.floor)
+        self.assertEqual(u2.floor, '')
+
+    def test_floor_validation_simultaneous_floor_and_building_change(self):
+        """10. Simultaneous floor + building change: post-write state evaluated atomically.
+        Old building has floor_count=5 (would reject 6), new building has floor_count=10 (allows 6).
+        """
+        b_low = self.env['edara.building'].create({
+            'name': 'B-Low', 'code': 'BLOW', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        b_high = self.env['edara.building'].create({
+            'name': 'B-High', 'code': 'BHIGH', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        unit = self.env['edara.unit'].create({
+            'name': 'U-Simult', 'code': 'USIM', 'building_id': b_low.id, 'floor': '2',
+        })
+        unit.write({'floor': '6', 'building_id': b_high.id})
+        self.assertEqual(unit.floor, '6')
+        self.assertEqual(unit.building_id, b_high)
+
+    def test_floor_validation_building_reassignment_above_new_limit_raises(self):
+        """11. Reassigning unit to a building with lower floor_count raises ValidationError."""
+        b_high = self.env['edara.building'].create({
+            'name': 'B-Reassign-High', 'code': 'BRHIGH', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        b_low = self.env['edara.building'].create({
+            'name': 'B-Reassign-Low', 'code': 'BRLOW', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        unit = self.env['edara.unit'].create({
+            'name': 'U-Reassign', 'code': 'UREAS', 'building_id': b_high.id, 'floor': '8',
+        })
+        with self.assertRaises(ValidationError):
+            unit.write({'building_id': b_low.id})
+
+    def test_floor_validation_multi_unit_write_atomic(self):
+        """12. Multi-record Unit write: batch validation is atomic."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Multi-Unit', 'code': 'BMU', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        u1 = self.env['edara.unit'].create({'name': 'MU-1', 'code': 'MU1', 'building_id': b.id, 'floor': '1'})
+        u2 = self.env['edara.unit'].create({'name': 'MU-2', 'code': 'MU2', 'building_id': b.id, 'floor': '2'})
+        with self.assertRaises(ValidationError):
+            (u1 | u2).write({'floor': '7'})
+        self.assertEqual(u1.floor, '1')
+        self.assertEqual(u2.floor, '2')
+
+    def test_floor_validation_building_increase_floor_count(self):
+        """13. Increasing floor_count on building passes."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Inc', 'code': 'BINC', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        self.env['edara.unit'].create({'name': 'U-Inc', 'code': 'UINC', 'building_id': b.id, 'floor': '5'})
+        b.write({'floor_count': 8})
+        self.assertEqual(b.floor_count, 8)
+
+    def test_floor_validation_building_reduce_within_limit(self):
+        """14. Reducing floor_count within limit of highest numeric unit floor passes (10 -> 8, highest=7)."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Red-Safe', 'code': 'BRSAFE', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        self.env['edara.unit'].create({'name': 'U-RS-1', 'code': 'URS1', 'building_id': b.id, 'floor': '7'})
+        self.env['edara.unit'].create({'name': 'U-RS-2', 'code': 'URS2', 'building_id': b.id, 'floor': '3'})
+        b.write({'floor_count': 8})
+        self.assertEqual(b.floor_count, 8)
+
+    def test_floor_validation_building_reduce_below_existing_floor_raises(self):
+        """15. Reducing floor_count below existing numeric unit floor raises ValidationError (10 -> 5, unit=8)."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Red-Fail', 'code': 'BRFAIL', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        self.env['edara.unit'].create({'name': 'U-RF-1', 'code': 'URF1', 'building_id': b.id, 'floor': '8'})
+        with self.assertRaises(ValidationError):
+            b.write({'floor_count': 5})
+        self.assertEqual(b.floor_count, 10)
+
+    def test_floor_validation_building_reduce_with_non_numeric_units(self):
+        """16. Non-numeric unit floor labels do not block building floor_count reduction."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Red-NonNum', 'code': 'BRNN', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        self.env['edara.unit'].create({'name': 'U-NN-1', 'code': 'UNN1', 'building_id': b.id, 'floor': 'Ground'})
+        self.env['edara.unit'].create({'name': 'U-NN-2', 'code': 'UNN2', 'building_id': b.id, 'floor': 'B1'})
+        self.env['edara.unit'].create({'name': 'U-NN-3', 'code': 'UNN3', 'building_id': b.id, 'floor': 'Mezzanine'})
+        self.env['edara.unit'].create({'name': 'U-NN-4', 'code': 'UNN4', 'building_id': b.id, 'floor': '12A'})
+        self.env['edara.unit'].create({'name': 'U-NN-5', 'code': 'UNN5', 'building_id': b.id, 'floor': '2'})
+        b.write({'floor_count': 3})
+        self.assertEqual(b.floor_count, 3)
+
+    def test_floor_validation_multi_building_write_atomic(self):
+        """17. Multi-record Building write: atomic rejection across records."""
+        b1 = self.env['edara.building'].create({
+            'name': 'B-MB-1', 'code': 'BMB1', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        b2 = self.env['edara.building'].create({
+            'name': 'B-MB-2', 'code': 'BMB2', 'property_id': self.property_a.id, 'floor_count': 10,
+        })
+        self.env['edara.unit'].create({'name': 'U-MB-1', 'code': 'UMB1', 'building_id': b1.id, 'floor': '3'})
+        self.env['edara.unit'].create({'name': 'U-MB-2', 'code': 'UMB2', 'building_id': b2.id, 'floor': '8'})
+        with self.assertRaises(ValidationError):
+            (b1 | b2).write({'floor_count': 5})
+        self.assertEqual(b1.floor_count, 10)
+        self.assertEqual(b2.floor_count, 10)
+
+    def test_floor_validation_edge_cases_and_stored_values_untouched(self):
+        """18. Edge cases: whitespace trimming, leading zeros, floor 0, and stored value preservation."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Edge', 'code': 'BEDGE', 'property_id': self.property_a.id, 'floor_count': 5,
+        })
+        u_space = self.env['edara.unit'].create({
+            'name': 'U-Space', 'code': 'USPACE', 'building_id': b.id, 'floor': ' 5 ',
+        })
+        self.assertEqual(u_space.floor, ' 5 ')
+
+        u_zero = self.env['edara.unit'].create({
+            'name': 'U-Zero5', 'code': 'UZERO5', 'building_id': b.id, 'floor': '05',
+        })
+        self.assertEqual(u_zero.floor, '05')
+
+        u_zero2 = self.env['edara.unit'].create({
+            'name': 'U-Zero05', 'code': 'UZERO05', 'building_id': b.id, 'floor': '005',
+        })
+        self.assertEqual(u_zero2.floor, '005')
+
+        u_zero_floor = self.env['edara.unit'].create({
+            'name': 'U-Floor0', 'code': 'UFL0', 'building_id': b.id, 'floor': '0',
+        })
+        self.assertEqual(u_zero_floor.floor, '0')
+
+        with self.assertRaises(ValidationError):
+            self.env['edara.unit'].create({
+                'name': 'U-Space6', 'code': 'USPACE6', 'building_id': b.id, 'floor': ' 6 ',
+            })
+
+        with self.assertRaises(ValidationError):
+            self.env['edara.unit'].create({
+                'name': 'U-Zero6', 'code': 'UZERO6', 'building_id': b.id, 'floor': '06',
+            })
+
+    def test_floor_validation_unconstrained_when_building_floor_count_zero(self):
+        """Building with floor_count=0 (or negative) skips validation."""
+        b = self.env['edara.building'].create({
+            'name': 'B-Unconstrained', 'code': 'BUNC', 'property_id': self.property_a.id, 'floor_count': 0,
+        })
+        u = self.env['edara.unit'].create({
+            'name': 'U-Unc', 'code': 'UUNC', 'building_id': b.id, 'floor': '99',
+        })
+        self.assertEqual(u.floor, '99')
+
 
 @tagged('post_install', '-at_install')
 class TestEdaraPropertyMultiBuilding(TransactionCase):

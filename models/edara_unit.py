@@ -1,3 +1,5 @@
+import re
+
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -123,6 +125,36 @@ class EdaraUnit(models.Model):
             units_clearing_maintenance._sync_occupancy_from_contracts()
         return res
 
+    @api.model
+    def _parse_numeric_floor(self, value):
+        """Parse a floor value into an integer if it represents a non-negative integer.
+
+        Returns int if value after trimming whitespace matches ^\d+$, else None.
+        Does not normalize or alter the stored value.
+        """
+        if not value:
+            return None
+        s = str(value).strip()
+        if not s or not re.match(r'^\d+$', s):
+            return None
+        return int(s)
+
+    @api.constrains('floor', 'building_id')
+    def _check_floor_within_building_limit(self):
+        for unit in self:
+            numeric_floor = unit._parse_numeric_floor(unit.floor)
+            if numeric_floor is None:
+                continue
+            building = unit.building_id
+            if not building or building.floor_count <= 0:
+                continue
+            if numeric_floor > building.floor_count:
+                raise ValidationError(self.env._(
+                    'Unit "%(unit)s" cannot be on floor %(floor)s because its building has only %(count)d floors.',
+                    unit=unit.display_name,
+                    floor=unit.floor,
+                    count=building.floor_count,
+                ))
 
     @api.constrains('occupancy_status', 'operational_status')
     def _check_status_consistency(self):

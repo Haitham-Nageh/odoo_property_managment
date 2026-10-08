@@ -5527,3 +5527,14 @@ msgstr "عميل"
 msgid "Date From (%(start)s) cannot be later than Date To (%(end)s)."
 msgstr "لا يمكن أن يكون تاريخ البدء (%(start)s) بعد تاريخ الانتهاء (%(end)s)."
 
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_unit.py:0
+msgid "Unit \"%(unit)s\" cannot be on floor %(floor)s because its building has only %(count)d floors."
+msgstr "لا يمكن أن تكون الوحدة \"%(unit)s\" في الطابق %(floor)s لأن المبنى يتكون من %(count)d طوابق فقط."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_building.py:0
+msgid "Building \"%(building)s\" cannot be reduced to %(count)d floors because unit \"%(unit)s\" is on floor %(floor)s."
+msgstr "لا يمكن تخفيض عدد طوابق المبنى \"%(building)s\" إلى %(count)d لأن الوحدة \"%(unit)s\" في الطابق %(floor)s."
