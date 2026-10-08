@@ -7,7 +7,7 @@
             <list string="Recurring Maintenance" decoration-muted="not active">
                 <field name="name"/>
                 <field name="unit_id"/>
-                <field name="category"/>
+                <field name="category_id"/>
                 <field name="vendor_id"/>
                 <field name="frequency"/>
                 <field name="next_date"/>
@@ -32,7 +32,7 @@
                     <filter string="Branch" name="group_by_branch" context="{'group_by': 'branch_id'}"/>
                     <filter string="Vendor" name="group_by_vendor" context="{'group_by': 'vendor_id'}"/>
                     <filter string="Frequency" name="group_by_frequency" context="{'group_by': 'frequency'}"/>
-                    <filter string="Category" name="group_by_category" context="{'group_by': 'category'}"/>
+                    <filter string="Category" name="group_by_category" context="{'group_by': 'category_id'}"/>
                 </group>
             </search>
         </field>
@@ -62,7 +62,7 @@
                             <field name="unit_id"/>
                             <field name="building_id" readonly="1" groups="base.group_no_one"/>
                             <field name="property_id" readonly="1" groups="base.group_no_one"/>
-                            <field name="category"/>
+                            <field name="category_id"/>
                             <field name="vendor_id"/>
                         </group>
                         <group>

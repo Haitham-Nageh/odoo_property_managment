@@ -12,7 +12,7 @@
                 <field name="name"/>
                 <field name="building_id"/>
                 <field name="property_id" groups="base.group_no_one"/>
-                <field name="unit_type"/>
+                <field name="unit_type_id"/>
                 <field name="floor"/>
                 <field name="area"/>
                 <field name="rent_amount_default"/>
@@ -84,6 +84,7 @@
             <search string="Units">
                 <field name="name"/>
                 <field name="building_id"/>
+                <field name="unit_type_id"/>
                 <field name="floor"/>
                 <filter string="Available" name="available" domain="[('occupancy_status', '=', 'available')]"/>
                 <filter string="Rented" name="rented" domain="[('occupancy_status', '=', 'rented')]"/>
@@ -91,6 +92,7 @@
                         domain="[('operational_status', '=', 'under_maintenance')]"/>
                 <group>
                     <filter string="Building" name="group_by_building" context="{'group_by': 'building_id'}"/>
+                    <filter string="Unit Type" name="group_by_unit_type" context="{'group_by': 'unit_type_id'}"/>
                     <filter string="Floor" name="group_by_floor" context="{'group_by': 'floor'}"/>
                     <filter string="Occupancy" name="group_by_occupancy" context="{'group_by': 'occupancy_status'}"/>
                 </group>
@@ -137,14 +139,15 @@
                             <field name="property_id" readonly="1" groups="base.group_no_one"/>
                             <field name="branch_id" readonly="1" groups="base.group_no_one"/>
                             <field name="active" invisible="1"/>
-                            <field name="unit_type"/>
+                            <field name="has_bedrooms_bathrooms" invisible="1"/>
+                            <field name="unit_type_id"/>
                             <field name="floor"/>
                             <field name="unit_number"/>
                         </group>
                         <group>
                             <field name="area"/>
-                            <field name="bedrooms" invisible="unit_type not in ('apartment', 'villa')"/>
-                            <field name="bathrooms" invisible="unit_type not in ('apartment', 'villa')"/>
+                            <field name="bedrooms" invisible="not has_bedrooms_bathrooms"/>
+                            <field name="bathrooms" invisible="not has_bedrooms_bathrooms"/>
                             <field name="rent_amount_default"/>
                             <field name="currency_id" groups="base.group_multi_currency"/>
                         </group>

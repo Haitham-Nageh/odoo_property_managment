@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_maintenance_category_list" model="ir.ui.view">
+        <field name="name">edara.maintenance.category.list</field>
+        <field name="model">edara.maintenance.category</field>
+        <field name="arch" type="xml">
+            <list string="Maintenance Categories" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_edara_maintenance_category_form" model="ir.ui.view">
+        <field name="name">edara.maintenance.category.form</field>
+        <field name="model">edara.maintenance.category</field>
+        <field name="arch" type="xml">
+            <form string="Maintenance Category">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_edara_maintenance_category_search" model="ir.ui.view">
+        <field name="name">edara.maintenance.category.search</field>
+        <field name="model">edara.maintenance.category</field>
+        <field name="arch" type="xml">
+            <search string="Maintenance Categories">
+                <field name="name"/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_edara_maintenance_category" model="ir.actions.act_window">
+        <field name="name">Maintenance Categories</field>
+        <field name="res_model">edara.maintenance.category</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_edara_maintenance_category_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smart_action">
+                Create your first maintenance category
+            </p>
+        </field>
+    </record>
+</odoo>

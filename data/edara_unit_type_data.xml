@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="edara_unit_type_apartment" model="edara.unit.type">
+        <field name="name">Apartment</field>
+        <field name="has_bedrooms_bathrooms" eval="True"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="edara_unit_type_office" model="edara.unit.type">
+        <field name="name">Office</field>
+        <field name="has_bedrooms_bathrooms" eval="False"/>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="edara_unit_type_shop" model="edara.unit.type">
+        <field name="name">Shop</field>
+        <field name="has_bedrooms_bathrooms" eval="False"/>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="edara_unit_type_warehouse" model="edara.unit.type">
+        <field name="name">Warehouse</field>
+        <field name="has_bedrooms_bathrooms" eval="False"/>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="edara_unit_type_villa" model="edara.unit.type">
+        <field name="name">Villa</field>
+        <field name="has_bedrooms_bathrooms" eval="True"/>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="edara_unit_type_parking" model="edara.unit.type">
+        <field name="name">Parking</field>
+        <field name="has_bedrooms_bathrooms" eval="False"/>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="edara_unit_type_commercial" model="edara.unit.type">
+        <field name="name">Commercial Space</field>
+        <field name="has_bedrooms_bathrooms" eval="False"/>
+        <field name="sequence">70</field>
+    </record>
+
+    <record id="edara_unit_type_other" model="edara.unit.type">
+        <field name="name">Other</field>
+        <field name="has_bedrooms_bathrooms" eval="False"/>
+        <field name="sequence">80</field>
+    </record>
+</odoo>

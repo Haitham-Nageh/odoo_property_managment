@@ -341,7 +341,7 @@
                 <tr><td>Property</td><td><t t-out="unit.property_id.display_name"/></td></tr>
                 <tr><td>Building</td><td><t t-out="unit.building_id.display_name"/></td></tr>
                 <tr><td>Floor</td><td><t t-out="unit.floor"/></td></tr>
-                <tr><td>Type</td><td><t t-out="unit.unit_type"/></td></tr>
+                <tr><td>Type</td><td><t t-out="unit.unit_type_id.name"/></td></tr>
                 <tr t-if="unit.area"><td>Area</td><td><t t-out="unit.area"/> sqm</td></tr>
                 <tr t-if="unit.bedrooms"><td>Bedrooms</td><td><t t-out="unit.bedrooms"/></td></tr>
                 <tr t-if="unit.bathrooms"><td>Bathrooms</td><td><t t-out="unit.bathrooms"/></td></tr>

@@ -1,6 +1,7 @@
 from . import edara_branch
 from . import edara_property
 from . import edara_building
+from . import edara_unit_type
 from . import edara_unit
 from . import edara_ownership
 from . import edara_lease_contract
@@ -9,6 +10,7 @@ from . import edara_deposit
 from . import edara_deposit_transaction
 from . import edara_service_charge
 from . import edara_service_charge_line
+from . import edara_maintenance_category
 from . import edara_maintenance_request
 from . import edara_recurring_maintenance
 from . import edara_renewal_request

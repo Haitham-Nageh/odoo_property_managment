@@ -788,6 +788,7 @@ msgstr "الحساب التحليلي"
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__apartment
+#: model:edara.unit.type,name:property_managment.edara_unit_type_apartment
 msgid "Apartment"
 msgstr "شقة"
 
@@ -1067,7 +1068,9 @@ msgstr "لا يمكن استرداد مبلغ أكبر من رصيد التأم�
 
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_maintenance_request__category
+#: model:ir.model.fields,field_description:property_managment.field_edara_maintenance_request__category_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_recurring_maintenance__category
+#: model:ir.model.fields,field_description:property_managment.field_edara_recurring_maintenance__category_id
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_request_search
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_recurring_maintenance_search
 msgid "Category"
@@ -1095,6 +1098,7 @@ msgstr "المدينة"
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__cleaning
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__cleaning
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_cleaning
 msgid "Cleaning"
 msgstr "النظافة"
 
@@ -1144,6 +1148,7 @@ msgstr ""
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__commercial
+#: model:edara.unit.type,name:property_managment.edara_unit_type_commercial
 msgid "Commercial Space"
 msgstr "مساحة تجارية"
 
@@ -1866,6 +1871,7 @@ msgstr "عدد طلبات مورد إدارة"
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__electrical
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__electrical
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_electrical
 msgid "Electrical"
 msgstr "كهربائي"
 
@@ -2096,6 +2102,7 @@ msgstr "وصول فني ووظيفي كامل لنظام إدارة، بما ف�
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__general
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__general
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_general
 msgid "General"
 msgstr "عام"
 
@@ -2157,6 +2164,7 @@ msgstr ""
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__hvac
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__hvac
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_hvac
 msgid "HVAC"
 msgstr "HVAC"
 
@@ -3051,6 +3059,7 @@ msgstr "تاريخ الاستحقاق"
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__office
+#: model:edara.unit.type,name:property_managment.edara_unit_type_office
 msgid "Office"
 msgstr "مكتب"
 
@@ -3160,6 +3169,8 @@ msgstr ""
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__other
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__other
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__other
+#: model:edara.unit.type,name:property_managment.edara_unit_type_other
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_other
 msgid "Other"
 msgstr "أخرى"
 
@@ -3244,6 +3255,7 @@ msgstr "مدفوع"
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__parking
+#: model:edara.unit.type,name:property_managment.edara_unit_type_parking
 msgid "Parking"
 msgstr "موقف سيارات"
 
@@ -3416,6 +3428,7 @@ msgstr "يرجى تحديد المبلغ الإجمالي للتخصيص."
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__plumbing
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__plumbing
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_plumbing
 msgid "Plumbing"
 msgstr "سباكة"
 
@@ -4122,6 +4135,7 @@ msgstr "الإعدادات"
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__shop
+#: model:edara.unit.type,name:property_managment.edara_unit_type_shop
 msgid "Shop"
 msgstr "محل تجاري"
 
@@ -4203,6 +4217,7 @@ msgstr "الشارع"
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__category__structural
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__category__structural
+#: model:edara.maintenance.category,name:property_managment.edara_maintenance_category_structural
 msgid "Structural"
 msgstr "إنشائي / هيكلي"
 
@@ -4723,11 +4738,13 @@ msgstr ""
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__villa
+#: model:edara.unit.type,name:property_managment.edara_unit_type_villa
 msgid "Villa"
 msgstr "فيلا"
 
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_unit__unit_type__warehouse
+#: model:edara.unit.type,name:property_managment.edara_unit_type_warehouse
 msgid "Warehouse"
 msgstr "مستودع"
 
@@ -5538,3 +5555,37 @@ msgstr "لا يمكن أن تكون الوحدة \"%(unit)s\" في الطابق 
 #: code:addons/property_managment/models/edara_building.py:0
 msgid "Building \"%(building)s\" cannot be reduced to %(count)d floors because unit \"%(unit)s\" is on floor %(floor)s."
 msgstr "لا يمكن تخفيض عدد طوابق المبنى \"%(building)s\" إلى %(count)d لأن الوحدة \"%(unit)s\" في الطابق %(floor)s."
+
+#. module: property_managment
+#: model:ir.model,name:property_managment.model_edara_unit_type
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_type_form
+msgid "Unit Type"
+msgstr "نوع الوحدة"
+
+#. module: property_managment
+#: model:ir.actions.act_window,name:property_managment.action_edara_unit_type
+#: model:ir.ui.menu,name:property_managment.menu_edara_unit_type
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_type_list
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_unit_type_search
+msgid "Unit Types"
+msgstr "أنواع الوحدات"
+
+#. module: property_managment
+#: model:ir.model,name:property_managment.model_edara_maintenance_category
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_category_form
+msgid "Maintenance Category"
+msgstr "فئة الصيانة"
+
+#. module: property_managment
+#: model:ir.actions.act_window,name:property_managment.action_edara_maintenance_category
+#: model:ir.ui.menu,name:property_managment.menu_edara_maintenance_category
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_category_list
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_category_search
+msgid "Maintenance Categories"
+msgstr "فئات الصيانة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_unit_type__has_bedrooms_bathrooms
+#: model:ir.model.fields,field_description:property_managment.field_edara_unit__has_bedrooms_bathrooms
+msgid "Has Bedrooms/Bathrooms"
+msgstr "يحتوي على غرف نوم / حمامات"

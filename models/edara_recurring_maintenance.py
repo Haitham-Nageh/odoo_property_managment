@@ -4,8 +4,6 @@ from dateutil.relativedelta import relativedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
-from .edara_maintenance_request import MAINTENANCE_CATEGORIES
-
 _logger = logging.getLogger(__name__)
 
 # Maintenance Phase 2 (2026-09-23), ticket §20: minimum required set,
@@ -44,7 +42,7 @@ class EdaraRecurringMaintenance(models.Model):
     branch_id = fields.Many2one(related='unit_id.branch_id', store=True, index=True)
     company_id = fields.Many2one(related='unit_id.company_id', store=True, index=True)
 
-    category = fields.Selection(MAINTENANCE_CATEGORIES)
+    category_id = fields.Many2one('edara.maintenance.category', string='Category', ondelete='restrict')
     vendor_id = fields.Many2one('res.partner', string='Vendor')
     description = fields.Text()
     priority = fields.Selection([
@@ -108,7 +106,7 @@ class EdaraRecurringMaintenance(models.Model):
                         'title': _("Recurring: %(name)s", name=definition.name),
                         'description': definition.description,
                         'unit_id': definition.unit_id.id,
-                        'category': definition.category,
+                        'category_id': definition.category_id.id,
                         'vendor_id': definition.vendor_id.id,
                         'priority': definition.priority,
                         'edara_recurring_id': definition.id,

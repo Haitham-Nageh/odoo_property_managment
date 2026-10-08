@@ -18,22 +18,6 @@ STATES = [
     ('cancelled', 'Cancelled'),
 ]
 
-# Maintenance Phase 2 (2026-09-23): the spec names no maintenance category
-# list at all (§41's suggested fields are silent on it) - this generic,
-# industry-standard set is a reasonable engineering default, defined once
-# here and reused everywhere (never hard-coded inline per the ticket's own
-# §27 instruction), not a business-mandated taxonomy. Optional, not required
-# - a request/recurring definition can leave it unset.
-MAINTENANCE_CATEGORIES = [
-    ('plumbing', 'Plumbing'),
-    ('electrical', 'Electrical'),
-    ('hvac', 'HVAC'),
-    ('general', 'General'),
-    ('cleaning', 'Cleaning'),
-    ('structural', 'Structural'),
-    ('other', 'Other'),
-]
-
 # Notifications & Reminders Automation (2026-09-22): no explicit deadline
 # field exists on this model (spec doesn't define one), so staleness is
 # anchored on the only date field that does - requested_date - per the
@@ -69,7 +53,7 @@ class EdaraMaintenanceRequest(models.Model):
     assigned_user_id = fields.Many2one('res.users', string='Assigned To', tracking=True)
     priority = fields.Selection(PRIORITIES, required=True, default='normal', tracking=True)
     state = fields.Selection(STATES, required=True, default='new', tracking=True, copy=False, index=True)
-    category = fields.Selection(MAINTENANCE_CATEGORIES, tracking=True)
+    category_id = fields.Many2one('edara.maintenance.category', string='Category', ondelete='restrict', tracking=True)
 
     requested_date = fields.Date(required=True, default=fields.Date.context_today)
     completed_date = fields.Date(readonly=True, copy=False)

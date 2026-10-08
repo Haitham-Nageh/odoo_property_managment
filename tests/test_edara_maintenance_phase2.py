@@ -211,14 +211,15 @@ class TestEdaraRecurringMaintenance(TestEdaraMaintenancePhase2Base):
 
     def test_generation_creates_request_on_due_date(self):
         today = Date.today()
-        definition = self._make_recurring(vendor_id=self.vendor.id, category='hvac', next_date=today)
+        hvac_category = self.env.ref('property_managment.edara_maintenance_category_hvac')
+        definition = self._make_recurring(vendor_id=self.vendor.id, category_id=hvac_category.id, next_date=today)
         created = self.env['edara.recurring.maintenance']._cron_generate_recurring_maintenance()
         self.assertEqual(created, 1)
         self.assertEqual(len(definition.generated_request_ids), 1)
         request = definition.generated_request_ids
         self.assertEqual(request.unit_id, self.unit)
         self.assertEqual(request.vendor_id, self.vendor)
-        self.assertEqual(request.category, 'hvac')
+        self.assertEqual(request.category_id, hvac_category)
         self.assertEqual(request.edara_recurring_id, definition)
         self.assertEqual(request.occurrence_date, today)
         self.assertEqual(request.state, 'new')

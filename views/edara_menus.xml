@@ -71,6 +71,12 @@
     <menuitem id="menu_edara_branch" name="Branches" parent="menu_edara_configuration"
               action="action_edara_branch" sequence="10"/>
 
+    <menuitem id="menu_edara_unit_type" name="Unit Types" parent="menu_edara_configuration"
+              action="action_edara_unit_type" sequence="20"/>
+
+    <menuitem id="menu_edara_maintenance_category" name="Maintenance Categories" parent="menu_edara_configuration"
+              action="action_edara_maintenance_category" sequence="30"/>
+
     <menuitem id="menu_edara_settings" name="Settings" parent="menu_edara_configuration"
               action="action_edara_config_settings" sequence="90"
               groups="group_edara_company_manager"/>

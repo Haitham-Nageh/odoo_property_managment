@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="edara_maintenance_category_plumbing" model="edara.maintenance.category">
+        <field name="name">Plumbing</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="edara_maintenance_category_electrical" model="edara.maintenance.category">
+        <field name="name">Electrical</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="edara_maintenance_category_hvac" model="edara.maintenance.category">
+        <field name="name">HVAC</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="edara_maintenance_category_general" model="edara.maintenance.category">
+        <field name="name">General</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="edara_maintenance_category_cleaning" model="edara.maintenance.category">
+        <field name="name">Cleaning</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="edara_maintenance_category_structural" model="edara.maintenance.category">
+        <field name="name">Structural</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="edara_maintenance_category_other" model="edara.maintenance.category">
+        <field name="name">Other</field>
+        <field name="sequence">70</field>
+    </record>
+</odoo>

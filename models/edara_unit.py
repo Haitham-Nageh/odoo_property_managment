@@ -3,17 +3,6 @@ import re
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
-UNIT_TYPES = [
-    ('apartment', 'Apartment'),
-    ('office', 'Office'),
-    ('shop', 'Shop'),
-    ('warehouse', 'Warehouse'),
-    ('villa', 'Villa'),
-    ('parking', 'Parking'),
-    ('commercial', 'Commercial Space'),
-    ('other', 'Other'),
-]
-
 OCCUPANCY_STATUSES = [
     ('available', 'Available'),
     ('reserved', 'Reserved'),
@@ -44,7 +33,21 @@ class EdaraUnit(models.Model):
 
     floor = fields.Char()
     unit_number = fields.Char()
-    unit_type = fields.Selection(UNIT_TYPES, string='Type', required=True, default='apartment', tracking=True)
+    unit_type_id = fields.Many2one(
+        'edara.unit.type',
+        string='Type',
+        required=True,
+        default=lambda self: self.env.ref(
+            'property_managment.edara_unit_type_apartment',
+            raise_if_not_found=False,
+        ),
+        ondelete='restrict',
+        tracking=True,
+    )
+    has_bedrooms_bathrooms = fields.Boolean(
+        related='unit_type_id.has_bedrooms_bathrooms',
+        string='Has Bedrooms/Bathrooms',
+    )
     area = fields.Float(string='Area (sqm)')
     bedrooms = fields.Integer()
     bathrooms = fields.Integer()
