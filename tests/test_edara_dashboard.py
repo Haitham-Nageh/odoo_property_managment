@@ -3604,3 +3604,174 @@ class TestEdaraDashboard(TransactionCase):
         empty_act = dash._render_recent_activity_html([('branch_id', '=', self.branch.id)], self.branch, self.dash_company, False)
         self.assertNotIn('%(', empty_act)
 
+    # -------------------------------------------------------------------------
+    # Ticket B: Dynamic Branch Filter Buttons Tests
+    # -------------------------------------------------------------------------
+
+    def test_b_01_multiple_accessible_branches(self):
+        """Test 1: User with access to Branch A + Branch B sees both in accessible_branch_ids."""
+        viewer = new_test_user(
+            self.env,
+            login='branch_test_viewer_multi',
+            groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id,
+            company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        branch_a = self.env['edara.branch'].create({
+            'name': 'Ticket B Branch A', 'code': 'TBBA',
+            'company_id': self.dash_company.id,
+            'user_ids': [(4, viewer.id)],
+        })
+        branch_b = self.env['edara.branch'].create({
+            'name': 'Ticket B Branch B', 'code': 'TBBB',
+            'company_id': self.dash_company.id,
+            'user_ids': [(4, viewer.id)],
+        })
+        dash = self.env['edara.dashboard'].with_user(viewer).create({})
+        self.assertIn(branch_a, dash.accessible_branch_ids)
+        self.assertIn(branch_b, dash.accessible_branch_ids)
+        self.assertEqual(len(dash.accessible_branch_ids), 2)
+
+    def test_b_02_single_accessible_branch(self):
+        """Test 2: User with access to Branch A only sees Branch A in accessible_branch_ids."""
+        viewer = new_test_user(
+            self.env,
+            login='branch_test_viewer_single',
+            groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id,
+            company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        branch_a = self.env['edara.branch'].create({
+            'name': 'Ticket B Branch Single A', 'code': 'TBSA',
+            'company_id': self.dash_company.id,
+            'user_ids': [(4, viewer.id)],
+        })
+        # Create another branch not assigned to viewer
+        self.env['edara.branch'].create({
+            'name': 'Ticket B Branch Single Other', 'code': 'TBSO',
+            'company_id': self.dash_company.id,
+        })
+        dash = self.env['edara.dashboard'].with_user(viewer).create({})
+        self.assertEqual(dash.accessible_branch_ids, branch_a)
+
+    def test_b_03_no_branch_access(self):
+        """Test 3: User with no branch access has empty accessible_branch_ids."""
+        viewer = new_test_user(
+            self.env,
+            login='branch_test_viewer_none',
+            groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id,
+            company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        dash = self.env['edara.dashboard'].with_user(viewer).create({})
+        self.assertFalse(dash.accessible_branch_ids)
+        self.assertEqual(len(dash.accessible_branch_ids), 0)
+
+    def test_b_04_archived_branch_excluded(self):
+        """Test 4: Archived branch does not appear in accessible_branch_ids (active_test semantics)."""
+        viewer = new_test_user(
+            self.env,
+            login='branch_test_viewer_archived',
+            groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id,
+            company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        branch_archived = self.env['edara.branch'].create({
+            'name': 'Ticket B Archived Branch', 'code': 'TBAR',
+            'company_id': self.dash_company.id,
+            'user_ids': [(4, viewer.id)],
+            'active': False,
+        })
+        dash = self.env['edara.dashboard'].with_user(viewer).create({})
+        self.assertNotIn(branch_archived, dash.accessible_branch_ids)
+
+    def test_b_05_cross_company_branch_excluded(self):
+        """Test 5: Branch outside user's allowed company context does not appear."""
+        other_company = self.env['res.company'].create({'name': 'Ticket B Other Company'})
+        branch_other = self.env['edara.branch'].create({
+            'name': 'Ticket B Other Co Branch', 'code': 'TBOC',
+            'company_id': other_company.id,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({})
+        self.assertNotIn(branch_other, dash.accessible_branch_ids)
+
+    def test_b_06_unauthorized_branch_id_yields_zero_kpis(self):
+        """Test 6: Attempting to set an unauthorized branch_id leaves downstream KPIs empty/zero."""
+        # Viewer only has access to branch_allowed
+        viewer = new_test_user(
+            self.env,
+            login='branch_test_viewer_unauth',
+            groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id,
+            company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        branch_allowed = self.env['edara.branch'].create({
+            'name': 'Ticket B Allowed Branch', 'code': 'TBAL',
+            'company_id': self.dash_company.id,
+            'user_ids': [(4, viewer.id)],
+        })
+        # Unassigned branch with its own property and unit
+        branch_unauth = self.env['edara.branch'].create({
+            'name': 'Ticket B Unauthorized Branch', 'code': 'TBUN',
+            'company_id': self.dash_company.id,
+        })
+        prop = self.env['edara.property'].create({
+            'name': 'Unauth Prop', 'code': 'UPROP', 'branch_id': branch_unauth.id,
+        })
+        bld = self.env['edara.building'].create({
+            'name': 'Unauth Bldg', 'code': 'UBLD', 'property_id': prop.id,
+        })
+        self.env['edara.unit'].create({
+            'name': 'Unauth Unit', 'code': 'UUNIT', 'building_id': bld.id,
+        })
+
+        # Dashboard set to unauthorized branch by viewer
+        dash = self.env['edara.dashboard'].with_user(viewer).create({
+            'branch_id': branch_unauth.id,
+        })
+        # Record rules prevent viewer from seeing data of branch_unauth
+        self.assertEqual(dash.total_properties, 0)
+        self.assertEqual(dash.total_buildings, 0)
+        self.assertEqual(dash.total_units, 0)
+
+    def test_b_07_branch_period_independence(self):
+        """Test 7: Changing branch_id does not modify period preset or dates, and vice versa."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'period_preset': 'this_month',
+        })
+        initial_period = dash.period_preset
+        initial_from = dash.date_from
+        initial_to = dash.date_to
+        self.assertTrue(initial_from)
+        self.assertTrue(initial_to)
+
+        # 1. Changing branch_id to False (All Branches) preserves period fields
+        dash.write({'branch_id': False})
+        self.assertEqual(dash.period_preset, initial_period)
+        self.assertEqual(dash.date_from, initial_from)
+        self.assertEqual(dash.date_to, initial_to)
+
+        # 2. Changing branch_id back to self.branch preserves period fields
+        dash.write({'branch_id': self.branch.id})
+        self.assertEqual(dash.period_preset, initial_period)
+        self.assertEqual(dash.date_from, initial_from)
+        self.assertEqual(dash.date_to, initial_to)
+
+        # 3. Changing period_preset preserves branch_id
+        dash.write({'period_preset': 'this_year'})
+        self.assertEqual(dash.branch_id, self.branch)
+        self.assertEqual(dash.period_preset, 'this_year')
+
+        # 4. Custom dates preserve branch_id
+        custom_from = date(2026, 6, 1)
+        custom_to = date(2026, 6, 30)
+        dash.write({
+            'period_preset': 'custom',
+            'date_from': custom_from,
+            'date_to': custom_to,
+        })
+        self.assertEqual(dash.branch_id, self.branch)
+        self.assertEqual(dash.period_preset, 'custom')
+        self.assertEqual(dash.date_from, custom_from)
+        self.assertEqual(dash.date_to, custom_to)

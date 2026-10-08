@@ -378,3 +378,77 @@
 .o_edara_dashboard [dir="rtl"] .fa-arrow-right {
     transform: scaleX(-1);
 }
+
+/* Ticket B: Dynamic Branch Filter Buttons */
+.o_edara_dashboard .o_edara_context_bar {
+    .row > div {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100%;
+    }
+
+    label {
+        text-align: start;
+        width: 100%;
+    }
+
+    .o_edara_branch_filter_widget {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        width: 100%;
+
+        .o_edara_branch_filter_btn {
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 5px 14px;
+            border-radius: 20px;
+            transition: all 0.15s ease-in-out;
+            white-space: nowrap;
+
+            &.btn-outline-secondary {
+                color: $body-color;
+                border-color: $border-color;
+                background-color: $card-bg;
+
+                &:hover {
+                    background-color: $body-secondary-bg;
+                    border-color: $secondary;
+                    color: $body-color;
+                    transform: translateY(-1px);
+                }
+            }
+
+            &.btn-primary {
+                background-color: $primary !important;
+                border-color: $primary !important;
+                color: #fff !important;
+                font-weight: 600;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+
+                &:hover {
+                    background-color: darken($primary, 5%) !important;
+                    border-color: darken($primary, 5%) !important;
+                    color: #fff !important;
+                    transform: translateY(-1px);
+                }
+            }
+        }
+    }
+}
+
+/* Ticket B: RTL Support for Branch Filter Buttons */
+.o_rtl .o_edara_dashboard .o_edara_context_bar label,
+[dir="rtl"] .o_edara_dashboard .o_edara_context_bar label,
+.o_edara_dashboard [dir="rtl"] .o_edara_context_bar label {
+    text-align: right !important;
+}
+
+.o_rtl .o_edara_dashboard .o_edara_branch_filter_widget,
+[dir="rtl"] .o_edara_dashboard .o_edara_branch_filter_widget,
+.o_edara_dashboard [dir="rtl"] .o_edara_branch_filter_widget {
+    direction: rtl;
+    justify-content: flex-start;
+}

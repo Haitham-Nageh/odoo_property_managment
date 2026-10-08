@@ -76,6 +76,12 @@ class EdaraDashboard(models.TransientModel):
         compute='_compute_branch_info',
         help="Indicates whether the current user has access to multiple branches, to toggle selector vs display label.",
     )
+    accessible_branch_ids = fields.Many2many(
+        'edara.branch',
+        compute='_compute_accessible_branches',
+        string='Accessible Branches',
+        help="Branches accessible to the current user under active record rules.",
+    )
     period_preset = fields.Selection([
         ('this_month', 'This Month'),
         ('last_month', 'Last Month'),
@@ -189,6 +195,13 @@ class EdaraDashboard(models.TransientModel):
         accessible_count = self.env['edara.branch'].search_count([])
         for dash in self:
             dash.has_multiple_branches = accessible_count > 1
+
+    @api.depends()
+    def _compute_accessible_branches(self):
+        """Fetches branches accessible to current user strictly respecting record rules (no sudo)."""
+        accessible_branches = self.env['edara.branch'].search([])
+        for dashboard in self:
+            dashboard.accessible_branch_ids = accessible_branches
 
     @api.onchange('period_preset')
     def _onchange_period_preset(self):

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="property_managment.EdaraBranchFilterWidget">
+        <div class="o_edara_branch_filter_widget d-flex flex-wrap gap-2 align-items-center" role="group" aria-label="Branch Filter">
+            <button type="button"
+                    t-attf-class="btn btn-sm o_edara_branch_filter_btn {{ isAllBranchesSelected ? 'btn-primary active' : 'btn-outline-secondary' }}"
+                    t-att-disabled="props.readonly ? 'disabled' : undefined"
+                    t-on-click="() => this.onSelectBranch(false)">
+                <span t-esc="allBranchesLabel"/>
+            </button>
+            <t t-foreach="accessibleBranches" t-as="branch" t-key="branch.id">
+                <button type="button"
+                        t-attf-class="btn btn-sm o_edara_branch_filter_btn {{ currentBranchId === branch.id ? 'btn-primary active' : 'btn-outline-secondary' }}"
+                        t-att-disabled="props.readonly ? 'disabled' : undefined"
+                        t-on-click="() => this.onSelectBranch(branch)">
+                    <span t-esc="branch.name"/>
+                </button>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -21,6 +21,7 @@
                     <field name="currency_id" invisible="1"/>
                     <field name="has_accounting_access" invisible="1"/>
                     <field name="has_multiple_branches" invisible="1"/>
+                    <field name="accessible_branch_ids" invisible="1" widget="many2many_tags"/>
 
                     <!-- QUICK ADD / CREATE NEW -->
                     <div class="o_edara_quick_actions p-3 mb-3 bg-view border rounded shadow-sm">
@@ -43,9 +44,9 @@
                     <!-- 1. GLOBAL CONTEXT BAR -->
                     <div class="o_edara_context_bar p-3 mb-4 bg-view border rounded shadow-sm">
                         <div class="row align-items-center g-3">
-                            <div class="col-lg-4 col-md-6 col-12">
+                            <div class="col-12">
                                 <label for="branch_id" class="fw-bold text-muted small text-uppercase d-block mb-1">Branch</label>
-                                <field name="branch_id" placeholder="All Accessible Branches" readonly="not has_multiple_branches" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="branch_id" widget="edara_branch_filter"/>
                             </div>
                         </div>
                     </div>
