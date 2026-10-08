@@ -2643,6 +2643,7 @@ msgstr "طلب صيانة Count"
 #. module: property_managment
 #: model:ir.actions.act_window,name:property_managment.action_edara_maintenance_request
 #: model:ir.model.fields,field_description:property_managment.field_edara_unit__maintenance_request_ids
+#: model:ir.ui.menu,name:property_managment.menu_edara_maintenance_requests
 #: model_terms:ir.ui.view,arch_db:property_managment.portal_my_home_edara
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_request_list
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_request_search

@@ -18,13 +18,27 @@
         <field name="arch" type="xml">
             <form string="EDARA Dashboard" create="false" delete="false">
                 <div class="o_edara_dashboard container-fluid py-2">
-                    <div class="oe_title mb-3">
-                        <h1 class="mb-1">EDARA Property Management</h1>
-                        <p class="text-muted mb-0">Operational Command Center — occupancy, leases, collections and maintenance at a glance.</p>
-                    </div>
                     <field name="currency_id" invisible="1"/>
                     <field name="has_accounting_access" invisible="1"/>
                     <field name="has_multiple_branches" invisible="1"/>
+
+                    <!-- QUICK ADD / CREATE NEW -->
+                    <div class="o_edara_quick_actions p-3 mb-3 bg-view border rounded shadow-sm">
+                        <div class="o_quick_actions_group">
+                            <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Create New</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="object" name="action_new_lease_contract" class="btn btn-primary">
+                                    <i class="fa fa-file-text me-1"/> New Lease Contract
+                                </button>
+                                <button type="object" name="action_new_maintenance_request" class="btn btn-primary">
+                                    <i class="fa fa-wrench me-1"/> New Maintenance Request
+                                </button>
+                                <button type="object" name="action_new_tenant" class="btn btn-primary">
+                                    <i class="fa fa-user-plus me-1"/> New Tenant
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- 1. GLOBAL CONTEXT BAR -->
                     <div class="o_edara_context_bar p-3 mb-4 bg-view border rounded shadow-sm">
@@ -502,22 +516,6 @@
                     <!-- 7. QUICK ACTIONS & AUTOMATION -->
                     <separator string="Quick Actions &amp; Automation"/>
                     <div class="o_edara_quick_actions p-3 mt-2 bg-view border rounded shadow-sm">
-                        <!-- Create Shortcuts -->
-                        <div class="o_quick_actions_group mb-3 pb-3 border-bottom">
-                            <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Create New</div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button type="object" name="action_new_lease_contract" class="btn btn-primary">
-                                    <i class="fa fa-file-text me-1"/> New Lease Contract
-                                </button>
-                                <button type="object" name="action_new_maintenance_request" class="btn btn-primary">
-                                    <i class="fa fa-wrench me-1"/> New Maintenance Request
-                                </button>
-                                <button type="object" name="action_new_tenant" class="btn btn-primary">
-                                    <i class="fa fa-user-plus me-1"/> New Tenant
-                                </button>
-                            </div>
-                        </div>
-
                         <!-- Automation Triggers -->
                         <div class="o_quick_actions_group">
                             <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Automation &amp; Operations</div>

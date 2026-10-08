@@ -38,6 +38,9 @@
     <menuitem id="menu_edara_maintenance_request" name="Maintenance" parent="menu_edara_root"
               action="action_edara_maintenance_request" sequence="40"/>
 
+    <menuitem id="menu_edara_maintenance_requests" name="Maintenance Requests" parent="menu_edara_maintenance_request"
+              action="action_edara_maintenance_request" sequence="5"/>
+
     <menuitem id="menu_edara_recurring_maintenance" name="Recurring Maintenance" parent="menu_edara_maintenance_request"
               action="action_edara_recurring_maintenance" sequence="10"
               groups="group_edara_property_manager"/>
