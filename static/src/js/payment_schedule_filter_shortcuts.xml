@@ -1,20 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
-    <!-- Phase 6.6: MUST be t-inherit-mode="primary". "extension" mode
-         patches the shared web.ListView template in place (see
-         payment_schedule_filter_shortcuts.js header and Phase 6.3 in
-         EDARA_PROJECT_STATE.md), affecting every list view in the backend
-         regardless of js_class - "primary" instead creates this as an
-         independent template that only this controller opts into. -->
+    <!-- Ticket U1 / Phase 6.6: MUST be t-inherit-mode="primary". "extension" mode
+         patches the shared web.ListView template in place, affecting every list
+         view in the backend regardless of js_class - "primary" instead creates
+         this as an independent template that only this controller opts into. -->
     <t t-name="property_managment.PaymentScheduleFilterShortcutsListView" t-inherit="web.ListView" t-inherit-mode="primary">
         <xpath expr="//t[@t-component='props.Renderer']" position="before">
-            <div class="o_edara_schedule_filter_shortcuts" t-if="edaraFilterShortcuts.length">
+            <div class="o_edara_schedule_filter_shortcuts" t-if="edaraFilterShortcuts.length" role="toolbar" aria-label="Status Filters">
                 <button t-foreach="edaraFilterShortcuts" t-as="item" t-key="item.id"
                         type="button"
-                        t-attf-class="btn btn-sm o_edara_schedule_filter_shortcut {{ item.isActive ? ('btn-' + item.color) : ('btn-outline-' + item.color) }}"
+                        t-att-aria-pressed="item.isActive ? 'true' : 'false'"
+                        t-attf-class="btn btn-sm o_edara_schedule_filter_shortcut o_edara_shortcut_{{ item.name }} {{ item.isActive ? ('btn-' + item.color + ' is-active') : ('btn-outline-' + item.color) }}"
                         t-on-click="() => this.onEdaraFilterShortcutClick(item.id)">
                     <span class="o_edara_schedule_filter_shortcut_label" t-esc="item.description"/>
-                    <span class="badge rounded-pill ms-1" t-attf-class="{{ item.isActive ? 'bg-light text-dark' : ('bg-' + item.color + ' text-white') }}" t-esc="item.count"/>
+                    <span class="o_edara_schedule_filter_shortcut_count" t-esc="item.count"/>
                 </button>
             </div>
         </xpath>

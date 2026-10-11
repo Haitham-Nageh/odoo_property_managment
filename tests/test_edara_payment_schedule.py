@@ -764,3 +764,335 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
         self.assertEqual(manager_counts.get('overdue', 0), 2) # 1 from A + 1 from B
         self.assertEqual(manager_counts.get('draft', 0), 1)   # 1 from A + 0 from B
 
+    def test_payment_schedule_counts_contract_isolation_and_global_scope(self):
+        """Ticket U1: Payment schedule status counters must reflect the effective domain.
+        When opened with a Contract domain, counts must isolate strictly to that Contract.
+        When opened from the global menu (empty domain), counts reflect all accessible records."""
+        branch = self.env['edara.branch'].create({'name': 'U1 Branch', 'code': 'U1B'})
+        prop = self.env['edara.property'].create({'name': 'U1 Prop', 'code': 'U1P', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'U1 Bld', 'code': 'U1BD', 'property_id': prop.id})
+        unit_a = self.env['edara.unit'].create({'name': 'U1 Unit A', 'code': 'U1A', 'building_id': bld.id})
+        unit_b = self.env['edara.unit'].create({'name': 'U1 Unit B', 'code': 'U1B2', 'building_id': bld.id})
+        tenant = self.env['res.partner'].create({'name': 'U1 Tenant'})
+
+        contract_a = self.env['edara.lease.contract'].create({
+            'unit_id': unit_a.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_b = self.env['edara.lease.contract'].create({
+            'unit_id': unit_b.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_a.action_activate()
+        contract_b.action_activate()
+
+        lines_a = contract_a.schedule_line_ids
+        lines_b = contract_b.schedule_line_ids
+        self.assertEqual(len(lines_a), 3)
+        self.assertEqual(len(lines_b), 3)
+
+        # Distribute states: Contract A (1 paid, 1 overdue, 1 draft)
+        lines_a[0].state = 'paid'
+        lines_a[1].state = 'overdue'
+        lines_a[2].state = 'draft'
+
+        # Contract B (2 paid, 1 overdue, 0 draft)
+        lines_b[0].state = 'paid'
+        lines_b[1].state = 'paid'
+        lines_b[2].state = 'overdue'
+
+        # 1. Contract A isolated counts via web_read_group
+        domain_a = [('contract_id', '=', contract_a.id)]
+        res_a = self.env['edara.payment.schedule.line'].web_read_group(
+            domain_a, ['state'], ['__count'])['groups']
+        counts_a = {g['state']: g['__count'] for g in res_a}
+        self.assertEqual(counts_a.get('paid', 0), 1)
+        self.assertEqual(counts_a.get('overdue', 0), 1)
+        self.assertEqual(counts_a.get('draft', 0), 1)
+
+        # Fallback read_group path for Contract A produces identical counts
+        fallback_a = self.env['edara.payment.schedule.line'].read_group(
+            domain_a, ['state'], ['state'])
+        fallback_counts_a = {g['state']: g['state_count'] for g in fallback_a}
+        self.assertEqual(fallback_counts_a.get('paid', 0), 1)
+        self.assertEqual(fallback_counts_a.get('overdue', 0), 1)
+        self.assertEqual(fallback_counts_a.get('draft', 0), 1)
+
+        # 2. Contract B isolated counts via web_read_group
+        domain_b = [('contract_id', '=', contract_b.id)]
+        res_b = self.env['edara.payment.schedule.line'].web_read_group(
+            domain_b, ['state'], ['__count'])['groups']
+        counts_b = {g['state']: g['__count'] for g in res_b}
+        self.assertEqual(counts_b.get('paid', 0), 2)
+        self.assertEqual(counts_b.get('overdue', 0), 1)
+        self.assertEqual(counts_b.get('draft', 0), 0)
+
+        # Fallback read_group path for Contract B produces identical counts
+        fallback_b = self.env['edara.payment.schedule.line'].read_group(
+            domain_b, ['state'], ['state'])
+        fallback_counts_b = {g['state']: g['state_count'] for g in fallback_b}
+        self.assertEqual(fallback_counts_b.get('paid', 0), 2)
+        self.assertEqual(fallback_counts_b.get('overdue', 0), 1)
+        self.assertEqual(fallback_counts_b.get('draft', 0), 0)
+
+        # Contract A counts strictly exclude Contract B records
+        self.assertNotEqual(counts_a, counts_b)
+
+        # 3. Global menu counts (empty domain, filtered to test lines)
+        test_ids = (lines_a + lines_b).ids
+        domain_global = [('id', 'in', test_ids)]
+        res_global = self.env['edara.payment.schedule.line'].web_read_group(
+            domain_global, ['state'], ['__count'])['groups']
+        counts_global = {g['state']: g['__count'] for g in res_global}
+        self.assertEqual(counts_global.get('paid', 0), 3)    # 1 (A) + 2 (B)
+        self.assertEqual(counts_global.get('overdue', 0), 2) # 1 (A) + 1 (B)
+        self.assertEqual(counts_global.get('draft', 0), 1)   # 1 (A) + 0 (B)
+
+        fallback_global = self.env['edara.payment.schedule.line'].read_group(
+            domain_global, ['state'], ['state'])
+        fallback_counts_global = {g['state']: g['state_count'] for g in fallback_global}
+        self.assertEqual(fallback_counts_global, counts_global)
+
+    def test_contract_action_navigation_domain_and_context(self):
+        """Ticket U1: Verify that navigating from Contract form generates the exact
+        contract domain and default_contract_id creation context expected by the list."""
+        branch = self.env['edara.branch'].create({'name': 'U1 Nav Branch', 'code': 'U1NB'})
+        prop = self.env['edara.property'].create({'name': 'U1 Nav Prop', 'code': 'U1NP', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'U1 Nav Bld', 'code': 'U1NBD', 'property_id': prop.id})
+        unit = self.env['edara.unit'].create({'name': 'U1 Nav Unit', 'code': 'U1NU', 'building_id': bld.id})
+        tenant = self.env['res.partner'].create({'name': 'U1 Nav Tenant'})
+
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': unit.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract.action_activate()
+
+        action = contract.action_view_schedule_lines()
+        self.assertEqual(action.get('res_model'), 'edara.payment.schedule.line')
+        self.assertEqual(action.get('domain'), [('contract_id', '=', contract.id)])
+        self.assertEqual(action.get('context', {}).get('default_contract_id'), contract.id)
+
+    def test_active_domain_status_filters_and_or_semantics(self):
+        """Ticket U1: When active domain contains status filters (including OR combinations),
+        web_read_group and read_group evaluate the matching scoped subsets accurately."""
+        branch = self.env['edara.branch'].create({'name': 'U1 Filter Branch', 'code': 'U1FB'})
+        prop = self.env['edara.property'].create({'name': 'U1 Filter Prop', 'code': 'U1FP', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'U1 Filter Bld', 'code': 'U1FBD', 'property_id': prop.id})
+        unit = self.env['edara.unit'].create({'name': 'U1 Filter Unit', 'code': 'U1FU', 'building_id': bld.id})
+        tenant = self.env['res.partner'].create({'name': 'U1 Filter Tenant'})
+
+        contract = self.env['edara.lease.contract'].create({
+            'unit_id': unit.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract.action_activate()
+        lines = contract.schedule_line_ids
+        lines[0].state = 'paid'
+        lines[1].state = 'overdue'
+        lines[2].state = 'draft'
+
+        # Active domain with Contract + single status filter
+        domain_paid = [('contract_id', '=', contract.id), ('state', '=', 'paid')]
+        res_paid = self.env['edara.payment.schedule.line'].web_read_group(
+            domain_paid, ['state'], ['__count'])['groups']
+        counts_paid = {g['state']: g['__count'] for g in res_paid}
+        self.assertEqual(counts_paid.get('paid', 0), 1)
+        self.assertEqual(counts_paid.get('overdue', 0), 0)
+        self.assertEqual(counts_paid.get('draft', 0), 0)
+
+        # Active domain with Contract + multiple status filters (native OR semantics)
+        domain_or = [('contract_id', '=', contract.id), '|', ('state', '=', 'paid'), ('state', '=', 'overdue')]
+        res_or = self.env['edara.payment.schedule.line'].web_read_group(
+            domain_or, ['state'], ['__count'])['groups']
+        counts_or = {g['state']: g['__count'] for g in res_or}
+        self.assertEqual(counts_or.get('paid', 0), 1)
+        self.assertEqual(counts_or.get('overdue', 0), 1)
+        self.assertEqual(counts_or.get('draft', 0), 0)
+
+    def test_redesigned_shortcut_styling_and_attributes(self):
+        """Ticket U1: Verify rectangular styling, 6px border radius, refined accent colors,
+        no count badge, label above count, and aria-pressed attribute."""
+        base_dir = os.path.dirname(__file__)
+        js_path = os.path.normpath(os.path.join(
+            base_dir, '..', 'static', 'src', 'js', 'payment_schedule_filter_shortcuts.js'))
+        with open(js_path, 'r', encoding='utf-8') as f:
+            js_source = f.read()
+
+        xml_path = os.path.normpath(os.path.join(
+            base_dir, '..', 'static', 'src', 'js', 'payment_schedule_filter_shortcuts.xml'))
+        with open(xml_path, 'r', encoding='utf-8') as f:
+            xml_source = f.read()
+
+        css_path = os.path.normpath(os.path.join(
+            base_dir, '..', 'static', 'src', 'css', 'payment_schedule_filter_shortcuts.css'))
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_source = f.read()
+
+        # JS Controller assertions:
+        # 1. No hardcoded empty domain in webReadGroup or read_group
+        self.assertNotIn('this.orm.webReadGroup(\n                    "edara.payment.schedule.line",\n                    []', js_source)
+        self.assertNotIn('{ domain: [], fields: ["state"], groupby: ["state"] }', js_source)
+        # 2. Resolves effectiveDomain and effectiveContext
+        self.assertIn('effectiveDomain', js_source)
+        self.assertIn('effectiveContext', js_source)
+        # 3. Refresh on inline save
+        self.assertIn('onRecordSaved', js_source)
+        # 4. Stale-response and component disposal guards
+        self.assertIn('_countRequestId', js_source)
+        self.assertIn('_isDestroyed', js_source)
+
+        # XML Template assertions:
+        # 1. Accessible aria-pressed
+        self.assertIn('t-att-aria-pressed', xml_source)
+        # 2. Label above tabular count
+        self.assertIn('o_edara_schedule_filter_shortcut_label', xml_source)
+        self.assertIn('o_edara_schedule_filter_shortcut_count', xml_source)
+        # 3. No separate badge or bordered badge around the count
+        self.assertNotIn('badge rounded-pill', xml_source)
+
+        # CSS assertions:
+        # 1. Rectangular 6px corner radius
+        self.assertIn('border-radius: 6px', css_source)
+        # 2. Refined palette colors: Draft #405469, Paid #315D84, Overdue #7A5A22
+        self.assertIn('#315d84', css_source.lower())
+        self.assertIn('#7a5a22', css_source.lower())
+        self.assertIn('#405469', css_source.lower())
+        # 3. Tabular numeric styling for stable numbers
+        self.assertIn('tabular-nums', css_source)
+
+    def test_filter_toggle_sequence_contract_and_global_counts(self):
+        """Ticket U1 Bug Fix: Verify that toggling Draft, clearing Draft, and selecting Overdue
+        updates both the row population and the status counters correctly without lag or zeroes.
+        Clearing Draft must immediately restore all counters to full unfiltered totals."""
+        branch = self.env['edara.branch'].create({'name': 'U1 Seq Branch', 'code': 'U1SB'})
+        prop = self.env['edara.property'].create({'name': 'U1 Seq Prop', 'code': 'U1SP', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'U1 Seq Bld', 'code': 'U1SBD', 'property_id': prop.id})
+        unit_a = self.env['edara.unit'].create({'name': 'U1 Seq Unit A', 'code': 'U1SA', 'building_id': bld.id})
+        unit_b = self.env['edara.unit'].create({'name': 'U1 Seq Unit B', 'code': 'U1SB2', 'building_id': bld.id})
+        tenant = self.env['res.partner'].create({'name': 'U1 Seq Tenant'})
+
+        # Contract A: 4 schedule lines (2 draft, 1 overdue, 1 paid)
+        contract_a = self.env['edara.lease.contract'].create({
+            'unit_id': unit_a.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 4, 30),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        # Contract B: 3 schedule lines (1 draft, 1 overdue, 1 paid)
+        contract_b = self.env['edara.lease.contract'].create({
+            'unit_id': unit_b.id, 'tenant_id': tenant.id,
+            'start_date': date(2026, 1, 1), 'end_date': date(2026, 3, 31),
+            'rent_amount': 1000, 'deposit_required': False,
+        })
+        contract_a.action_activate()
+        contract_b.action_activate()
+
+        lines_a = contract_a.schedule_line_ids
+        lines_b = contract_b.schedule_line_ids
+        self.assertEqual(len(lines_a), 4)
+        self.assertEqual(len(lines_b), 3)
+
+        lines_a[0].state = 'paid'
+        lines_a[1].state = 'overdue'
+        lines_a[2].state = 'draft'
+        lines_a[3].state = 'draft'
+
+        lines_b[0].state = 'paid'
+        lines_b[1].state = 'overdue'
+        lines_b[2].state = 'draft'
+
+        def get_counts(domain):
+            res = self.env['edara.payment.schedule.line'].web_read_group(
+                domain, ['state'], ['__count'])['groups']
+            return {g['state']: g['__count'] for g in res}
+
+        # Step 1: Contract-scoped initial state (no status filter applied)
+        contract_domain = [('contract_id', '=', contract_a.id)]
+        initial_counts = get_counts(contract_domain)
+        self.assertEqual(initial_counts.get('draft', 0), 2)
+        self.assertEqual(initial_counts.get('overdue', 0), 1)
+        self.assertEqual(initial_counts.get('paid', 0), 1)
+        self.assertEqual(self.env['edara.payment.schedule.line'].search_count(contract_domain), 4)
+
+        # Step 2: User selects Draft shortcut filter
+        draft_domain = [('contract_id', '=', contract_a.id), ('state', '=', 'draft')]
+        draft_filtered_counts = get_counts(draft_domain)
+        self.assertEqual(draft_filtered_counts.get('draft', 0), 2)
+        self.assertEqual(draft_filtered_counts.get('overdue', 0), 0)
+        self.assertEqual(draft_filtered_counts.get('paid', 0), 0)
+        self.assertEqual(self.env['edara.payment.schedule.line'].search_count(draft_domain), 2)
+
+        # Step 3: User clears Draft filter
+        cleared_domain = [('contract_id', '=', contract_a.id)]
+        restored_counts = get_counts(cleared_domain)
+        # CRITICAL DEFECT CHECK: Clearing Draft must restore all three counters immediately!
+        self.assertEqual(restored_counts.get('draft', 0), 2)
+        self.assertEqual(restored_counts.get('overdue', 0), 1)
+        self.assertEqual(restored_counts.get('paid', 0), 1)
+        self.assertEqual(self.env['edara.payment.schedule.line'].search_count(cleared_domain), 4)
+
+        # Step 4: User selects Overdue filter
+        overdue_domain = [('contract_id', '=', contract_a.id), ('state', '=', 'overdue')]
+        overdue_filtered_counts = get_counts(overdue_domain)
+        self.assertEqual(overdue_filtered_counts.get('overdue', 0), 1)
+        self.assertEqual(overdue_filtered_counts.get('draft', 0), 0)
+        self.assertEqual(overdue_filtered_counts.get('paid', 0), 0)
+        self.assertEqual(self.env['edara.payment.schedule.line'].search_count(overdue_domain), 1)
+
+        # Step 5: Verify Contract B remains completely isolated throughout
+        contract_b_counts = get_counts([('contract_id', '=', contract_b.id)])
+        self.assertEqual(contract_b_counts.get('draft', 0), 1)
+        self.assertEqual(contract_b_counts.get('overdue', 0), 1)
+        self.assertEqual(contract_b_counts.get('paid', 0), 1)
+
+        # Step 6: Global view sequence (scoped across test records)
+        test_scope_domain = [('id', 'in', (lines_a + lines_b).ids)]
+        global_initial = get_counts(test_scope_domain)
+        self.assertEqual(global_initial.get('draft', 0), 3)
+        self.assertEqual(global_initial.get('overdue', 0), 2)
+        self.assertEqual(global_initial.get('paid', 0), 2)
+
+        global_draft = get_counts(test_scope_domain + [('state', '=', 'draft')])
+        self.assertEqual(global_draft.get('draft', 0), 3)
+        self.assertEqual(global_draft.get('overdue', 0), 0)
+        self.assertEqual(global_draft.get('paid', 0), 0)
+
+        global_restored = get_counts(test_scope_domain)
+        self.assertEqual(global_restored, global_initial)
+
+        global_overdue = get_counts(test_scope_domain + [('state', '=', 'overdue')])
+        self.assertEqual(global_overdue.get('overdue', 0), 2)
+        self.assertEqual(global_overdue.get('draft', 0), 0)
+        self.assertEqual(global_overdue.get('paid', 0), 0)
+
+    def test_search_update_lifecycle_and_scope_deduplication_contract(self):
+        """Ticket U1 Bug Fix: Verify JS implementation contracts for SearchModel update timing,
+        empty-array truthiness resolution, modelParams onRootLoaded hook, and deduplication."""
+        base_dir = os.path.dirname(__file__)
+        js_path = os.path.normpath(os.path.join(
+            base_dir, '..', 'static', 'src', 'js', 'payment_schedule_filter_shortcuts.js'))
+        with open(js_path, 'r', encoding='utf-8') as f:
+            js_source = f.read()
+
+        # 1. searchModel.domain prioritizes Array.isArray over truthy checks
+        self.assertIn('Array.isArray(searchDomain)', js_source)
+        # 2. searchModel 'update' event handler passes searchModel scope directly
+        self.assertIn('useBus(this.env.searchModel, "update"', js_source)
+        self.assertIn('loadStateCounts({ domain, context })', js_source)
+        # 3. modelParams overrides hooks.onRootLoaded
+        self.assertIn('get modelParams()', js_source)
+        self.assertIn('onRootLoaded', js_source)
+        # 4. Scope deduplication key mechanism
+        self.assertIn('_currentScopeKey', js_source)
+        self.assertIn('JSON.stringify([domain, context])', js_source)
+        # 5. Pending scope and in-flight coalescing
+        self.assertIn('_pendingScope', js_source)
+        self.assertIn('_needsReloadCounts', js_source)
+        # 6. Discard obsolete responses
+        self.assertIn('requestScopeKey !== this._currentScopeKey', js_source)
+        self.assertIn('currentRequestId !== this._countRequestId', js_source)
+
