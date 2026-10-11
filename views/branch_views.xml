@@ -52,8 +52,27 @@
                         </page>
                         <page string="Maintenance SLA" name="maintenance_sla">
                             <group>
-                                <field name="sla_response_hours"/>
-                                <field name="sla_resolution_hours"/>
+                                <group string="Response SLA">
+                                    <field name="sla_response_mode"/>
+                                    <field name="sla_response_override_hours"
+                                           invisible="sla_response_mode != 'custom'"
+                                           required="sla_response_mode == 'custom'"/>
+                                    <field name="sla_response_enabled" readonly="1"/>
+                                    <field name="sla_response_hours" readonly="1"/>
+                                    <field name="sla_response_source" readonly="1"/>
+                                </group>
+                                <group string="Resolution SLA">
+                                    <field name="sla_resolution_mode"/>
+                                    <field name="sla_resolution_override_hours"
+                                           invisible="sla_resolution_mode != 'custom'"
+                                           required="sla_resolution_mode == 'custom'"/>
+                                    <field name="sla_resolution_enabled" readonly="1"/>
+                                    <field name="sla_resolution_hours" readonly="1"/>
+                                    <field name="sla_resolution_source" readonly="1"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="sla_notifications_enabled" readonly="1"/>
                             </group>
                         </page>
                         <page string="Financial Summary" name="financials" invisible="not has_accounting_access">

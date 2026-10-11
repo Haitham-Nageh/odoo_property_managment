@@ -419,7 +419,8 @@ class EdaraDashboard(models.TransientModel):
 
             sla_candidates_domain = [
                 ('state', 'in', ('new', 'assigned', 'in_progress')),
-                ('branch_id.sla_resolution_hours', '>', 0),
+                '|', ('branch_id.sla_response_enabled', '=', True),
+                ('branch_id.sla_resolution_enabled', '=', True),
             ]
             if branch:
                 sla_candidates_domain.append(('branch_id', '=', branch.id))
@@ -1201,7 +1202,8 @@ class EdaraDashboard(models.TransientModel):
         filter once opened - just expressed as ('id', 'in', [...])."""
         domain = [
             ('state', 'in', ('new', 'assigned', 'in_progress')),
-            ('branch_id.sla_resolution_hours', '>', 0),
+            '|', ('branch_id.sla_response_enabled', '=', True),
+            ('branch_id.sla_resolution_enabled', '=', True),
         ]
         if self.branch_id:
             domain.append(('branch_id', '=', self.branch_id.id))
@@ -1220,7 +1222,8 @@ class EdaraDashboard(models.TransientModel):
         are currently 'At Risk' or 'Breached' per their branch's configured SLA."""
         domain = [
             ('state', 'in', ('new', 'assigned', 'in_progress')),
-            ('branch_id.sla_resolution_hours', '>', 0),
+            '|', ('branch_id.sla_response_enabled', '=', True),
+            ('branch_id.sla_resolution_enabled', '=', True),
             ('vendor_id', '!=', False),
         ]
         if self.branch_id:

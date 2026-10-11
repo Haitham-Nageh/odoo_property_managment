@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 
 from odoo.exceptions import AccessError
 from odoo.fields import Date
-from odoo.tests import HttpCase, TransactionCase, tagged
+from odoo.tests import HttpCase, TransactionCase, new_test_user, tagged
 from odoo.tools import mute_logger
 
 
@@ -117,24 +117,24 @@ class TestEdaraSlaTracking(TestEdaraMaintenancePhase2Base):
         self.assertGreaterEqual(request.resolution_hours, request.response_hours)
 
     def test_sla_state_within_when_recent(self):
-        self.branch.sla_resolution_hours = 72
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 72})
         request = self._make_request()
         self.assertEqual(request.sla_state, 'within')
 
     def test_sla_state_at_risk_past_threshold(self):
-        self.branch.sla_resolution_hours = 72
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 72})
         request = self._make_request()
         self._backdate_create_date(request, hours_ago=60)  # 60/72 = 83% > 80% threshold
         self.assertEqual(request.sla_state, 'at_risk')
 
     def test_sla_state_breached_past_target(self):
-        self.branch.sla_resolution_hours = 72
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 72})
         request = self._make_request()
         self._backdate_create_date(request, hours_ago=100)
         self.assertEqual(request.sla_state, 'breached')
 
     def test_sla_state_disabled_when_target_is_zero(self):
-        self.branch.sla_resolution_hours = 0
+        self.branch.sla_resolution_mode = 'disabled'
         request = self._make_request()
         self._backdate_create_date(request, hours_ago=1000)
         self.assertEqual(request.sla_state, 'within')
@@ -144,7 +144,7 @@ class TestEdaraSlaTracking(TestEdaraMaintenancePhase2Base):
         self.assertFalse(self.env['edara.maintenance.request']._fields['sla_state'].store)
 
     def test_completed_request_sla_state_reflects_actual_resolution(self):
-        self.branch.sla_resolution_hours = 72
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 72})
         request = self._make_request()
         request.action_assign(self.staff.id)
         request.action_start()
@@ -158,7 +158,7 @@ class TestEdaraSlaTracking(TestEdaraMaintenancePhase2Base):
         self.assertEqual(request.sla_state, 'within')
 
     def test_sla_notification_idempotent(self):
-        self.branch.sla_resolution_hours = 24
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 24})
         request = self._make_request()
         self._backdate_create_date(request, hours_ago=100)
         sent_first = self.env['edara.maintenance.request']._cron_send_sla_notifications()
@@ -169,7 +169,7 @@ class TestEdaraSlaTracking(TestEdaraMaintenancePhase2Base):
         self.assertEqual(len(request.activity_ids.filtered(lambda a: a.activity_type_id == activity_type)), 1)
 
     def test_sla_notification_skips_completed_requests(self):
-        self.branch.sla_resolution_hours = 24
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 24})
         request = self._make_request()
         request.action_assign(self.staff.id)
         request.action_start()
@@ -179,11 +179,57 @@ class TestEdaraSlaTracking(TestEdaraMaintenancePhase2Base):
         self.assertEqual(sent, 0)
 
     def test_sla_notification_skips_branches_without_target(self):
-        self.branch.sla_resolution_hours = 0
+        self.branch.sla_resolution_mode = 'disabled'
         request = self._make_request()
         self._backdate_create_date(request, hours_ago=1000)
         sent = self.env['edara.maintenance.request']._cron_send_sla_notifications()
         self.assertEqual(sent, 0)
+
+    def test_company_notification_toggle_suppresses_new_sla_activities(self):
+        self.branch.write({'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 24.0})
+        request = self._make_request()
+        self._backdate_create_date(request, hours_ago=100)
+        self.env.company.edara_sla_notifications_enabled = False
+        self.assertFalse(self.branch.sla_notifications_enabled)
+        self.assertEqual(self.env['edara.maintenance.request']._cron_send_sla_notifications(), 0)
+        self.env.company.edara_sla_notifications_enabled = True
+        self.assertEqual(self.env['edara.maintenance.request']._cron_send_sla_notifications(), 1)
+        activity_type = self.env.ref('property_managment.mail_activity_type_edara_maintenance_sla')
+        activity = request.activity_ids.filtered(lambda a: a.activity_type_id == activity_type)
+        self.env.company.edara_sla_notifications_enabled = False
+        self.assertEqual(self.env['edara.maintenance.request']._cron_send_sla_notifications(), 0)
+        self.assertTrue(activity.exists())
+
+    def test_request_targets_and_vendor_durations_remain_distinct(self):
+        self.branch.write({
+            'sla_response_mode': 'custom', 'sla_response_override_hours': 2.25,
+            'sla_resolution_mode': 'custom', 'sla_resolution_override_hours': 8.5,
+        })
+        request = self._make_request(vendor_id=self.vendor.id)
+        self.assertEqual(request.sla_response_target_hours, 2.25)
+        self.assertEqual(request.sla_resolution_target_hours, 8.5)
+        self._backdate_create_date(request, hours_ago=5)
+        request.action_assign(self.staff.id)
+        request.action_start()
+        request.action_complete()
+        self.assertAlmostEqual(self.vendor.edara_vendor_avg_response_hours, request.response_hours)
+        self.assertAlmostEqual(self.vendor.edara_vendor_avg_resolution_hours, request.resolution_hours)
+        durations = (request.response_hours, request.resolution_hours)
+        self.branch.write({'sla_resolution_override_hours': 100.0})
+        self.assertEqual(request.sla_resolution_target_hours, 100.0)
+        self.assertEqual((request.response_hours, request.resolution_hours), durations)
+
+    def test_dashboard_candidates_include_response_only_configuration(self):
+        self.branch.write({
+            'sla_response_mode': 'custom', 'sla_response_override_hours': 2.25,
+            'sla_resolution_mode': 'disabled',
+        })
+        request = self._make_request(vendor_id=self.vendor.id)
+        dashboard = self.env['edara.dashboard'].create({'branch_id': self.branch.id})
+        self.assertIn(request.id, dashboard._sla_request_ids('within'))
+        # Live response state aggregation remains a later phase: resolution is
+        # disabled, so the current compatibility state continues to be 'within'.
+        self.assertEqual(request.sla_state, 'within')
 
 
 @tagged('post_install', '-at_install')
@@ -555,6 +601,10 @@ class TestEdaraMaintenancePhase2Portal(HttpCase):
             'name': 'Portal P4 Tenant', 'login': 'edara_p4_tenant', 'password': 'edara_p4_tenant',
             'partner_id': cls.partner.id, 'group_ids': [(6, 0, [portal_group.id])],
         })
+        cls.sla_manager = new_test_user(
+            cls.env, login='u2_sla_rpc_manager', password='u2_sla_rpc_manager',
+            groups='property_managment.group_edara_branch_manager,base.group_erp_manager')
+        cls.branch.user_ids = [(4, cls.sla_manager.id)]
         cls.contract = cls.env['edara.lease.contract'].create({
             'unit_id': cls.unit.id, 'tenant_id': cls.partner.id,
             'start_date': date(2026, 1, 1), 'end_date': date(2026, 12, 31), 'rent_amount': 1000,
@@ -591,6 +641,85 @@ class TestEdaraMaintenancePhase2Portal(HttpCase):
         self.assertNotIn('Portal P4 Vendor', response.text)
         self.assertNotIn('SLA', response.text)
         self.assertNotIn('250', response.text)
+
+    def test_tenant_non_sudo_sla_reads_and_writes_are_denied(self):
+        request = self.env['edara.maintenance.request'].create({
+            'title': 'U2 Private SLA', 'unit_id': self.unit.id, 'tenant_id': self.partner.id,
+        })
+        ordinary = request.with_user(self.user)
+        self.assertEqual(ordinary.read(['title'])[0]['title'], 'U2 Private SLA')
+        for name, value in (
+                ('first_response_at', '2026-01-01 00:00:00'),
+                ('resolved_at', '2026-01-01 00:00:00'),
+                ('response_hours', 1.0), ('resolution_hours', 1.0),
+                ('sla_response_target_hours', 1.0), ('sla_resolution_target_hours', 1.0),
+                ('sla_state', 'within')):
+            with self.subTest(field=name):
+                with self.assertRaises(AccessError):
+                    ordinary.read([name])
+                with self.assertRaises(AccessError):
+                    ordinary.write({name: value})
+        # Portal model ACL allows create: this tests field restrictions rather
+        # than merely observing its general write ACL denial.
+        with self.assertRaises(AccessError), self.env.cr.savepoint():
+            self.env['edara.maintenance.request'].with_user(self.user).create({
+                'title': 'Forged response', 'unit_id': self.unit.id,
+                'tenant_id': self.partner.id, 'first_response_at': '2026-01-01 00:00:00',
+            })
+
+    def _sla_rpc(self, model, method, args):
+        return self.url_open('/web/dataset/call_kw/%s/%s' % (model, method), json={
+            'jsonrpc': '2.0', 'id': 1, 'method': 'call',
+            'params': {'model': model, 'method': method, 'args': args, 'kwargs': {}},
+        }).json()
+
+    def test_portal_rpc_company_and_request_sla_boundaries(self):
+        request = self.env['edara.maintenance.request'].create({
+            'title': 'U2 RPC SLA', 'unit_id': self.unit.id, 'tenant_id': self.partner.id,
+        })
+        self.authenticate('edara_p4_tenant', 'edara_p4_tenant')
+        allowed = self._sla_rpc('edara.maintenance.request', 'read', [[request.id], ['title']])
+        self.assertEqual(allowed['result'][0]['title'], 'U2 RPC SLA')
+        for model, record_id, values in (
+                ('res.company', self.branch.company_id.id, {
+                    'edara_sla_response_enabled': True, 'edara_sla_response_hours': 1.0,
+                    'edara_sla_resolution_enabled': True, 'edara_sla_resolution_hours': 1.0,
+                    'edara_sla_notifications_enabled': False,
+                }),
+                ('edara.maintenance.request', request.id, {
+                    'first_response_at': '2026-01-01 00:00:00', 'resolved_at': '2026-01-01 00:00:00',
+                    'response_hours': 1.0, 'resolution_hours': 1.0,
+                    'sla_response_target_hours': 1.0, 'sla_resolution_target_hours': 1.0,
+                    'sla_state': 'within',
+                })):
+            for name, value in values.items():
+                for method, argument in (('read', [name]), ('write', {name: value})):
+                    with self.subTest(model=model, field=name, method=method):
+                        result = self._sla_rpc(model, method, [[record_id], argument])
+                        self.assertEqual(result['error']['data']['name'], 'odoo.exceptions.AccessError')
+
+    def test_internal_rpc_configuration_and_effective_field_guard(self):
+        self.authenticate('u2_sla_rpc_manager', 'u2_sla_rpc_manager')
+        allowed = self._sla_rpc('edara.branch', 'write', [[self.branch.id], {
+            'sla_response_mode': 'custom', 'sla_response_override_hours': 2.75,
+        }])
+        self.assertTrue(allowed['result'])
+        effective = self._sla_rpc('edara.branch', 'read', [[self.branch.id], ['sla_response_hours']])
+        self.assertEqual(effective['result'][0]['sla_response_hours'], 2.75)
+        for name, value in (
+                ('sla_response_hours', 999.0), ('sla_resolution_hours', 999.0),
+                ('sla_response_enabled', False), ('sla_resolution_enabled', True),
+                ('sla_notifications_enabled', False),
+                ('sla_response_source', 'disabled'), ('sla_resolution_source', 'custom')):
+            result = self._sla_rpc('edara.branch', 'write', [[self.branch.id], {name: value}])
+            self.assertEqual(result['error']['data']['name'], 'odoo.exceptions.AccessError')
+        allowed_company = self._sla_rpc('res.company', 'write', [[self.branch.company_id.id], {
+            'edara_sla_response_enabled': True, 'edara_sla_response_hours': 6.0,
+        }])
+        self.assertTrue(allowed_company['result'])
+        company = self._sla_rpc('res.company', 'read', [[self.branch.company_id.id],
+                                                      ['edara_sla_response_hours']])
+        self.assertEqual(company['result'][0]['edara_sla_response_hours'], 6.0)
 
     def test_tenant_has_no_access_to_recurring_maintenance_model(self):
         definition = self.env['edara.recurring.maintenance'].create({

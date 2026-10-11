@@ -3255,7 +3255,8 @@ class TestEdaraDashboard(TransactionCase):
             'name': 'C9 Branch A',
             'code': 'C9BA',
             'company_id': company.id,
-            'sla_resolution_hours': 24.0,
+            'sla_resolution_mode': 'custom',
+            'sla_resolution_override_hours': 24.0,
         })
         prop_a = self.env['edara.property'].create({
             'name': 'C9 Property A',
@@ -3293,7 +3294,8 @@ class TestEdaraDashboard(TransactionCase):
             'name': 'C9 Branch B',
             'code': 'C9BB',
             'company_id': company.id,
-            'sla_resolution_hours': 24.0,
+            'sla_resolution_mode': 'custom',
+            'sla_resolution_override_hours': 24.0,
         })
         prop_b = self.env['edara.property'].create({
             'name': 'C9 Property B',
@@ -3568,6 +3570,10 @@ class TestEdaraDashboard(TransactionCase):
         self.assertNotIn('%(', rendered_due)
 
         # 4. Populated Maintenance Attention HTML & Badge Labels
+        self.branch.write({
+            'sla_resolution_mode': 'custom',
+            'sla_resolution_override_hours': 24.0,
+        })
         req_urgent = self.env['edara.maintenance.request'].create({
             'title': 'D1 Broken HVAC',
             'unit_id': self.unit_rented.id,

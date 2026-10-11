@@ -1,4 +1,6 @@
-from odoo import api, fields, models
+from math import isfinite
+
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -29,20 +31,44 @@ class EdaraBranch(models.Model):
     property_ids = fields.One2many('edara.property', 'branch_id', string='Properties')
     property_count = fields.Integer(compute='_compute_property_count')
 
-    # Maintenance Phase 2 (2026-09-23), BD-MNT-003: SLA targets are
-    # branch-level, not company- or per-request-level - the spec defines no
-    # SLA mechanics at all, so branch-level is the reasonable, minimal choice
-    # consistent with every other operational parameter in this module
-    # already being branch-scoped (matches §11's "do not introduce
-    # unnecessary per-request configuration unless required"). 0 disables
-    # SLA tracking/notifications for that branch entirely (see
-    # edara.maintenance.request.sla_state/_cron_send_sla_notifications).
+    # U2 Phase 2: input configuration is separate from the stored effective
+    # values consumed by maintenance requests, dashboards and notification jobs.
+    sla_response_mode = fields.Selection([
+        ('inherit', 'Company default'), ('custom', 'Branch override'), ('disabled', 'Disabled'),
+    ], string='Response SLA Mode', required=True, default='inherit', groups='base.group_user')
+    sla_resolution_mode = fields.Selection([
+        ('inherit', 'Company default'), ('custom', 'Branch override'), ('disabled', 'Disabled'),
+    ], string='Resolution SLA Mode', required=True, default='inherit', groups='base.group_user')
+    sla_response_override_hours = fields.Float(
+        string='Response Override (Hours)', default=0.0, groups='base.group_user',
+        help="Branch response target. Must be strictly positive in custom mode; otherwise zero is allowed.")
+    sla_resolution_override_hours = fields.Float(
+        string='Resolution Override (Hours)', default=0.0, groups='base.group_user',
+        help="Branch resolution target. Must be strictly positive in custom mode; otherwise zero is allowed.")
+    sla_response_enabled = fields.Boolean(
+        string='Response SLA Enabled', compute='_compute_effective_sla', store=True, readonly=True,
+        groups='base.group_user')
+    sla_resolution_enabled = fields.Boolean(
+        string='Resolution SLA Enabled', compute='_compute_effective_sla', store=True, readonly=True,
+        groups='base.group_user')
     sla_response_hours = fields.Float(
-        string='SLA Response Target (h)', default=24.0,
-        help="Target hours from a maintenance request's creation to its first assignment. 0 disables SLA tracking.")
+        string='SLA Response Target (h)', compute='_compute_effective_sla', store=True, readonly=True,
+        groups='base.group_user',
+        help="Effective response target from this branch's mode and company. Zero means disabled.")
     sla_resolution_hours = fields.Float(
-        string='SLA Resolution Target (h)', default=72.0,
-        help="Target hours from a maintenance request's creation to its completion. 0 disables SLA tracking.")
+        string='SLA Resolution Target (h)', compute='_compute_effective_sla', store=True, readonly=True,
+        groups='base.group_user',
+        help="Effective resolution target from this branch's mode and company. Zero means disabled.")
+    sla_notifications_enabled = fields.Boolean(
+        string='SLA Notifications Enabled', compute='_compute_effective_sla', store=True, readonly=True,
+        groups='base.group_user', help="Inherits the company notification setting independently of target activation.")
+    # Selection labels translate on read; no language-dependent text is stored.
+    sla_response_source = fields.Selection(
+        related='sla_response_mode', string='Response Configuration Source', readonly=True, store=False,
+        groups='base.group_user')
+    sla_resolution_source = fields.Selection(
+        related='sla_resolution_mode', string='Resolution Configuration Source', readonly=True, store=False,
+        groups='base.group_user')
 
     currency_id = fields.Many2one(related='company_id.currency_id', string='Currency')
     total_revenue = fields.Monetary(compute='_compute_financial_summary', currency_field='currency_id')
@@ -68,6 +94,44 @@ class EdaraBranch(models.Model):
         for branch in self:
             if not branch.code or not branch.code.strip():
                 raise ValidationError(self.env._("Branch code cannot be empty."))
+
+    @api.depends(
+        'company_id', 'sla_response_mode', 'sla_resolution_mode',
+        'sla_response_override_hours', 'sla_resolution_override_hours',
+        'company_id.edara_sla_response_enabled', 'company_id.edara_sla_response_hours',
+        'company_id.edara_sla_resolution_enabled', 'company_id.edara_sla_resolution_hours',
+        'company_id.edara_sla_notifications_enabled',
+    )
+    def _compute_effective_sla(self):
+        for branch in self:
+            company = branch.company_id
+            for dimension in ('response', 'resolution'):
+                mode = branch['sla_%s_mode' % dimension]
+                if mode == 'inherit':
+                    enabled = company['edara_sla_%s_enabled' % dimension]
+                    hours = company['edara_sla_%s_hours' % dimension]
+                elif mode == 'custom':
+                    enabled = True
+                    hours = branch['sla_%s_override_hours' % dimension]
+                else:
+                    enabled, hours = False, 0.0
+                # An incomplete form or corrupted input must never activate a target.
+                enabled = bool(enabled and isfinite(hours) and hours > 0)
+                branch['sla_%s_enabled' % dimension] = enabled
+                branch['sla_%s_hours' % dimension] = hours if enabled else 0.0
+            branch.sla_notifications_enabled = company.edara_sla_notifications_enabled
+
+    @api.constrains('sla_response_mode', 'sla_resolution_mode',
+                    'sla_response_override_hours', 'sla_resolution_override_hours')
+    def _check_sla_configuration(self):
+        for branch in self:
+            for dimension, label in (('response', _('Response')), ('resolution', _('Resolution'))):
+                hours = branch['sla_%s_override_hours' % dimension]
+                custom = branch['sla_%s_mode' % dimension] == 'custom'
+                if not isfinite(hours) or hours < 0 or (custom and hours == 0):
+                    raise ValidationError(_(
+                        "The %(dimension)s SLA override must be finite and non-negative, "
+                        "and strictly positive in custom mode.", dimension=label))
 
     @api.depends('property_ids')
     def _compute_property_count(self):

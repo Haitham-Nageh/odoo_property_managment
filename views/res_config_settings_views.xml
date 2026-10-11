@@ -38,6 +38,28 @@
                             <field name="edara_maintenance_expense_account_id"/>
                         </setting>
                     </block>
+                    <block title="Maintenance SLA" name="edara_maintenance_sla_setting_container">
+                        <setting id="edara_sla_response_enabled_setting"
+                                 help="Enable response SLA tracking for maintenance requests by default for this company. Disabled by default. Enabling response SLA does not enable resolution SLA. The 80% at-risk threshold is fixed in this release.">
+                            <field name="edara_sla_response_enabled"/>
+                        </setting>
+                        <setting id="edara_sla_response_hours_setting"
+                                 help="Default target time in hours from request creation until the first qualifying staff action. 24 hours is a suggested value only. Applies when Response SLA is enabled.">
+                            <field name="edara_sla_response_hours"/>
+                        </setting>
+                        <setting id="edara_sla_resolution_enabled_setting"
+                                 help="Enable resolution SLA tracking for maintenance requests by default for this company. Disabled by default. Enabling resolution SLA does not enable response SLA. The 80% at-risk threshold is fixed in this release.">
+                            <field name="edara_sla_resolution_enabled"/>
+                        </setting>
+                        <setting id="edara_sla_resolution_hours_setting"
+                                 help="Default target time in hours from request creation until final completion. 72 hours is a suggested value only. Applies when Resolution SLA is enabled.">
+                            <field name="edara_sla_resolution_hours"/>
+                        </setting>
+                        <setting id="edara_sla_notifications_enabled_setting"
+                                 help="Enable automated notifications when maintenance SLA targets approach or breach. Enabled by default and controlled independently from target activation.">
+                            <field name="edara_sla_notifications_enabled"/>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

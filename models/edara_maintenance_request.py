@@ -70,25 +70,25 @@ class EdaraMaintenanceRequest(models.Model):
     # granularity) is preserved unchanged; resolved_at is a genuinely
     # different, more precise concept (Datetime) needed for hour-level SLA
     # math, not a duplicate of it.
-    first_response_at = fields.Datetime(readonly=True, copy=False, help=(
+    first_response_at = fields.Datetime(readonly=True, copy=False, groups='base.group_user', help=(
         "Set exactly once, the first time this request is assigned - never "
         "overwritten by a later re-assignment."))
-    resolved_at = fields.Datetime(readonly=True, copy=False, help=(
+    resolved_at = fields.Datetime(readonly=True, copy=False, groups='base.group_user', help=(
         "Set exactly once, when this request is completed - the Datetime "
         "counterpart to completed_date (Date), needed for hour-level SLA math."))
-    response_hours = fields.Float(compute='_compute_sla_durations', store=True, help=(
+    response_hours = fields.Float(compute='_compute_sla_durations', store=True, groups='base.group_user', help=(
         "Hours between creation and first_response_at. Blank until the "
         "request has actually been assigned."))
-    resolution_hours = fields.Float(compute='_compute_sla_durations', store=True, help=(
+    resolution_hours = fields.Float(compute='_compute_sla_durations', store=True, groups='base.group_user', help=(
         "Hours between creation and resolved_at. Blank until the request "
         "has actually been completed."))
     sla_response_target_hours = fields.Float(
-        related='branch_id.sla_response_hours', string='SLA Response Target (h)')
+        related='branch_id.sla_response_hours', string='SLA Response Target (h)', groups='base.group_user')
     sla_resolution_target_hours = fields.Float(
-        related='branch_id.sla_resolution_hours', string='SLA Resolution Target (h)')
+        related='branch_id.sla_resolution_hours', string='SLA Resolution Target (h)', groups='base.group_user')
     sla_state = fields.Selection(
         [('within', 'Within SLA'), ('at_risk', 'At Risk'), ('breached', 'Breached')],
-        string='SLA Status', compute='_compute_sla_state', help=(
+        string='SLA Status', compute='_compute_sla_state', groups='base.group_user', help=(
             "Always derived from timestamps and the branch's configured SLA "
             "targets - never manually settable (ticket §12). Not stored: a "
             "live, on-demand snapshot (same pattern as "
@@ -394,7 +394,7 @@ class EdaraMaintenanceRequest(models.Model):
         "nobody has looked at this in N days" staleness reminder that stays
         unchanged) - this is specifically about the branch's configured SLA
         target being at risk or breached. Bounded domain (open requests whose
-        branch has a configured resolution target > 0) rather than a full-
+        branch has an enabled target and permits notifications) rather than a full-
         table scan; sla_state itself is a non-stored live computation (see
         its own help text) so it's evaluated in Python per candidate, not
         searched for directly. Idempotent via the same "does an open
@@ -404,7 +404,9 @@ class EdaraMaintenanceRequest(models.Model):
         activity_type = self.env.ref('property_managment.mail_activity_type_edara_maintenance_sla')
         requests = self.search([
             ('state', 'in', ('new', 'assigned', 'in_progress')),
-            ('branch_id.sla_resolution_hours', '>', 0),
+            ('branch_id.sla_notifications_enabled', '=', True),
+            '|', ('branch_id.sla_response_enabled', '=', True),
+            ('branch_id.sla_resolution_enabled', '=', True),
         ])
         sent = 0
         for request in requests:

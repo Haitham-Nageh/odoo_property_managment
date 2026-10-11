@@ -62,6 +62,11 @@ def _guard(model, system_fields=()):
 
 
 for _model, _fields in (
+    ('edara.branch', (
+        'sla_response_enabled', 'sla_resolution_enabled',
+        'sla_response_hours', 'sla_resolution_hours', 'sla_notifications_enabled',
+        'sla_response_source', 'sla_resolution_source',
+    )),
     ('edara.unit', ()),
     ('edara.building', ()),
     ('edara.property', ()),

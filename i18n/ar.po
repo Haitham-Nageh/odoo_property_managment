@@ -2660,8 +2660,9 @@ msgstr "طلبات الصيانة"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_branch_form
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
 msgid "Maintenance SLA"
-msgstr "اتفاقية مستوى خدمة الصيانة SLA"
+msgstr "اتفاقية مستوى الخدمة للصيانة"
 
 #. module: property_managment
 #: model:mail.activity.type,summary:property_managment.mail_activity_type_edara_maintenance_sla
@@ -4250,23 +4251,6 @@ msgid ""
 msgstr "مجموع إجمالي فواتير المورد المُرَحَّلة لطلبات صيانة هذا المورد."
 
 #. module: property_managment
-#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_resolution_hours
-#: model:ir.model.fields,help:property_managment.field_edara_maintenance_request__sla_resolution_target_hours
-msgid ""
-"Target hours from a maintenance request's creation to its completion. 0 "
-"disables SLA tracking."
-msgstr "الساعات المستهدفة من إنشاء طلب الصيانة حتى إكماله. 0 يعطل تتبع SLA."
-
-#. module: property_managment
-#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_response_hours
-#: model:ir.model.fields,help:property_managment.field_edara_maintenance_request__sla_response_target_hours
-msgid ""
-"Target hours from a maintenance request's creation to its first assignment. "
-"0 disables SLA tracking."
-msgstr ""
-"الساعات المستهدفة من إنشاء طلب الصيانة حتى إسناده الأول. 0 يعطل تتبع SLA."
-
-#. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_deposit__tenant_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_lease_contract__tenant_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_payment_schedule_line__tenant_id
@@ -5589,3 +5573,232 @@ msgstr "فئات الصيانة"
 #: model:ir.model.fields,field_description:property_managment.field_edara_unit__has_bedrooms_bathrooms
 msgid "Has Bedrooms/Bathrooms"
 msgstr "يحتوي على غرف نوم / حمامات"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_sla_response_enabled
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_sla_response_enabled
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_response_enabled
+msgid "Response SLA Enabled"
+msgstr "تفعيل اتفاقية مستوى خدمة الاستجابة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_sla_response_hours
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_sla_response_hours
+msgid "Default Response Target (Hours)"
+msgstr "الهدف الافتراضي للاستجابة (بالساعات)"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_sla_resolution_enabled
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_sla_resolution_enabled
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_resolution_enabled
+msgid "Resolution SLA Enabled"
+msgstr "تفعيل اتفاقية مستوى خدمة الحل"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_sla_resolution_hours
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_sla_resolution_hours
+msgid "Default Resolution Target (Hours)"
+msgstr "الهدف الافتراضي للحل (بالساعات)"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_sla_notifications_enabled
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_sla_notifications_enabled
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_notifications_enabled
+msgid "SLA Notifications Enabled"
+msgstr "تفعيل إشعارات اتفاقية مستوى الخدمة"
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_company__edara_sla_response_enabled
+#: model:ir.model.fields,help:property_managment.field_res_config_settings__edara_sla_response_enabled
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid ""
+"Enable response SLA tracking for maintenance requests by default for this "
+"company. Disabled by default. Enabling response SLA does not enable "
+"resolution SLA. The 80% at-risk threshold is fixed in this release."
+msgstr ""
+"تفعيل تتبع اتفاقية مستوى خدمة الاستجابة لطلبات الصيانة افتراضياً لهذه "
+"الشركة. معطل افتراضياً. تفعيل اتفاقية الاستجابة لا يفعل اتفاقية الحل. "
+"نسبة 80% للتنبيه بالخطر ثابتة في هذا الإصدار."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_company__edara_sla_response_hours
+#: model:ir.model.fields,help:property_managment.field_res_config_settings__edara_sla_response_hours
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid ""
+"Default target time in hours from request creation until the first "
+"qualifying staff action. 24 hours is a suggested value only. Applies when "
+"Response SLA is enabled."
+msgstr ""
+"الوقت المستهدف الافتراضي بالساعات من إنشاء الطلب حتى أول إجراء مؤهل من "
+"الموظف. 24 ساعة هي قيمة مقترحة فقط. ينطبق عند تفعيل اتفاقية مستوى خدمة الاستجابة."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_company__edara_sla_resolution_enabled
+#: model:ir.model.fields,help:property_managment.field_res_config_settings__edara_sla_resolution_enabled
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid ""
+"Enable resolution SLA tracking for maintenance requests by default for this "
+"company. Disabled by default. Enabling resolution SLA does not enable "
+"response SLA. The 80% at-risk threshold is fixed in this release."
+msgstr ""
+"تفعيل تتبع اتفاقية مستوى خدمة الحل لطلبات الصيانة افتراضياً لهذه الشركة. "
+"معطل افتراضياً. تفعيل اتفاقية الحل لا يفعل اتفاقية الاستجابة. "
+"نسبة 80% للتنبيه بالخطر ثابتة في هذا الإصدار."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_company__edara_sla_resolution_hours
+#: model:ir.model.fields,help:property_managment.field_res_config_settings__edara_sla_resolution_hours
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid ""
+"Default target time in hours from request creation until final completion. "
+"72 hours is a suggested value only. Applies when Resolution SLA is enabled."
+msgstr ""
+"الوقت المستهدف الافتراضي بالساعات من إنشاء الطلب حتى الإتمام النهائي. "
+"72 ساعة هي قيمة مقترحة فقط. ينطبق عند تفعيل اتفاقية مستوى خدمة الحل."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_company__edara_sla_notifications_enabled
+#: model:ir.model.fields,help:property_managment.field_res_config_settings__edara_sla_notifications_enabled
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid ""
+"Enable automated notifications when maintenance SLA targets approach or "
+"breach. Enabled by default and controlled independently from target activation."
+msgstr ""
+"تفعيل الإشعارات الآلية عند اقتراب أو تجاوز أهداف اتفاقية مستوى الخدمة للصيانة. "
+"مفعل افتراضياً ويتم التحكم به بشكل مستقل عن تفعيل الأهداف."
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_branch__sla_resolution_mode__custom
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_branch__sla_response_mode__custom
+msgid "Branch override"
+msgstr "تخصيص الفرع"
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_resolution_override_hours
+msgid ""
+"Branch resolution target. Must be strictly positive in custom mode; "
+"otherwise zero is allowed."
+msgstr ""
+"هدف الحل الخاص بالفرع. يجب أن يكون أكبر من صفر في وضع التخصيص؛ ويُسمح بالصفر"
+" في الأوضاع الأخرى."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_response_override_hours
+msgid ""
+"Branch response target. Must be strictly positive in custom mode; otherwise "
+"zero is allowed."
+msgstr ""
+"هدف الاستجابة الخاص بالفرع. يجب أن يكون أكبر من صفر في وضع التخصيص؛ ويُسمح "
+"بالصفر في الأوضاع الأخرى."
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_branch__sla_resolution_mode__inherit
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_branch__sla_response_mode__inherit
+msgid "Company default"
+msgstr "القيمة الافتراضية للشركة"
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_branch__sla_resolution_mode__disabled
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_branch__sla_response_mode__disabled
+msgid "Disabled"
+msgstr "معطل"
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_resolution_hours
+#: model:ir.model.fields,help:property_managment.field_edara_maintenance_request__sla_resolution_target_hours
+msgid ""
+"Effective resolution target from this branch's mode and company. Zero means "
+"disabled."
+msgstr ""
+"الهدف الفعلي للحل وفق نمط إعداد الفرع وشركته. الصفر يعني تعطيل هذا الهدف."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_response_hours
+#: model:ir.model.fields,help:property_managment.field_edara_maintenance_request__sla_response_target_hours
+msgid ""
+"Effective response target from this branch's mode and company. Zero means "
+"disabled."
+msgstr ""
+"الهدف الفعلي للاستجابة وفق نمط إعداد الفرع وشركته. الصفر يعني تعطيل هذا "
+"الهدف."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_branch__sla_notifications_enabled
+msgid ""
+"Inherits the company notification setting independently of target "
+"activation."
+msgstr "يرث إعداد إشعارات الشركة بصورة مستقلة عن تفعيل الأهداف."
+
+#. module: property_managment
+#: code:addons/property_managment/models/edara_branch.py:0
+#: code:addons/property_managment/models/res_company.py:0
+#. odoo-python
+msgid "Resolution"
+msgstr "الحل"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_resolution_source
+msgid "Resolution Configuration Source"
+msgstr "مصدر إعداد الحل"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_resolution_override_hours
+msgid "Resolution Override (Hours)"
+msgstr "الهدف المخصص للحل (بالساعات)"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_branch_form
+msgid "Resolution SLA"
+msgstr "اتفاقية مستوى خدمة الحل"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_resolution_mode
+msgid "Resolution SLA Mode"
+msgstr "نمط اتفاقية مستوى خدمة الحل"
+
+#. module: property_managment
+#: code:addons/property_managment/models/edara_branch.py:0
+#: code:addons/property_managment/models/res_company.py:0
+#. odoo-python
+msgid "Response"
+msgstr "الاستجابة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_response_source
+msgid "Response Configuration Source"
+msgstr "مصدر إعداد الاستجابة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_response_override_hours
+msgid "Response Override (Hours)"
+msgstr "الهدف المخصص للاستجابة (بالساعات)"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_branch_form
+msgid "Response SLA"
+msgstr "اتفاقية مستوى خدمة الاستجابة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_branch__sla_response_mode
+msgid "Response SLA Mode"
+msgstr "نمط اتفاقية مستوى خدمة الاستجابة"
+
+#. module: property_managment
+#: code:addons/property_managment/models/edara_branch.py:0
+#. odoo-python
+msgid ""
+"The %(dimension)s SLA override must be finite and non-negative, and strictly"
+" positive in custom mode."
+msgstr ""
+"يجب أن تكون قيمة هدف %(dimension)s المخصص عددًا محدودًا وغير سالب، وأكبر من "
+"صفر في وضع التخصيص."
+
+#. module: property_managment
+#: code:addons/property_managment/models/res_company.py:0
+#. odoo-python
+msgid ""
+"The %(dimension)s SLA target must be finite and non-negative, and strictly "
+"positive when enabled."
+msgstr ""
+"يجب أن تكون قيمة هدف %(dimension)s عددًا محدودًا وغير سالب، وأكبر من صفر عند"
+" التفعيل."
