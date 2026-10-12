@@ -18,11 +18,14 @@
     <menuitem id="menu_edara_lease_contract" name="Contracts" parent="menu_edara_root"
               action="action_edara_lease_contract" sequence="20"/>
 
-    <menuitem id="menu_edara_lease_timeline" name="Lease Timeline" parent="menu_edara_lease_contract"
-              action="action_edara_lease_timeline" sequence="10"/>
+    <menuitem id="menu_edara_contract_overview" name="Contract Overview" parent="menu_edara_lease_contract"
+              action="action_edara_contract_overview" sequence="10"/>
 
     <menuitem id="menu_edara_renewal_request" name="Renewal Requests" parent="menu_edara_lease_contract"
               action="action_edara_renewal_request" sequence="20"/>
+
+    <menuitem id="menu_edara_lease_timeline" name="Schedule" parent="menu_edara_root"
+              action="action_edara_lease_timeline" sequence="25"/>
 
     <menuitem id="menu_edara_finance" name="Finance" parent="menu_edara_root" sequence="30"/>
 

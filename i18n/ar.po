@@ -2530,7 +2530,6 @@ msgstr "تقرير انتهاء عقود الإيجار"
 
 #. module: property_managment
 #: model:ir.actions.act_window,name:property_managment.action_edara_lease_timeline
-#: model:ir.ui.menu,name:property_managment.menu_edara_lease_timeline
 msgid "Lease Timeline"
 msgstr "الجدول الزمني للإيجار"
 
@@ -3973,6 +3972,7 @@ msgid "SMS Delivery error"
 msgstr "خطأ في تسليم الرسالة النصية القصيرة"
 
 #. module: property_managment
+#: model:ir.ui.menu,name:property_managment.menu_edara_lease_timeline
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_form
 msgid "Schedule"
 msgstr "الجدول الزمني"
@@ -6085,3 +6085,9 @@ msgstr "<span class=\"o_pending_title\">بانتظار الفوترة</span>"
 #: model:ir.actions.act_window,name:property_managment.action_edara_service_charge_invoices
 msgid "Service Charge Invoices"
 msgstr "فواتير رسوم الخدمات"
+
+#. module: property_managment
+#: model:ir.actions.act_window,name:property_managment.action_edara_contract_overview
+#: model:ir.ui.menu,name:property_managment.menu_edara_contract_overview
+msgid "Contract Overview"
+msgstr "نظرة عامة على العقود"
