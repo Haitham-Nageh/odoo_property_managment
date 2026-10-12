@@ -4,12 +4,12 @@ from odoo import api, fields, models
 class EdaraProperty(models.Model):
     _name = 'edara.property'
     _description = 'EDARA Property'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'edara.optional.code.mixin']
     _order = 'name'
 
     name = fields.Char(required=True, tracking=True,
                         help="e.g. Al-Irsal Complex, Al-Masyoun Residence.")
-    code = fields.Char(required=True, tracking=True)
+    code = fields.Char(tracking=True)
     branch_id = fields.Many2one('edara.branch', string='Branch', required=True, index=True, tracking=True)
     company_id = fields.Many2one(related='branch_id.company_id', string='Company', store=True, index=True)
     active = fields.Boolean(default=True)

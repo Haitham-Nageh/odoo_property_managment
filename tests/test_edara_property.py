@@ -450,6 +450,89 @@ class TestEdaraProperty(TransactionCase):
         })
         self.assertEqual(u.floor, '99')
 
+    # -- Ticket C: property / building / unit codes are optional --
+
+    def test_codes_are_optional_and_not_required(self):
+        for model in ('edara.property', 'edara.building', 'edara.unit'):
+            self.assertFalse(self.env[model]._fields['code'].required, model)
+
+    def test_property_building_unit_can_be_saved_without_code(self):
+        prop = self.env['edara.property'].create({'name': 'No Code Property', 'branch_id': self.branch_a.id})
+        building = self.env['edara.building'].create({'name': 'No Code Building', 'property_id': prop.id})
+        unit = self.env['edara.unit'].create({'name': 'No Code Unit', 'building_id': building.id})
+        for record in (prop, building, unit):
+            self.assertFalse(record.code)
+        # a later edit that still leaves the code empty must save as well
+        unit.write({'name': 'No Code Unit Renamed'})
+        self.assertFalse(unit.code)
+
+    def test_empty_codes_do_not_collide_but_filled_codes_stay_unique(self):
+        prop_1 = self.env['edara.property'].create({'name': 'Empty 1', 'branch_id': self.branch_a.id})
+        prop_2 = self.env['edara.property'].create({'name': 'Empty 2', 'branch_id': self.branch_a.id})
+        building_1 = self.env['edara.building'].create({'name': 'Empty B1', 'property_id': prop_1.id})
+        building_2 = self.env['edara.building'].create({'name': 'Empty B2', 'property_id': prop_1.id})
+        unit_1 = self.env['edara.unit'].create({'name': 'Empty U1', 'building_id': building_1.id})
+        unit_2 = self.env['edara.unit'].create({'name': 'Empty U2', 'building_id': building_1.id})
+        self.assertEqual(len(prop_1 | prop_2), 2)
+        self.assertEqual(len(building_1 | building_2), 2)
+        self.assertEqual(len(unit_1 | unit_2), 2)
+        # uniqueness is still enforced for non-empty codes
+        with mute_logger('odoo.sql_db'), self.assertRaises(UniqueViolation):
+            with self.env.cr.savepoint():
+                self.env['edara.property'].create(
+                    {'name': 'Dup Property', 'code': 'IRS', 'branch_id': self.branch_a.id})
+        with mute_logger('odoo.sql_db'), self.assertRaises(UniqueViolation):
+            with self.env.cr.savepoint():
+                self.env['edara.building'].create({'name': 'Dup Building', 'code': 'A', 'property_id': self.property_a.id})
+
+    def test_duplicate_unit_without_code_stays_without_code(self):
+        original = self.env['edara.unit'].create({'name': 'No Code Copy Source', 'building_id': self.building_a.id})
+        duplicate = original.copy()
+        self.assertFalse(duplicate.code)
+        self.assertNotEqual(duplicate, original)
+
+    def test_blank_codes_are_normalised_to_false(self):
+        """'' (and whitespace only) is stored as no code, exactly like False/None, on create and write."""
+        blank_values = ('', '   ', False, None)
+        properties = self.env['edara.property']
+        buildings = self.env['edara.building']
+        units = self.env['edara.unit']
+        for i, blank in enumerate(blank_values):
+            prop = self.env['edara.property'].create(
+                {'name': 'Blank P%d' % i, 'code': blank, 'branch_id': self.branch_a.id})
+            building = self.env['edara.building'].create(
+                {'name': 'Blank B%d' % i, 'code': blank, 'property_id': self.property_a.id})
+            unit = self.env['edara.unit'].create(
+                {'name': 'Blank U%d' % i, 'code': blank, 'building_id': self.building_a.id})
+            properties |= prop
+            buildings |= building
+            units |= unit
+        # all of them coexist and none stores an empty string
+        for records in (properties, buildings, units):
+            self.assertEqual(len(records), len(blank_values))
+            self.env.flush_all()
+            self.env.cr.execute(
+                "SELECT COUNT(*) FROM %s WHERE id IN %%s AND code = ''" % records._table, [tuple(records.ids)])
+            self.assertEqual(self.env.cr.fetchone()[0], 0)
+            self.assertFalse(any(records.mapped('code')))
+
+        # write: clearing an existing code with '' leaves no code and does not collide with the others
+        prop = self.env['edara.property'].create({'name': 'Coded P', 'code': 'CP1', 'branch_id': self.branch_a.id})
+        building = self.env['edara.building'].create(
+            {'name': 'Coded B', 'code': 'CB1', 'property_id': self.property_a.id})
+        unit = self.env['edara.unit'].create({'name': 'Coded U', 'code': 'CU1', 'building_id': self.building_a.id})
+        for record in (prop, building, unit):
+            record.write({'code': ''})
+            self.assertFalse(record.code)
+        # non-empty codes are stored untouched and stay unique
+        prop.write({'code': 'CP2'})
+        building.write({'code': 'CB2'})
+        unit.write({'code': 'CU2'})
+        self.assertEqual((prop.code, building.code, unit.code), ('CP2', 'CB2', 'CU2'))
+        with mute_logger('odoo.sql_db'), self.assertRaises(UniqueViolation):
+            with self.env.cr.savepoint():
+                self.env['edara.unit'].create({'name': 'Dup CU2', 'code': 'CU2', 'building_id': self.building_a.id})
+
 
 @tagged('post_install', '-at_install')
 class TestEdaraPropertyMultiBuilding(TransactionCase):

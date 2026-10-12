@@ -20,11 +20,11 @@ OPERATIONAL_STATUSES = [
 class EdaraUnit(models.Model):
     _name = 'edara.unit'
     _description = 'EDARA Unit'
-    _inherit = ['mail.thread', 'portal.mixin']
+    _inherit = ['mail.thread', 'portal.mixin', 'edara.optional.code.mixin']
     _order = 'building_id, floor, name'
 
     name = fields.Char(required=True, tracking=True, help="e.g. A-101, Shop-01.")
-    code = fields.Char(required=True, tracking=True)
+    code = fields.Char(tracking=True)
     building_id = fields.Many2one('edara.building', string='Building', required=True, index=True, tracking=True)
     property_id = fields.Many2one(related='building_id.property_id', string='Property', store=True, index=True)
     branch_id = fields.Many2one(related='building_id.branch_id', string='Branch', store=True, index=True)
@@ -103,7 +103,7 @@ class EdaraUnit(models.Model):
         scope), guaranteed unique before the copy is even created - never
         touches the original unit's code, never bypasses the constraint."""
         default = dict(default or {})
-        if 'code' not in default:
+        if 'code' not in default and self.code:
             candidate = '%s-COPY' % self.code
             suffix = 2
             while self.search_count([('building_id', '=', self.building_id.id), ('code', '=', candidate)]):

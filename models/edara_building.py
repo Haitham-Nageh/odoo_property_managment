@@ -5,11 +5,11 @@ from odoo.exceptions import ValidationError
 class EdaraBuilding(models.Model):
     _name = 'edara.building'
     _description = 'EDARA Building'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'edara.optional.code.mixin']
     _order = 'name'
 
     name = fields.Char(required=True, tracking=True)
-    code = fields.Char(required=True, tracking=True)
+    code = fields.Char(tracking=True)
     property_id = fields.Many2one('edara.property', string='Property', required=True, index=True, tracking=True)
     branch_id = fields.Many2one(related='property_id.branch_id', string='Branch', store=True, index=True)
     company_id = fields.Many2one(related='property_id.company_id', string='Company', store=True, index=True)
