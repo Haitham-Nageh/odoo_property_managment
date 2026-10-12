@@ -319,220 +319,134 @@
                     </div>
 
 
-                    <!-- Lease Lifecycle Statuses (Phase C5) -->
+                    <!-- Lease Lifecycle Statuses (Phase C5): one proportional distribution bar.
+                         The seven *_contracts_count KPI fields stay on the form; the Live /
+                         Pre-live / Historical groups are presentation-only. -->
                     <div class="o_edara_lifecycle_section mt-3">
                         <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Lease Lifecycle Statuses</div>
-                        <div class="row g-3">
-                            <!-- 1. Live Group (2 cards) -->
-                            <div class="col-xl-4 col-lg-5 col-12 d-flex flex-column o_lifecycle_group o_lifecycle_live">
-                                <div class="text-muted small fw-semibold text-uppercase mb-2 pb-1 border-bottom">Live</div>
-                                <div class="row g-2 flex-grow-1">
-                                    <div class="col-6">
-                                        <button type="object" name="action_view_contracts_active" class="oe_stat_button" icon="fa-check-circle text-success">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="active_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Active Leases</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <div class="col-6">
-                                        <button type="object" name="action_view_contracts_scheduled" class="oe_stat_button" icon="fa-clock-o text-info">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="scheduled_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Scheduled Leases</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 2. Historical Group (5 cards) -->
-                            <div class="col-xl-8 col-lg-7 col-12 d-flex flex-column o_lifecycle_group o_lifecycle_historical border-start ps-lg-3">
-                                <div class="text-muted small fw-semibold text-uppercase mb-2 pb-1 border-bottom">Historical</div>
-                                <div class="row g-2 flex-grow-1">
-                                    <div class="col-lg col-md-4 col-6">
-                                        <button type="object" name="action_view_contracts_draft" class="oe_stat_button" icon="fa-pencil text-muted">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="draft_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Draft Leases</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <div class="col-lg col-md-4 col-6">
-                                        <button type="object" name="action_view_contracts_renewed" class="oe_stat_button" icon="fa-refresh text-primary">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="renewed_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Renewed</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <div class="col-lg col-md-4 col-6">
-                                        <button type="object" name="action_view_contracts_terminated" class="oe_stat_button" icon="fa-ban text-muted">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="terminated_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Terminated</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <div class="col-lg col-md-4 col-6">
-                                        <button type="object" name="action_view_contracts_expired" class="oe_stat_button" icon="fa-hourglass-end text-danger">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="expired_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Expired</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <div class="col-lg col-md-4 col-6">
-                                        <button type="object" name="action_view_contracts_cancelled" class="oe_stat_button" icon="fa-times-circle text-muted">
-                                            <div class="o_stat_info">
-                                                <span class="o_stat_value"><field name="cancelled_contracts_count" readonly="1"/></span>
-                                                <span class="o_stat_text">Cancelled</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <field name="active_contracts_count" invisible="1"/>
+                        <field name="scheduled_contracts_count" invisible="1"/>
+                        <field name="draft_contracts_count" invisible="1"/>
+                        <field name="renewed_contracts_count" invisible="1"/>
+                        <field name="terminated_contracts_count" invisible="1"/>
+                        <field name="expired_contracts_count" invisible="1"/>
+                        <field name="cancelled_contracts_count" invisible="1"/>
+                        <field name="lifecycle_chart_data" widget="edara_lifecycle_bar" readonly="1" class="w-100"/>
                     </div>
 
-                    <!-- 4. SECURITY DEPOSITS (Phase C6) -->
+                    <!-- 4. SECURITY DEPOSITS (Phase C6): donut of the collected deposit amount split into three
+                         disjoint categories (still held / awaiting settlement / settled or returned). The three KPI
+                         fields below stay loaded because they are the existing Total Held / Held Deposits /
+                         Unsettled on Closed Leases values that the donut categories are built from. -->
                     <separator string="Security Deposits"/>
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-4 col-md-4 col-12">
-                            <button type="object" name="action_view_deposits_held" class="oe_stat_button" icon="fa-shield text-primary">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="total_held_deposit_amount" widget="monetary" readonly="1"/></span>
-                                    <span class="o_stat_text">Total Held</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-4 col-md-4 col-12">
-                            <button type="object" name="action_view_deposits_held" class="oe_stat_button" icon="fa-lock text-info">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="held_deposits_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Held Deposits</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-4 col-md-4 col-12">
-                            <button type="object" name="action_view_deposits_unsettled_closed" class="oe_stat_button" icon="fa-exclamation-triangle text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="unsettled_closed_deposits_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Unsettled on Closed Leases</span>
-                                </div>
-                            </button>
-                        </div>
+                    <div class="o_edara_deposit_section mt-2">
+                        <field name="total_held_deposit_amount" invisible="1"/>
+                        <field name="held_deposits_count" invisible="1"/>
+                        <field name="unsettled_closed_deposits_count" invisible="1"/>
+                        <field name="deposit_chart_data" widget="edara_deposit_donut" readonly="1" class="w-100"/>
                     </div>
 
-                    <!-- 5. SERVICE CHARGES PENDING INVOICING (Phase C8) -->
-                    <separator string="Service Charges Pending Invoicing"/>
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-6 col-md-6 col-12">
-                            <button type="object" name="action_view_service_charges_pending_invoice" class="oe_stat_button" icon="fa-file-text-o text-info">
+                    <!-- 5. SERVICE CHARGE INVOICING (Phase C8): generated invoices and their monthly activity (needs
+                         Accounting read access). The pending-invoice metrics below it keep their original meaning. -->
+                    <separator string="Service Charge Invoicing"/>
+                    <div class="o_edara_invoicing_section mt-2">
+                        <div invisible="not has_accounting_access">
+                            <field name="service_invoice_chart_data" widget="edara_service_invoice" readonly="1" class="w-100"/>
+                        </div>
+                        <div class="o_edara_pending_row">
+                            <span class="o_pending_title">Awaiting Invoicing</span>
+                            <button type="object" name="action_view_service_charges_pending_invoice" class="o_edara_flat_stat">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="uninvoiced_service_charge_lines_count" readonly="1"/></span>
                                     <span class="o_stat_text">Pending Invoice</span>
+                                    <span class="o_stat_value"><field name="uninvoiced_service_charge_lines_count" readonly="1"/></span>
                                 </div>
                             </button>
-                        </div>
-                        <div class="col-lg-6 col-md-6 col-12">
-                            <button type="object" name="action_view_service_charges_pending_invoice" class="oe_stat_button" icon="fa-bolt text-warning">
+                            <button type="object" name="action_view_service_charges_pending_invoice" class="o_edara_flat_stat">
                                 <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="uninvoiced_service_charge_amount" widget="monetary" readonly="1"/></span>
                                     <span class="o_stat_text">Uninvoiced Amount</span>
+                                    <span class="o_stat_value"><field name="uninvoiced_service_charge_amount" readonly="1" widget="monetary"/></span>
                                 </div>
                             </button>
                         </div>
                     </div>
 
-                    <!-- 6. MAINTENANCE OVERVIEW -->
+                    <!-- 6. MAINTENANCE OVERVIEW: the ten existing indicators in two groups -->
+                    <div class="o_edara_maint_section">
                     <separator string="Maintenance Overview"/>
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_open" class="oe_stat_button" icon="fa-wrench text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="open_maintenance_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Open Requests</span>
-                                </div>
-                            </button>
+                    <div class="row g-3 mt-1 o_edara_maint_groups">
+                        <div class="col-12 col-lg-7 o_maint_group">
+                            <div class="o_maint_group_title">Request Status</div>
+                            <div class="o_edara_status_matrix">
+                                <button type="object" name="action_view_maintenance_new" class="o_edara_flat_stat o_ic_new o_tone_blue">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">New</span>
+                                        <span class="o_stat_value"><field name="maintenance_new_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_maintenance_assigned" class="o_edara_flat_stat o_ic_assigned o_tone_blue">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">Assigned</span>
+                                        <span class="o_stat_value"><field name="maintenance_assigned_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_maintenance_in_progress" class="o_edara_flat_stat o_ic_progress o_tone_blue">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">In Progress</span>
+                                        <span class="o_stat_value"><field name="maintenance_in_progress_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_maintenance_open" class="o_edara_flat_stat o_ic_open o_tone_blue">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">Open Requests</span>
+                                        <span class="o_stat_value"><field name="open_maintenance_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_maintenance_done" class="o_edara_flat_stat o_ic_done o_tone_green">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">Done</span>
+                                        <span class="o_stat_value"><field name="maintenance_done_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_maintenance_cancelled" class="o_edara_flat_stat o_ic_cancelled o_tone_gray">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">Cancelled</span>
+                                        <span class="o_stat_value"><field name="maintenance_cancelled_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_new" class="oe_stat_button" icon="fa-inbox text-primary">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_new_count" readonly="1"/></span>
-                                    <span class="o_stat_text">New</span>
-                                </div>
-                            </button>
+                        <div class="col-12 col-lg-5 o_maint_group o_maint_group_ops">
+                            <div class="o_maint_group_title">SLA &amp; Operations</div>
+                            <div class="o_edara_sla_list">
+                                <button type="object" name="action_view_maintenance_sla_breached" class="o_edara_flat_stat o_ic_breached o_risk_breached">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">SLA Breached</span>
+                                        <span class="o_stat_value"><field name="maintenance_sla_breached_count" readonly="1" decoration-danger="maintenance_sla_breached_count &gt; 0"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_maintenance_sla_at_risk" class="o_edara_flat_stat o_ic_at_risk o_risk_at_risk">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">SLA At Risk</span>
+                                        <span class="o_stat_value"><field name="maintenance_sla_at_risk_count" readonly="1" decoration-warning="maintenance_sla_at_risk_count &gt; 0"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_vendor_requests_sla_risk" class="o_edara_flat_stat o_ic_vendor o_risk_at_risk">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">Vendor SLA Risk</span>
+                                        <span class="o_stat_value"><field name="vendor_sla_risk_count" readonly="1" decoration-warning="vendor_sla_risk_count &gt; 0"/></span>
+                                    </div>
+                                </button>
+                                <button type="object" name="action_view_recurring_maintenance_due" class="o_edara_flat_stat o_ic_recurring o_tone_blue" title="Recurring maintenance schedules that are due - not maintenance requests">
+                                    <div class="o_stat_info">
+                                        <span class="o_stat_text">Recurring Due</span>
+                                        <span class="o_stat_value"><field name="recurring_maintenance_due_count" readonly="1"/></span>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_assigned" class="oe_stat_button" icon="fa-user text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_assigned_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Assigned</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_in_progress" class="oe_stat_button" icon="fa-wrench text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_in_progress_count" readonly="1"/></span>
-                                    <span class="o_stat_text">In Progress</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_done" class="oe_stat_button" icon="fa-check-circle text-success">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_done_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Done</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-2 col-md-4 col-6">
-                            <button type="object" name="action_view_maintenance_cancelled" class="oe_stat_button" icon="fa-ban text-muted">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_cancelled_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Cancelled</span>
-                                </div>
-                            </button>
-                        </div>
+                    </div>
                     </div>
 
-                    <!-- SLA & Recurring Status -->
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-3 col-md-6 col-12">
-                            <button type="object" name="action_view_maintenance_sla_at_risk" class="oe_stat_button" icon="fa-hourglass-half text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_sla_at_risk_count" readonly="1"/></span>
-                                    <span class="o_stat_text">SLA At Risk</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-6 col-12">
-                            <button type="object" name="action_view_maintenance_sla_breached" class="oe_stat_button" icon="fa-exclamation-triangle text-danger">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="maintenance_sla_breached_count" readonly="1"/></span>
-                                    <span class="o_stat_text">SLA Breached</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-6 col-12">
-                            <button type="object" name="action_view_vendor_requests_sla_risk" class="oe_stat_button" icon="fa-truck text-warning">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="vendor_sla_risk_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Vendor SLA Risk</span>
-                                </div>
-                            </button>
-                        </div>
-                        <div class="col-lg-3 col-md-6 col-12">
-                            <button type="object" name="action_view_recurring_maintenance_due" class="oe_stat_button" icon="fa-repeat text-primary">
-                                <div class="o_stat_info">
-                                    <span class="o_stat_value"><field name="recurring_maintenance_due_count" readonly="1"/></span>
-                                    <span class="o_stat_text">Recurring Due</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
 
                     <!-- 7. RECENT ACTIVITY -->
                     <separator string="Recent Activity"/>

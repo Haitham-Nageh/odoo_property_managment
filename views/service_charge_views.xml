@@ -95,4 +95,15 @@
             </p>
         </field>
     </record>
+
+    <!-- Dashboard "Billing Invoices" / "Invoice Amount": invoices generated from service charges.
+         The authoritative domain is applied by edara.dashboard.action_view_service_invoices(). -->
+    <record id="action_edara_service_charge_invoices" model="ir.actions.act_window">
+        <field name="name">Service Charge Invoices</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="account.view_out_invoice_tree"/>
+        <field name="domain">[('move_type', '=', 'out_invoice'), ('edara_invoice_type', '=', 'service_charge'), ('state', '=', 'posted')]</field>
+        <field name="context">{'default_move_type': 'out_invoice'}</field>
+    </record>
 </odoo>

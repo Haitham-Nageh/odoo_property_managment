@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="property_managment.EdaraLifecycleBarField">
+        <div class="o_edara_lifecycle_widget w-100">
+            <t t-if="chartData.total === 0">
+                <div class="o_edara_lifecycle_empty text-muted small py-2">No lease contracts</div>
+            </t>
+            <t t-else="">
+                <div class="o_edara_lifecycle_bar">
+                    <button t-foreach="visibleSegments" t-as="seg" t-key="seg.status"
+                            type="button"
+                            class="o_edara_lifecycle_seg"
+                            t-att-data-status="seg.status"
+                            t-attf-style="flex-grow: {{ seg.count }}; background-color: {{ seg.color }}"
+                            t-att-title="segmentTitle(seg)"
+                            t-att-aria-label="segmentTitle(seg)"
+                            t-on-click="() => this.onSegmentClick(seg.action_method)">
+                        <span class="o_seg_count"><t t-esc="seg.count"/></span>
+                        <span t-if="showPercent(seg)" class="o_seg_pct" dir="ltr"><t t-esc="seg.percent"/>%</span>
+                    </button>
+                </div>
+                <div class="o_edara_lifecycle_legend">
+                    <div t-foreach="chartData.groups" t-as="group" t-key="group.key" class="o_edara_lifecycle_group">
+                        <div class="o_edara_lifecycle_group_title"><t t-esc="group.label"/></div>
+                        <div class="o_edara_lifecycle_items">
+                            <button t-foreach="group.segments" t-as="seg" t-key="seg.status"
+                                    type="button"
+                                    class="o_edara_lifecycle_item"
+                                    t-att-class="{ 'o_zero': seg.count === 0 }"
+                                    t-att-title="segmentTitle(seg)"
+                                    t-on-click="() => this.onSegmentClick(seg.action_method)">
+                                <span class="o_edara_lifecycle_dot" t-attf-style="background-color: {{ seg.color }}"/>
+                                <span class="o_edara_lifecycle_label"><t t-esc="seg.label"/></span>
+                                <span class="o_edara_lifecycle_count"><t t-esc="seg.count"/></span>
+                                <span class="o_edara_lifecycle_pct"><t t-esc="seg.percent"/>%</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

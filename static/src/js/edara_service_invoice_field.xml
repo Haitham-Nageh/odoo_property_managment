@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="property_managment.EdaraServiceInvoiceField">
+        <div class="o_edara_service_invoice_widget w-100">
+            <div class="o_edara_invoice_metrics">
+                <button type="button" class="o_edara_invoice_metric" t-on-click="() => this.openInvoices()">
+                    <span class="o_invoice_metric_label">Billing Invoices</span>
+                    <span class="o_invoice_metric_value"><t t-esc="chartData.count"/></span>
+                </button>
+                <button type="button" class="o_edara_invoice_metric" t-on-click="() => this.openInvoices()">
+                    <span class="o_invoice_metric_label">Invoice Amount</span>
+                    <span class="o_invoice_metric_value"><t t-esc="formatAmount(chartData.amount)"/></span>
+                </button>
+            </div>
+            <div class="o_edara_invoice_chart_head">
+                <span class="o_invoice_chart_title">Invoice Activity</span>
+                <span class="o_invoice_chart_caption">By Month</span>
+            </div>
+            <t t-if="hasActivity">
+                <div class="o_edara_invoice_canvas position-relative">
+                    <canvas t-ref="canvas"/>
+                </div>
+            </t>
+            <t t-else="">
+                <div class="o_edara_invoice_empty text-muted small py-2">No service charge invoices in the last 6 months</div>
+            </t>
+        </div>
+    </t>
+</templates>

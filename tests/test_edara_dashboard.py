@@ -1,10 +1,13 @@
 import json
+import re
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from lxml import etree
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, new_test_user, tagged
+from odoo.tools import file_path
 from odoo.tools.safe_eval import safe_eval
 
 from odoo.addons.property_managment.models.edara_dashboard import _preset_dates
@@ -2288,6 +2291,174 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(dash.renewed_contracts_count, 1)
         self.assertEqual(dash.terminated_contracts_count, 1)
         self.assertEqual(dash.expired_contracts_count, 1)
+
+    # -- U4: lifecycle distribution bar (presentation data only) --
+
+    LIFECYCLE_GROUPS = {
+        'active': 'live', 'scheduled': 'live', 'draft': 'pre_live',
+        'renewed': 'historical', 'terminated': 'historical', 'expired': 'historical', 'cancelled': 'historical',
+    }
+
+    def test_u4_01_lifecycle_chart_data_groups_and_counts(self):
+        """U4-01: lifecycle_chart_data carries the seven existing counts, grouped Live / Pre-live /
+        Historical for display only, and is consistent with the *_contracts_count KPI fields."""
+        f = self._setup_c5_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.lifecycle_chart_data)
+        self.assertEqual([g['key'] for g in data['groups']], ['live', 'pre_live', 'historical'])
+        segments = {s['status']: (g['key'], s) for g in data['groups'] for s in g['segments']}
+        self.assertEqual(set(segments), set(self.LIFECYCLE_GROUPS))
+        for status, (group_key, seg) in segments.items():
+            self.assertEqual(group_key, self.LIFECYCLE_GROUPS[status])
+            self.assertEqual(seg['count'], dash['%s_contracts_count' % status])
+            self.assertTrue(seg['color'].startswith('#'))
+        self.assertEqual(data['total'], sum(s['count'] for _g, s in segments.values()))
+        self.assertEqual(data['total'], 8)
+        self.assertAlmostEqual(sum(s['percent'] for _g, s in segments.values()), 100.0, delta=0.5)
+
+    def test_u4_02_lifecycle_chart_data_zero_total(self):
+        """U4-02: a branch with no leases yields total 0 and zero percents (no division by zero);
+        all seven statuses stay present so the legend can still list them."""
+        branch_empty = self.env['edara.branch'].create({
+            'name': 'U4 Empty Branch', 'code': 'U4EMPTY', 'company_id': self.dash_company.id,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_empty.id})
+        data = json.loads(dash.lifecycle_chart_data)
+        self.assertEqual(data['total'], 0)
+        segments = [s for g in data['groups'] for s in g['segments']]
+        self.assertEqual(len(segments), 7)
+        for seg in segments:
+            self.assertEqual(seg['count'], 0)
+            self.assertEqual(seg['percent'], 0.0)
+
+    def test_u4_03_lifecycle_segment_actions_match_counts(self):
+        """U4-03: every segment's action_method opens exactly the records it counts."""
+        f = self._setup_c5_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.lifecycle_chart_data)
+        Contract = self.env['edara.lease.contract'].with_user(self.dash_admin)
+        for seg in [s for g in data['groups'] for s in g['segments']]:
+            action = getattr(dash, seg['action_method'])()
+            self.assertEqual(Contract.search_count(action['domain']), seg['count'], seg['status'])
+
+    def test_u4_04_dashboard_view_keeps_indicator_inventory(self):
+        """U4-04: the redesigned sections still declare every KPI field and drill-down button, and the
+        lifecycle widget's click whitelist only names real dashboard methods."""
+        arch = self.env['edara.dashboard'].get_view(view_type='form')['arch']
+        buttons = [
+            'action_view_service_charges_pending_invoice',
+            'action_view_maintenance_open', 'action_view_maintenance_new', 'action_view_maintenance_assigned',
+            'action_view_maintenance_in_progress', 'action_view_maintenance_done',
+            'action_view_maintenance_cancelled', 'action_view_maintenance_sla_at_risk',
+            'action_view_maintenance_sla_breached', 'action_view_vendor_requests_sla_risk',
+            'action_view_recurring_maintenance_due',
+        ]
+        for name in buttons:
+            self.assertIn('name="%s"' % name, arch)
+        # Visual redesign: Request Status and SLA & Operations keep the approved order, and the
+        # redesigned sections no longer use the card-style stat buttons or their icons.
+        order = [
+            'action_view_maintenance_new', 'action_view_maintenance_assigned', 'action_view_maintenance_in_progress',
+            'action_view_maintenance_open', 'action_view_maintenance_done', 'action_view_maintenance_cancelled',
+            'action_view_maintenance_sla_breached', 'action_view_maintenance_sla_at_risk',
+            'action_view_vendor_requests_sla_risk', 'action_view_recurring_maintenance_due',
+        ]
+        maint = arch.index('o_edara_maint_groups')
+        positions = [arch.index('name="%s"' % name, maint) for name in order]
+        self.assertEqual(positions, sorted(positions))
+        # Parse the architecture so the checks do not depend on attribute order or on where a
+        # string slice ends: 2 pending-invoice + 6 request-status + 4 SLA/operations.
+        root = etree.fromstring(arch)
+        flat_buttons = root.xpath(
+            '//button[contains(concat(" ", normalize-space(@class), " "), " o_edara_flat_stat ")]')
+        self.assertEqual(len(flat_buttons), 2 + 6 + 4)
+        self.assertEqual([b.get('name') for b in flat_buttons], [
+            'action_view_service_charges_pending_invoice', 'action_view_service_charges_pending_invoice',
+        ] + order)
+        for button in flat_buttons:
+            self.assertIsNone(button.get('icon'), button.get('name'))
+            self.assertNotIn('oe_stat_button', (button.get('class') or '').split(), button.get('name'))
+        self.assertEqual(
+            [b.xpath('string(.//span[contains(@class, "o_stat_text")])').strip() for b in flat_buttons],
+            ['Pending Invoice', 'Uninvoiced Amount',
+             'New', 'Assigned', 'In Progress', 'Open Requests', 'Done', 'Cancelled',
+             'SLA Breached', 'SLA At Risk', 'Vendor SLA Risk', 'Recurring Due'])
+        for status in self.LIFECYCLE_GROUPS:
+            self.assertIn('name="%s_contracts_count"' % status, arch)
+        for fname in ('total_held_deposit_amount', 'held_deposits_count', 'unsettled_closed_deposits_count',
+                      'uninvoiced_service_charge_lines_count', 'uninvoiced_service_charge_amount',
+                      'lifecycle_chart_data', 'deposit_chart_data', 'service_invoice_chart_data'):
+            self.assertIn('name="%s"' % fname, arch)
+        self.assertIn('widget="edara_lifecycle_bar"', arch)
+        self.assertIn('widget="edara_deposit_donut"', arch)
+        self.assertIn('widget="edara_service_invoice"', arch)
+        for widget_js, pattern, expected in (
+                ('edara_deposit_donut_field.js', r'"(action_view_deposits_\w+)"', 3),
+                ('edara_service_invoice_field.js', r'"(action_view_service_invoices)"', 1)):
+            with open(file_path('property_managment/static/src/js/' + widget_js), encoding='utf-8') as fh:
+                methods = set(re.findall(pattern, fh.read()))
+            self.assertEqual(len(methods), expected, widget_js)
+            for method in methods:
+                self.assertTrue(callable(getattr(self.env['edara.dashboard'], method, None)), method)
+        with open(file_path('property_managment/static/src/js/edara_lifecycle_bar_field.js'), encoding='utf-8') as fh:
+            js = fh.read()
+        whitelisted = set(re.findall(r'"(action_view_contracts_\w+)"', js))
+        self.assertEqual(len(whitelisted), 7)
+        dashboard = self.env['edara.dashboard']
+        for method in whitelisted:
+            self.assertTrue(callable(getattr(dashboard, method, None)), method)
+
+    # -- U5: Security Deposits donut (reconciled categories) --
+
+    def test_u5_01_deposit_chart_categories_reconcile(self):
+        """U5-01: still held / awaiting settlement / settled-or-returned are disjoint and add up
+        to the total collected, and awaiting + still held equals the existing Total Held KPI."""
+        f = self._setup_c6_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.deposit_chart_data)
+        by_key = {s['status']: s for s in data['slices']}
+        self.assertEqual(list(by_key), ['still_held', 'awaiting', 'settled'])
+        comp = self.dash_company
+        converted_other = f['other_cur']._convert(500.0, comp.currency_id, comp, fields.Date.context_today(dash))
+        self.assertAlmostEqual(by_key['still_held']['amount'], 1000.0 + converted_other, places=2)
+        self.assertAlmostEqual(by_key['awaiting']['amount'], 800.0 + 400.0, places=2)
+        self.assertAlmostEqual(by_key['settled']['amount'], 600.0, places=2)
+        self.assertEqual(
+            (by_key['still_held']['count'], by_key['awaiting']['count'], by_key['settled']['count']), (2, 2, 1))
+        self.assertAlmostEqual(data['total'], sum(s['amount'] for s in data['slices']), places=2)
+        self.assertAlmostEqual(
+            by_key['still_held']['amount'] + by_key['awaiting']['amount'], dash.total_held_deposit_amount, places=2)
+        self.assertEqual(by_key['awaiting']['count'], dash.unsettled_closed_deposits_count)
+        self.assertEqual(by_key['still_held']['count'] + by_key['awaiting']['count'], dash.held_deposits_count)
+
+    def test_u5_02_deposit_chart_actions_match_categories(self):
+        """U5-02: each category's action opens exactly the deposits it counts, with the branch filter."""
+        f = self._setup_c6_test_fixture()
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': f['branch_a'].id})
+        data = json.loads(dash.deposit_chart_data)
+        Deposit = self.env['edara.deposit']
+        opened = {}
+        for s in data['slices']:
+            action = getattr(dash, s['action_method'])()
+            self.assertEqual(action['res_model'], 'edara.deposit')
+            self.assertIn(('branch_id', '=', f['branch_a'].id), action['domain'])
+            opened[s['status']] = Deposit.search(action['domain'])
+            self.assertEqual(len(opened[s['status']]), s['count'], s['status'])
+        self.assertFalse(opened['still_held'] & opened['awaiting'])
+        deposits = f['deposits_a']
+        self.assertEqual(opened['still_held'], deposits['held_comp'] | deposits['held_other'])
+        self.assertEqual(opened['awaiting'], deposits['term_unsettled'] | deposits['canc_unsettled'])
+        self.assertEqual(opened['settled'], deposits['exp_settled'])
+
+    def test_u5_03_deposit_chart_empty_branch(self):
+        """U5-03: a branch without deposits yields zero amounts and counts for every category."""
+        branch_empty = self.env['edara.branch'].create({
+            'name': 'U5 Empty Branch', 'code': 'U5EMPTY', 'company_id': self.dash_company.id,
+        })
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({'branch_id': branch_empty.id})
+        data = json.loads(dash.deposit_chart_data)
+        self.assertEqual(data['total'], 0)
+        self.assertEqual([(s['amount'], s['count']) for s in data['slices']], [(0, 0)] * 3)
 
     def test_c5_08_empty_states(self):
         """C5-08: Scheduled and cancelled counts return 0 when no such contracts exist."""

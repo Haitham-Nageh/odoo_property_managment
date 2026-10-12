@@ -604,6 +604,8 @@ msgid "Activate"
 msgstr "تفعيل"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields,field_description:property_managment.field_edara_branch__active
 #: model:ir.model.fields,field_description:property_managment.field_edara_building__active
 #: model:ir.model.fields,field_description:property_managment.field_edara_ownership__active
@@ -1049,6 +1051,8 @@ msgid "Cancel this scheduled lease?"
 msgstr "هل تريد إلغاء عقد الإيجار المجدول هذا؟"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__cancelled
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_maintenance_request__state__cancelled
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_payment_schedule_line__state__cancelled
@@ -1559,6 +1563,8 @@ msgid "Done"
 msgstr "مكتمل"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__draft
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_payment_schedule_line__state__draft
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_service_charge__state__draft
@@ -1922,6 +1928,8 @@ msgstr ""
 "الوصول إليها؟"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__expired
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
 msgid "Expired"
@@ -3758,6 +3766,8 @@ msgid "Renewals"
 msgstr "التجديدات"
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__renewed
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
 msgid "Renewed"
@@ -4007,6 +4017,8 @@ msgstr ""
 "الفوترة ويوم الدفع."
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__scheduled
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
 #: code:addons/property_managment/static/src/js/edara_collections_chart_field.js:0
@@ -5346,6 +5358,8 @@ msgstr "حالات دورة حياة عقود الإيجار"
 
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid "Live"
 msgstr "حالية"
@@ -5364,6 +5378,8 @@ msgstr "<span class=\"o_stat_text\">العقود المجدولة</span>"
 
 
 #. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid "Historical"
 msgstr "تاريخية"
@@ -5949,3 +5965,123 @@ msgstr "هذا الربع"
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__period_preset__custom
 msgid "Custom"
 msgstr "فترة مخصصة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Pre-live"
+msgstr "قبل التفعيل"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_lifecycle_bar_field.xml:0
+msgid "No lease contracts"
+msgstr "لا توجد عقود إيجار"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Request Status"
+msgstr "حالة الطلبات"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "SLA &amp; Operations"
+msgstr "SLA والعمليات"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Part of the held deposits - not an additional amount"
+msgstr "جزء من الودائع المحتجزة وليس مبلغاً إضافياً"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Recurring maintenance schedules that are due - not maintenance requests"
+msgstr "جداول الصيانة الدورية المستحقة، وليست طلبات صيانة"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_deposit_donut_field.xml:0
+msgid "No security deposits collected"
+msgstr "لا توجد تأمينات محصّلة"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.xml:0
+msgid "Billing Invoices"
+msgstr "الفواتير الصادرة"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.js:0
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.xml:0
+msgid "Invoice Amount"
+msgstr "قيمة الفواتير"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.xml:0
+msgid "Invoice Activity"
+msgstr "نشاط الفواتير"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.xml:0
+msgid "By Month"
+msgstr "حسب الشهر"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.xml:0
+msgid "No service charge invoices in the last 6 months"
+msgstr "لا توجد فواتير رسوم خدمات في آخر 6 أشهر"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_deposit_donut_field.js:0
+msgid "Total Collected"
+msgstr "إجمالي المحصّل"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_deposit_donut_field.js:0
+msgid "%s deposits"
+msgstr "%s تأمين"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_service_invoice_field.js:0
+msgid "%s invoices"
+msgstr "%s فاتورة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Deposits Still Held"
+msgstr "تأمينات لا تزال محتجزة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Deposits Awaiting Settlement"
+msgstr "تأمينات بانتظار التسوية"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Deposits Settled or Returned"
+msgstr "تأمينات مُسوّاة أو مُعادة"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Service Charge Invoicing"
+msgstr "فوترة رسوم الخدمات"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "<span class=\"o_pending_title\">Awaiting Invoicing</span>"
+msgstr "<span class=\"o_pending_title\">بانتظار الفوترة</span>"
+
+#. module: property_managment
+#: model:ir.actions.act_window,name:property_managment.action_edara_service_charge_invoices
+msgid "Service Charge Invoices"
+msgstr "فواتير رسوم الخدمات"

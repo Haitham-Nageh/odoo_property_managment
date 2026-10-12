@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 from lxml import etree
@@ -208,6 +209,40 @@ class TestEdaraServiceCharge(TransactionCase):
             self.assertEqual(invoice_line.account_id, self.income_account)
             analytic_account = self.property.get_analytic_account()
             self.assertIn(str(analytic_account.id), invoice_line.analytic_distribution)
+
+    def test_dashboard_service_invoice_metrics_count_each_invoice_once(self):
+        """U5: Billing Invoices / Invoice Amount / Invoice Activity come from the posted
+        service-charge invoices (one row per invoice) and the actions open the same records."""
+        self.env.company.edara_service_charge_income_account_id = self.income_account.id
+        charge = self.env['edara.service.charge'].create({
+            'building_id': self.building.id, 'allocation_method': 'equal', 'total_amount': 300,
+        })
+        charge.action_generate_allocation()
+        dash = self.env['edara.dashboard'].create({'branch_id': self.branch.id})
+        self.assertEqual(json.loads(dash.service_invoice_chart_data)['count'], 0)
+        charge.action_invoice_lines()
+        charge.action_invoice_lines()  # a second run must not create or count anything new
+        invoices = charge.line_ids.invoice_id
+        self.assertEqual(len(invoices), 2)
+
+        dash = self.env['edara.dashboard'].create({'branch_id': self.branch.id})
+        data = json.loads(dash.service_invoice_chart_data)
+        self.assertEqual(data['count'], len(invoices))
+        self.assertAlmostEqual(data['amount'], sum(invoices.mapped('amount_total_signed')), places=2)
+        self.assertEqual(len(data['months']), 6)
+        self.assertEqual(sum(m['count'] for m in data['months']), len(invoices))
+        self.assertEqual(data['months'][-1]['count'], len(invoices))
+        self.assertAlmostEqual(data['months'][-1]['amount'], data['amount'], places=2)
+
+        action = dash.action_view_service_invoices()
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertEqual(self.env['account.move'].search(action['domain']), invoices)
+        self.assertEqual(self.env['account.move'].search(dash.action_view_service_invoices(5)['domain']), invoices)
+        self.assertFalse(self.env['account.move'].search(dash.action_view_service_invoices(0)['domain']))
+        with self.assertRaises(UserError):
+            dash.action_view_service_invoices(6)
+        # the existing pending-invoice metrics keep their meaning: nothing is left uninvoiced now
+        self.assertEqual(dash.uninvoiced_service_charge_lines_count, 0)
 
     def test_invoiced_line_cannot_be_deleted(self):
         self.env.company.edara_service_charge_income_account_id = self.income_account.id

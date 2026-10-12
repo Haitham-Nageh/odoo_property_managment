@@ -160,6 +160,9 @@ class EdaraDashboard(models.TransientModel):
     occupancy_chart_data = fields.Text(compute='_compute_kpis')
     revenue_trend_data = fields.Text(compute='_compute_kpis')
     collections_chart_data = fields.Text(compute='_compute_kpis')
+    lifecycle_chart_data = fields.Text(compute='_compute_kpis')
+    deposit_chart_data = fields.Text(compute='_compute_kpis')
+    service_invoice_chart_data = fields.Text(compute='_compute_kpis')
 
     currency_id = fields.Many2one('res.currency', compute='_compute_kpis')
     monthly_revenue = fields.Monetary(compute='_compute_kpis', currency_field='currency_id')
@@ -703,6 +706,7 @@ class EdaraDashboard(models.TransientModel):
                 'under_maintenance_units': under_maintenance_units,
                 'occupancy_chart_data': occupancy_chart_data,
                 'revenue_trend_data': revenue_trend_data,
+                'lifecycle_chart_data': dashboard._get_lifecycle_chart_data(contract_counts),
                 'collections_chart_data': dashboard._get_collections_chart_data(
                     eff_curr, period, today, branch_domain, has_accounting_access),
                 'draft_contracts_count': contract_counts['draft'],
@@ -747,6 +751,9 @@ class EdaraDashboard(models.TransientModel):
                 'unsettled_closed_deposits_count': unsettled_closed_deposits_count,
                 'uninvoiced_service_charge_lines_count': uninvoiced_service_charge_lines_count,
                 'uninvoiced_service_charge_amount': uninvoiced_service_charge_amount,
+                'deposit_chart_data': dashboard._get_deposit_chart_data(comp, today, branch_domain),
+                'service_invoice_chart_data': dashboard._get_service_invoice_data(
+                    comp, today, move_branch_domain, has_accounting_access),
             })
 
     def _render_expiring_leases_html(self, contracts, today):
@@ -1473,6 +1480,149 @@ class EdaraDashboard(models.TransientModel):
         return [(first + relativedelta(months=i),
                  first + relativedelta(months=i + 1) - timedelta(days=1)) for i in range(6)]
 
+    @api.model
+    def _get_lifecycle_chart_data(self, contract_counts):
+        """Presentation-only JSON for the lease lifecycle distribution bar. The groups
+        (Live / Pre-live / Historical) are display groupings of the seven stored lease
+        states; counts are the same values as the *_contracts_count KPI fields."""
+        total = sum(contract_counts.values())
+        spec = (
+            (_('Live'), 'live', (
+                ('active', _('Active'), '#059669', 'action_view_contracts_active'),
+                ('scheduled', _('Scheduled'), '#2563EB', 'action_view_contracts_scheduled'),
+            )),
+            (_('Pre-live'), 'pre_live', (
+                ('draft', _('Draft'), '#6B7280', 'action_view_contracts_draft'),
+            )),
+            (_('Historical'), 'historical', (
+                ('renewed', _('Renewed'), '#7C3AED', 'action_view_contracts_renewed'),
+                ('terminated', _('Terminated'), '#475569', 'action_view_contracts_terminated'),
+                ('expired', _('Expired'), '#D97706', 'action_view_contracts_expired'),
+                ('cancelled', _('Cancelled'), '#DC2626', 'action_view_contracts_cancelled'),
+            )),
+        )
+        groups = []
+        for group_label, group_key, segments in spec:
+            groups.append({
+                'key': group_key,
+                'label': group_label,
+                'segments': [{
+                    'status': status,
+                    'label': label,
+                    'count': contract_counts.get(status, 0),
+                    'percent': round(contract_counts.get(status, 0) * 100.0 / total, 1) if total else 0.0,
+                    'color': color,
+                    'action_method': action_method,
+                } for status, label, color, action_method in segments],
+            })
+        return json.dumps({'total': total, 'groups': groups})
+
+    def _deposit_category_domains(self):
+        """Mutually exclusive deposit categories for the Security Deposits donut.
+
+        A deposit is 'held' exactly while its balance (collected - refunded - deducted) is
+        positive, so splitting the held balance by lease status gives two disjoint buckets:
+        still held (lease not closed) and awaiting settlement (balance left on a terminated,
+        expired or cancelled lease - the existing 'Unsettled on Closed Leases' definition).
+        Settled/returned is the money already refunded or deducted. For every deposit
+        collected = still held + awaiting + refunded + deducted, so the three amounts
+        reconcile to the total collected."""
+        closed = ('terminated', 'expired', 'cancelled')
+        return {
+            'still_held': [('state', '=', 'held'), ('contract_id.state', 'not in', closed)],
+            'awaiting': [('balance', '>', 0), ('contract_id.state', 'in', closed)],
+            'settled': ['|', ('amount_refunded', '>', 0), ('amount_deducted', '>', 0)],
+        }
+
+    def _deposit_amount(self, domain, measures, comp, today):
+        """Sum stored deposit amounts in SQL per deposit currency, then convert each currency
+        subtotal once into the company currency (same rate date as the Total Held KPI)."""
+        total = 0.0
+        rows = self.env['edara.deposit']._read_group(
+            domain, ['currency_id'], ['%s:sum' % measure for measure in measures])
+        for currency, *sums in rows:
+            amount = sum(value or 0.0 for value in sums)
+            if currency and currency != comp.currency_id:
+                amount = currency._convert(amount, comp.currency_id, comp, today)
+            total += amount
+        return comp.currency_id.round(total)
+
+    def _get_deposit_chart_data(self, comp, today, branch_domain):
+        self.ensure_one()
+        Deposit = self.env['edara.deposit']
+        cur = comp.currency_id
+        domains = self._deposit_category_domains()
+        spec = (
+            ('still_held', _('Deposits Still Held'), '#0066CC', 'action_view_deposits_still_held', ('balance',)),
+            ('awaiting', _('Deposits Awaiting Settlement'), '#B7791F',
+             'action_view_deposits_unsettled_closed', ('balance',)),
+            ('settled', _('Deposits Settled or Returned'), '#00C853', 'action_view_deposits_settled',
+             ('amount_refunded', 'amount_deducted')),
+        )
+        slices = []
+        for key, label, color, action_method, measures in spec:
+            domain = domains[key] + branch_domain
+            slices.append({
+                'status': key,
+                'label': label,
+                'amount': self._deposit_amount(domain, measures, comp, today),
+                'count': Deposit.search_count(domain),
+                'color': color,
+                'action_method': action_method,
+            })
+        return json.dumps({
+            'total': cur.round(sum(s['amount'] for s in slices)),
+            'currency': cur.name or '',
+            'currency_symbol': cur.symbol or '',
+            'currency_precision': cur.decimal_places,
+            'slices': slices,
+        })
+
+    def _service_invoice_base_domain(self, comp):
+        """Invoices generated by service-charge invoicing: posted customer invoices created
+        from service-charge lines (edara_invoice_type), excluding fully reversed ones."""
+        return [
+            ('move_type', '=', 'out_invoice'), ('edara_invoice_type', '=', 'service_charge'),
+            ('state', '=', 'posted'), ('payment_state', '!=', 'reversed'),
+            ('company_id', '=', comp.id),
+        ]
+
+    def _get_service_invoice_data(self, comp, today, move_branch_domain, has_accounting_access):
+        self.ensure_one()
+        cur = comp.currency_id
+        ranges = self._collections_ranges('monthly', today)
+        months = [{
+            'index': i,
+            'label': format_date(self.env, s, date_format='MMM yyyy'),
+            'count': 0,
+            'amount': 0.0,
+        } for i, (s, _e) in enumerate(ranges)]
+        count = 0
+        amount = 0.0
+        if has_accounting_access:
+            Move = self.env['account.move']
+            domain = self._service_invoice_base_domain(comp) + move_branch_domain
+            # Invoices are searched directly (one row per invoice), so an invoice linked from
+            # several service-charge lines is still counted and summed once. Amounts are the
+            # stored company-currency totals, summed in SQL.
+            count = Move.search_count(domain)
+            amount = cur.round(Move._read_group(domain, [], ['amount_total_signed:sum'])[0][0] or 0.0)
+            window = domain + [('invoice_date', '>=', ranges[0][0]), ('invoice_date', '<=', ranges[-1][1])]
+            for month_start, month_count, month_amount in Move._read_group(
+                    window, ['invoice_date:month'], ['__count', 'amount_total_signed:sum']):
+                idx = next((i for i, (s, e) in enumerate(ranges) if s <= month_start <= e), None)
+                if idx is not None:
+                    months[idx]['count'] = month_count
+                    months[idx]['amount'] = cur.round(month_amount or 0.0)
+        return json.dumps({
+            'count': count,
+            'amount': amount,
+            'currency': cur.name or '',
+            'currency_symbol': cur.symbol or '',
+            'currency_precision': cur.decimal_places,
+            'months': months,
+        })
+
     def _get_collections_chart_data(self, eff_curr, period, today, branch_domain, has_accounting_access):
         self.ensure_one()
         precision = eff_curr.decimal_places
@@ -1597,10 +1747,35 @@ class EdaraDashboard(models.TransientModel):
             ('contract_id.state', 'in', ('terminated', 'expired', 'cancelled')),
         ])
 
+    def action_view_deposits_still_held(self):
+        """Donut 'Deposits Still Held': held balance on leases that are not closed."""
+        return self._quick_action('action_edara_deposit', self._deposit_category_domains()['still_held'])
+
+    def action_view_deposits_settled(self):
+        """Donut 'Deposits Settled or Returned': deposits with any refund or deduction."""
+        return self._quick_action('action_edara_deposit', self._deposit_category_domains()['settled'])
+
     # Phase C8: Service Charge Quick Actions
     def action_view_service_charges_pending_invoice(self):
         """Phase C8: Opens native Service Charge action filtered to charges with pending invoice lines."""
         return self._quick_action('action_edara_service_charge', [('state', '=', 'allocated')])
+
+    def action_view_service_invoices(self, month_index=None):
+        """Invoices generated by service-charge invoicing (the Billing Invoices / Invoice Amount
+        metrics); month_index (0-5, oldest first) narrows to one bar of the Invoice Activity chart."""
+        self.ensure_one()
+        self._require_accounting_access()
+        domain = self._service_invoice_base_domain(self.env.company)
+        if month_index is not None:
+            ranges = self._collections_ranges('monthly', fields.Date.context_today(self))
+            try:
+                start, end = ranges[int(month_index)] if int(month_index) >= 0 else (None, None)
+            except (TypeError, ValueError, IndexError):
+                start = end = None
+            if not start:
+                raise UserError(_("Period index is out of range."))
+            domain += [('invoice_date', '>=', start), ('invoice_date', '<=', end)]
+        return self._quick_action('action_edara_service_charge_invoices', domain)
 
     # ============ Business-level manual triggers (MAT-FIND-007, 2026-09-22) ============
     # Each wraps the SAME method the corresponding daily cron calls - see
