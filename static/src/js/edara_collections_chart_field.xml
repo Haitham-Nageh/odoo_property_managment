@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="property_managment.EdaraCollectionsChartField">
+        <div class="o_edara_collections_widget w-100">
+            <div class="o_edara_collections_header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                <span class="fw-bold">
+                    <i class="fa fa-calendar-check-o text-primary me-1"/>
+                    <t t-if="chartData.period === 'yearly'">Schedule &amp; Collections (Trailing 5 Years)</t>
+                    <t t-else="">Schedule &amp; Collections (Trailing 6 Months)</t>
+                </span>
+                <span class="badge bg-light text-dark border">
+                    <i class="fa fa-money me-1"/><t t-esc="chartData.currency"/>
+                </span>
+            </div>
+
+            <t t-if="isEmpty">
+                <div class="text-center py-3 text-muted">
+                    <i class="fa fa-calendar-o fa-2x mb-1 opacity-50"/>
+                    <div class="fw-semibold">No scheduled payments in this period</div>
+                </div>
+            </t>
+            <t t-else="">
+                <div class="o_edara_collections_summary d-flex flex-wrap gap-3 mb-2 small">
+                    <span><span class="text-muted">Scheduled</span> <b><t t-esc="formatAmount(chartData.totals.scheduled)"/></b></span>
+                    <span class="text-success"><span class="text-muted">Collected</span> <b><t t-esc="formatAmount(chartData.totals.collected)"/></b></span>
+                    <span class="text-danger"><span class="text-muted">Overdue</span> <b><t t-esc="formatAmount(chartData.totals.overdue)"/></b></span>
+                    <span class="text-warning"><span class="text-muted">Upcoming</span> <b><t t-esc="formatAmount(chartData.totals.upcoming)"/></b></span>
+                    <span><span class="text-muted">Collection Rate</span> <b><t t-esc="collectionRateLabel"/></b></span>
+                </div>
+                <div class="o_edara_collections_canvas_wrapper position-relative">
+                    <canvas t-ref="canvas"/>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

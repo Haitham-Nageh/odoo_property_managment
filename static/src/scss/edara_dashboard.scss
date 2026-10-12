@@ -116,15 +116,8 @@
 .o_edara_dashboard .oe_stat_button:has(.text-primary) .o_stat_value { border-color: $primary; color: $primary; }
 
 /* Phase A Foundation: Global Context Bar */
-.o_edara_dashboard .o_edara_context_bar {
-    background-color: $card-bg;
-    border: 1px solid $border-color;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
-}
-
 .o_edara_dashboard .o_edara_context_bar .o_field_widget {
-    width: 100%;
+    width: auto;
 }
 
 /* Phase A Foundation: Attention Required cards accent */
@@ -142,16 +135,11 @@
 }
 
 /* Phase A Foundation: Quick Actions Bar */
-.o_edara_dashboard .o_edara_quick_actions {
-    background-color: $card-bg;
-    border: 1px solid $border-color;
-    border-radius: 8px;
-}
 
 .o_edara_dashboard .o_edara_quick_actions .btn {
     font-size: 0.85rem;
     font-weight: 500;
-    padding: 6px 14px;
+    padding: 4px 10px;
     border-radius: 6px;
     transition: all 0.15s ease-in-out;
 }
@@ -164,6 +152,76 @@
 .o_edara_dashboard .o_quick_actions_title {
     font-size: 0.75rem;
     letter-spacing: 0.5px;
+}
+
+/* Main row: left column (branch context + financial overview) and the
+   Attention Required column sit side by side, both starting at the top. */
+.o_edara_dashboard .o_edara_main_row {
+    > .o_edara_left_col,
+    > .o_edara_attention_col {
+        display: block;
+        min-width: 0;
+    }
+
+    .o_horizontal_separator {
+        margin-top: 0;
+        padding-bottom: 4px;
+        border-bottom-width: 1px;
+    }
+}
+
+/* Compact KPI cards (4 per row on desktop): flatten the nested stat-info card
+   and keep long monetary values inside the card. */
+.o_edara_dashboard .o_edara_kpi_row {
+    .oe_stat_button {
+        min-height: 0;
+        padding: 6px 8px;
+        margin-bottom: 0;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .o_stat_info {
+        min-height: 0;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        box-shadow: none;
+        background: transparent;
+        max-width: 100%;
+    }
+
+    .o_button_icon {
+        margin: 0 0 2px 0 !important;
+        font-size: 1em;
+    }
+
+    .o_stat_text {
+        margin-bottom: 4px;
+        font-size: .68rem;
+        line-height: 1.2;
+    }
+
+    .o_stat_value {
+        font-size: 1.05rem;
+        padding: 2px 8px;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+}
+
+/* Attention Required: tighter cards */
+.o_edara_dashboard .o_edara_attention_center .o_attention_box .card-header {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+.o_edara_dashboard .o_edara_attention_center .o_attention_box .card-body {
+    padding: 6px 8px !important;
+}
+.o_edara_dashboard .o_edara_quick_actions .btn-sm {
+    font-size: 0.8rem;
+    padding: 4px 10px;
 }
 
 /* Phase B: Attention Center Refinement */
@@ -286,15 +344,108 @@
 }
 
 /* Phase C2: Occupancy Doughnut Chart & Operational Indicator */
-.o_edara_dashboard .o_edara_occupancy_section {
-    background-color: $card-bg;
-    border: 1px solid $border-color;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+/* Portfolio & Occupancy: chart (left) + three compact actions (right), one row.
+   Every rule below is scoped to .o_edara_portfolio_row / .o_edara_portfolio_actions. */
+.o_edara_dashboard .row.o_edara_portfolio_row {
+    > div.o_edara_portfolio_chart_col {
+        min-width: 0;
+    }
+
+    > div.o_edara_portfolio_actions {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        align-self: flex-start;
+        gap: 8px;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .o_edara_portfolio_actions button.oe_stat_button {
+        flex: 1 1 180px;
+        width: auto;
+        height: auto;
+        min-height: 0;
+        min-width: 0;
+        margin: 0;
+        padding: 6px 10px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        text-align: start;
+        background-color: transparent;
+        border: 1px solid $border-color;
+        border-radius: 6px;
+        box-shadow: none;
+
+        &:hover {
+            background-color: $body-secondary-bg;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .o_button_icon {
+            margin: 0 !important;
+            font-size: 1.1em;
+        }
+
+        .o_stat_info {
+            flex: 1 1 auto;
+            width: auto;
+            height: auto;
+            min-width: 0;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            text-align: start;
+        }
+
+        .o_stat_text {
+            margin: 0;
+            text-align: start;
+            overflow-wrap: anywhere;
+        }
+
+        .o_stat_value {
+            margin-inline-start: auto;
+            padding: 1px 8px;
+            font-size: 1rem;
+        }
+    }
+}
+
+@media (min-width: 992px) {
+    .o_edara_dashboard .row.o_edara_portfolio_row > div.o_edara_portfolio_actions {
+        flex: 0 0 220px;
+        width: 220px;
+        max-width: 220px;
+        flex-direction: column;
+        flex-wrap: nowrap;
+    }
+
+    .o_edara_dashboard .row.o_edara_portfolio_row .o_edara_portfolio_actions button.oe_stat_button {
+        flex: 0 0 auto;
+        width: 100%;
+    }
+
+    /* The row follows the document direction, so in RTL the first child (chart)
+       would land on the right. Reverse it so the chart stays physically LEFT. */
+    .o_edara_dashboard .row.o_edara_portfolio_row:dir(rtl) {
+        flex-direction: row-reverse;
+    }
 }
 
 .o_edara_dashboard .o_edara_occupancy_header {
-    border-bottom: 1px solid $border-color;
+    border-bottom: 0;
 }
 
 .o_edara_dashboard .o_operational_indicator {
@@ -355,20 +506,25 @@
 }
 
 /* Phase C3: Revenue Trend Bar Chart */
-.o_edara_dashboard .o_edara_revenue_trend_section {
-    background-color: $card-bg;
-    border: 1px solid $border-color;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
-}
-
 .o_edara_dashboard .o_edara_revenue_trend_header {
     border-bottom: 1px solid $border-color;
 }
 
 .o_edara_dashboard .o_edara_revenue_chart_canvas_wrapper {
     width: 100%;
-    height: 220px;
+    height: 190px;
+    position: relative;
+}
+
+/* Schedule & Collections stacked chart */
+.o_edara_dashboard .o_edara_collections_header {
+    border-bottom: 1px solid $border-color;
+    padding-bottom: 4px;
+}
+
+.o_edara_dashboard .o_edara_collections_canvas_wrapper {
+    width: 100%;
+    height: 200px;
     position: relative;
 }
 
@@ -381,29 +537,22 @@
 
 /* Ticket B: Dynamic Branch Filter Buttons */
 .o_edara_dashboard .o_edara_context_bar {
-    .row > div {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        width: 100%;
-    }
-
     label {
         text-align: start;
-        width: 100%;
+        white-space: nowrap;
     }
 
     .o_edara_branch_filter_widget {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
-        width: 100%;
+        width: auto;
 
         .o_edara_branch_filter_btn {
             font-size: 0.85rem;
             font-weight: 500;
-            padding: 5px 14px;
+            padding: 2px 12px;
             border-radius: 20px;
             transition: all 0.15s ease-in-out;
             white-space: nowrap;

@@ -22,138 +22,258 @@
                     <field name="has_accounting_access" invisible="1"/>
                     <field name="has_multiple_branches" invisible="1"/>
                     <field name="accessible_branch_ids" invisible="1" widget="many2many_tags"/>
+                    <field name="available_currency_ids" invisible="1"/>
 
-                    <!-- QUICK ADD / CREATE NEW -->
-                    <div class="o_edara_quick_actions p-3 mb-3 bg-view border rounded shadow-sm">
-                        <div class="o_quick_actions_group">
-                            <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Create New</div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button type="object" name="action_new_lease_contract" class="btn btn-primary">
-                                    <i class="fa fa-file-text me-1"/> New Lease Contract
-                                </button>
-                                <button type="object" name="action_new_maintenance_request" class="btn btn-primary">
-                                    <i class="fa fa-wrench me-1"/> New Maintenance Request
-                                </button>
-                                <button type="object" name="action_new_tenant" class="btn btn-primary">
-                                    <i class="fa fa-user-plus me-1"/> New Tenant
-                                </button>
-                            </div>
+                    <!-- ACTION BAR: CREATE NEW (start) + AUTOMATION (end) -->
+                    <div class="o_edara_quick_actions d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div class="o_quick_actions_group d-flex flex-wrap gap-2">
+                            <button type="object" name="action_new_lease_contract" class="btn btn-sm btn-primary">
+                                <i class="fa fa-file-text me-1"/> New Lease Contract
+                            </button>
+                            <button type="object" name="action_new_maintenance_request" class="btn btn-sm btn-primary">
+                                <i class="fa fa-wrench me-1"/> New Maintenance Request
+                            </button>
+                            <button type="object" name="action_new_tenant" class="btn btn-sm btn-primary">
+                                <i class="fa fa-user-plus me-1"/> New Tenant
+                            </button>
+                        </div>
+                        <div class="o_quick_actions_group d-flex flex-wrap gap-2">
+                            <button type="object" name="action_manual_generate_due_invoices" class="btn btn-sm btn-secondary"
+                                    confirm="Generate invoices now for every due, uninvoiced payment schedule line you can access?">
+                                <i class="fa fa-file-text-o me-1"/> Generate Due Invoices
+                            </button>
+                            <button type="object" name="action_manual_process_lease_expiry" class="btn btn-sm btn-secondary"
+                                    confirm="Expire every active contract past its end date, among those you can access?">
+                                <i class="fa fa-clock-o me-1"/> Process Lease Expiry
+                            </button>
+                            <button type="object" name="action_manual_process_reminders" class="btn btn-sm btn-secondary"
+                                    confirm="Send lease expiry, renewal, overdue payment, maintenance and SLA reminders now, for records you can access?">
+                                <i class="fa fa-bell-o me-1"/> Process Reminders
+                            </button>
+                            <button type="object" name="action_manual_generate_recurring_maintenance" class="btn btn-sm btn-secondary"
+                                    confirm="Generate maintenance requests now for every due, active recurring definition you can access?">
+                                <i class="fa fa-repeat me-1"/> Generate Recurring Maintenance
+                            </button>
                         </div>
                     </div>
 
-                    <!-- 1. GLOBAL CONTEXT BAR -->
-                    <div class="o_edara_context_bar p-3 mb-4 bg-view border rounded shadow-sm">
-                        <div class="row align-items-center g-3">
-                            <div class="col-12">
-                                <label for="branch_id" class="fw-bold text-muted small text-uppercase d-block mb-1">Branch</label>
+                    <!-- MAIN ROW: BRANCH CONTEXT + FINANCIAL OVERVIEW (left) | ATTENTION REQUIRED (right) -->
+                    <div class="row g-3 mb-3 o_edara_main_row">
+                        <div class="col-xl-8 col-12 o_edara_left_col">
+                            <!-- 1. GLOBAL CONTEXT BAR -->
+                            <div class="o_edara_context_bar d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <label for="branch_id" class="fw-bold text-muted small text-uppercase mb-0">Branch</label>
                                 <field name="branch_id" widget="edara_branch_filter"/>
                             </div>
-                        </div>
-                    </div>
 
-                    <!-- 2. ATTENTION REQUIRED -->
-                    <separator string="Attention Required"/>
-                    <div class="row g-3 mt-1 o_edara_attention_center">
-                        <!-- Card 1: Expiring Leases -->
-                        <div class="col-lg-6 col-12">
-                            <div class="card o_attention_box border shadow-sm w-100 h-100">
-                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
-                                    <div class="fw-bold d-flex align-items-center">
-                                        <i class="fa fa-clock-o text-warning me-2 fs-5"/>
-                                        <span>Expiring Leases</span>
+                        <!-- FINANCIAL OVERVIEW (Gated behind has_accounting_access) -->
+                        <div class="o_edara_financial_block" invisible="not has_accounting_access">
+                            <div class="w-100 d-block">
+                                <div class="o_horizontal_separator d-flex justify-content-between align-items-center flex-wrap gap-2 fw-bold small mt-0">
+                                    <span>Financial Overview</span>
+                                    <div class="d-flex align-items-center gap-2" style="text-transform: none; font-weight: normal;">
+                                        <field name="period_preset" required="1" class="mb-0" style="min-width: 140px;"/>
+                                        <div invisible="period_preset != 'custom'" class="d-flex align-items-center gap-1">
+                                            <field name="date_from" readonly="period_preset != 'custom'" required="period_preset == 'custom'" class="mb-0" style="width: 125px;"/>
+                                            <span class="text-muted">–</span>
+                                            <field name="date_to" readonly="period_preset != 'custom'" required="period_preset == 'custom'" class="mb-0" style="width: 125px;"/>
+                                        </div>
                                     </div>
-                                    <div class="d-flex gap-1 flex-wrap justify-content-end">
-                                        <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-outline-warning fw-semibold">
-                                            <field name="expiring_soon_contracts_count" readonly="1"/> Due Soon (30d)
+                                </div>
+                                <div class="row g-2 mt-1 w-100 o_edara_kpi_row">
+                                    <div class="col-xl-3 col-sm-6 col-12">
+                                        <button type="object" name="action_view_monthly_revenue" class="oe_stat_button" icon="fa-line-chart text-success">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="monthly_revenue" widget="monetary" readonly="1"/></span>
+                                                <span class="o_stat_text">Revenue (Period)</span>
+                                            </div>
                                         </button>
-                                        <button type="object" name="action_view_contracts_expiring_without_renewal" class="btn btn-sm btn-outline-danger fw-semibold" title="Expiring within 30 days without renewal in progress">
-                                            <field name="expiring_without_renewal_count" readonly="1"/> Without Renewal
+                                    </div>
+                                    <div class="col-xl-3 col-sm-6 col-12">
+                                        <button type="object" name="action_view_outstanding_receivables" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="outstanding_receivables" widget="monetary" readonly="1"/></span>
+                                                <span class="o_stat_text">Outstanding Receivables</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-xl-3 col-sm-6 col-12">
+                                        <button type="object" name="action_view_payments_this_month" class="oe_stat_button" icon="fa-money text-success">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="recent_payments_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Payments Recorded</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-xl-3 col-sm-6 col-12">
+                                        <button type="object" name="action_view_maintenance_cost_this_month" class="oe_stat_button" icon="fa-wrench text-warning">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="maintenance_cost_this_month" widget="monetary" readonly="1"/></span>
+                                                <span class="o_stat_text">Maintenance Expenses</span>
+                                            </div>
                                         </button>
                                     </div>
                                 </div>
-                                <div class="card-body p-2 d-flex flex-column justify-content-between">
-                                    <field name="expiring_leases_html" widget="html" readonly="1" class="w-100"/>
-                                    <div class="text-end pt-2 border-top mt-2">
-                                        <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-link text-decoration-none p-0">
-                                            View All Expiring Leases <i class="fa fa-arrow-right ms-1"/>
+
+                                <!-- Revenue Trend (Phase C3 & U3) -->
+                                <div class="o_edara_revenue_trend_section py-2 mt-2 w-100">
+                                    <div class="d-flex justify-content-end align-items-center gap-2 mb-1">
+                                        <field name="revenue_trend_currency_id" domain="[('id', 'in', available_currency_ids)]" options="{'no_create': True, 'no_open': True}" placeholder="Automatic" style="min-width: 140px;" class="mb-0"/>
+                                        <field name="revenue_trend_period" required="1" class="mb-0" style="min-width: 110px;"/>
+                                    </div>
+                                    <field name="revenue_trend_data" widget="edara_revenue_trend_chart" readonly="1" class="w-100"/>
+                                </div>
+
+                                <!-- Schedule & Collections -->
+                                <div class="o_edara_collections_section py-2 mt-2 w-100">
+                                    <field name="collections_chart_data" widget="edara_collections_chart" readonly="1" class="w-100"/>
+                                </div>
+                                <div class="row g-2 mt-1 w-100 o_edara_kpi_row">
+                                    <div class="col-md-3 col-6">
+                                        <button type="object" name="action_view_schedule_due_today" class="oe_stat_button" icon="fa-calendar-o text-warning">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="schedule_due_today_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Due Today</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <button type="object" name="action_view_schedule_due_this_month" class="oe_stat_button" icon="fa-calendar text-primary">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="schedule_due_this_month_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Due in Period</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <button type="object" name="action_view_schedule_paid" class="oe_stat_button" icon="fa-check-circle text-success">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="schedule_paid_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Paid</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <button type="object" name="action_view_schedule_overdue" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
+                                            <div class="o_stat_info">
+                                                <span class="o_stat_value"><field name="schedule_overdue_count" readonly="1"/></span>
+                                                <span class="o_stat_text">Overdue</span>
+                                            </div>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Card 2: Overdue Payments -->
-                        <div class="col-lg-6 col-12" invisible="not has_accounting_access">
-                            <div class="card o_attention_box border shadow-sm w-100 h-100">
-                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
-                                    <div class="fw-bold d-flex align-items-center">
-                                        <i class="fa fa-exclamation-circle text-danger me-2 fs-5"/>
-                                        <span>Overdue Payments</span>
-                                    </div>
-                                    <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-outline-danger fw-semibold">
-                                        <field name="schedule_overdue_count" readonly="1"/> Overdue (<field name="schedule_overdue_amount" widget="monetary" readonly="1"/>)
-                                    </button>
-                                </div>
-                                <div class="card-body p-2 d-flex flex-column justify-content-between">
-                                    <field name="overdue_payments_html" widget="html" readonly="1" class="w-100"/>
-                                    <div class="text-end pt-2 border-top mt-2">
-                                        <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-link text-decoration-none text-danger p-0">
-                                            View All Overdue Payments <i class="fa fa-arrow-right ms-1"/>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
-                        <!-- Card 3: Maintenance Attention -->
-                        <div class="col-lg-6 col-12">
-                            <div class="card o_attention_box border shadow-sm w-100 h-100">
-                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
-                                    <div class="fw-bold d-flex align-items-center">
-                                        <i class="fa fa-wrench text-danger me-2 fs-5"/>
-                                        <span>Maintenance Attention</span>
+                        <!-- ATTENTION REQUIRED -->
+                        <div class="col-xl-4 col-12 o_edara_attention_col">
+                            <div class="w-100 d-block">
+                                <div class="o_horizontal_separator fw-bold small mt-0">Attention Required</div>
+                                <div class="row g-2 mt-1 o_edara_attention_center w-100">
+                                    <!-- Card 1: Expiring Leases -->
+                                    <div class="col-12 o_attention_card_col">
+                                        <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                            <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                                <div class="fw-bold d-flex align-items-center">
+                                                    <i class="fa fa-clock-o text-warning me-2 fs-6"/>
+                                                    <span>Expiring Leases</span>
+                                                </div>
+                                                <div class="d-flex gap-1 flex-wrap justify-content-end">
+                                                    <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-outline-warning fw-semibold">
+                                                        <field name="expiring_soon_contracts_count" readonly="1"/> Due Soon (30d)
+                                                    </button>
+                                                    <button type="object" name="action_view_contracts_expiring_without_renewal" class="btn btn-sm btn-outline-danger fw-semibold" title="Expiring within 30 days without renewal in progress">
+                                                        <field name="expiring_without_renewal_count" readonly="1"/> Without Renewal
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                                <field name="expiring_leases_html" widget="html" readonly="1" class="w-100"/>
+                                                <div class="text-end pt-2 border-top mt-2">
+                                                    <button type="object" name="action_view_contracts_expiring_soon" class="btn btn-sm btn-link text-decoration-none p-0">
+                                                        View All Expiring Leases <i class="fa fa-arrow-right ms-1"/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="d-flex gap-1">
-                                        <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-outline-danger fw-semibold">
-                                            <field name="maintenance_urgent_count" readonly="1"/> Urgent
-                                        </button>
-                                        <button type="object" name="action_view_maintenance_sla_breached" class="btn btn-sm btn-outline-danger fw-semibold">
-                                            <field name="maintenance_sla_breached_count" readonly="1"/> Breached
-                                        </button>
-                                        <button type="object" name="action_view_maintenance_sla_at_risk" class="btn btn-sm btn-outline-warning fw-semibold">
-                                            <field name="maintenance_sla_at_risk_count" readonly="1"/> At Risk
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="card-body p-2 d-flex flex-column justify-content-between">
-                                    <field name="maintenance_attention_html" widget="html" readonly="1" class="w-100"/>
-                                    <div class="text-end pt-2 border-top mt-2">
-                                        <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-link text-decoration-none p-0">
-                                            View Urgent Requests <i class="fa fa-arrow-right ms-1"/>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Card 4: Pending Renewal Decisions -->
-                        <div class="col-lg-6 col-12">
-                            <div class="card o_attention_box border shadow-sm w-100 h-100">
-                                <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
-                                    <div class="fw-bold d-flex align-items-center">
-                                        <i class="fa fa-refresh text-warning me-2 fs-5"/>
-                                        <span>Pending Renewals</span>
+                                    <!-- Card 2: Overdue Payments -->
+                                    <div class="col-12 o_attention_card_col" invisible="not has_accounting_access">
+                                        <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                            <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                                <div class="fw-bold d-flex align-items-center">
+                                                    <i class="fa fa-exclamation-circle text-danger me-2 fs-6"/>
+                                                    <span>Overdue Payments</span>
+                                                </div>
+                                                <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-outline-danger fw-semibold">
+                                                    <field name="schedule_overdue_count" readonly="1"/> Overdue (<field name="schedule_overdue_amount" widget="monetary" readonly="1"/>)
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                                <field name="overdue_payments_html" widget="html" readonly="1" class="w-100"/>
+                                                <div class="text-end pt-2 border-top mt-2">
+                                                    <button type="object" name="action_view_schedule_overdue" class="btn btn-sm btn-link text-decoration-none text-danger p-0">
+                                                        View All Overdue Payments <i class="fa fa-arrow-right ms-1"/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-outline-warning fw-semibold">
-                                        <field name="upcoming_renewals_count" readonly="1"/> Awaiting Decision
-                                    </button>
-                                </div>
-                                <div class="card-body p-2 d-flex flex-column justify-content-between">
-                                    <field name="pending_renewals_html" widget="html" readonly="1" class="w-100"/>
-                                    <div class="text-end pt-2 border-top mt-2">
-                                        <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-link text-decoration-none p-0">
-                                            Review Renewal Decisions <i class="fa fa-arrow-right ms-1"/>
-                                        </button>
+
+                                    <!-- Card 3: Maintenance Attention -->
+                                    <div class="col-12 o_attention_card_col">
+                                        <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                            <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                                <div class="fw-bold d-flex align-items-center">
+                                                    <i class="fa fa-wrench text-danger me-2 fs-6"/>
+                                                    <span>Maintenance Attention</span>
+                                                </div>
+                                                <div class="d-flex gap-1">
+                                                    <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-outline-danger fw-semibold">
+                                                        <field name="maintenance_urgent_count" readonly="1"/> Urgent
+                                                    </button>
+                                                    <button type="object" name="action_view_maintenance_sla_breached" class="btn btn-sm btn-outline-danger fw-semibold">
+                                                        <field name="maintenance_sla_breached_count" readonly="1"/> Breached
+                                                    </button>
+                                                    <button type="object" name="action_view_maintenance_sla_at_risk" class="btn btn-sm btn-outline-warning fw-semibold">
+                                                        <field name="maintenance_sla_at_risk_count" readonly="1"/> At Risk
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                                <field name="maintenance_attention_html" widget="html" readonly="1" class="w-100"/>
+                                                <div class="text-end pt-2 border-top mt-2">
+                                                    <button type="object" name="action_view_maintenance_urgent" class="btn btn-sm btn-link text-decoration-none p-0">
+                                                        View Urgent Requests <i class="fa fa-arrow-right ms-1"/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card 4: Pending Renewal Decisions -->
+                                    <div class="col-12 o_attention_card_col">
+                                        <div class="card o_attention_box border shadow-sm w-100 h-100">
+                                            <div class="card-header bg-view d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                                <div class="fw-bold d-flex align-items-center">
+                                                    <i class="fa fa-refresh text-warning me-2 fs-6"/>
+                                                    <span>Pending Renewals</span>
+                                                </div>
+                                                <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-outline-warning fw-semibold">
+                                                    <field name="upcoming_renewals_count" readonly="1"/> Awaiting Decision
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                                <field name="pending_renewals_html" widget="html" readonly="1" class="w-100"/>
+                                                <div class="text-end pt-2 border-top mt-2">
+                                                    <button type="object" name="action_view_renewals_pending" class="btn btn-sm btn-link text-decoration-none p-0">
+                                                        Review Renewal Decisions <i class="fa fa-arrow-right ms-1"/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -162,25 +282,33 @@
 
                     <!-- 3. PORTFOLIO & OCCUPANCY -->
                     <separator string="Portfolio &amp; Occupancy"/>
-                    <!-- Portfolio Summary -->
-                    <div class="row g-3 mt-1">
-                        <div class="col-lg-4 col-md-4 col-12">
+                    <div class="row g-3 mt-1 o_edara_portfolio_row">
+                        <div class="col-12 col-lg o_edara_portfolio_chart_col">
+                            <!-- Occupancy Breakdown (Phase C2: Doughnut Chart + Click-to-Filter) -->
+                            <div class="o_edara_occupancy_section w-100">
+                                <!-- Keep individual KPI fields invisible in the view for form data access -->
+                                <field name="available_units" invisible="1"/>
+                                <field name="occupied_units" invisible="1"/>
+                                <field name="reserved_units" invisible="1"/>
+                                <field name="owner_occupied_units" invisible="1"/>
+                                <field name="sold_units" invisible="1"/>
+                                <field name="under_maintenance_units" invisible="1"/>
+                                <field name="occupancy_chart_data" widget="edara_occupancy_chart" readonly="1" class="w-100"/>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-auto o_edara_portfolio_actions">
                             <button type="object" name="action_view_properties" class="oe_stat_button" icon="fa-sitemap text-primary">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="total_properties" readonly="1"/></span>
                                     <span class="o_stat_text">Total Properties</span>
                                 </div>
                             </button>
-                        </div>
-                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_buildings" class="oe_stat_button" icon="fa-building text-primary">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="total_buildings" readonly="1"/></span>
                                     <span class="o_stat_text">Total Buildings</span>
                                 </div>
                             </button>
-                        </div>
-                        <div class="col-lg-4 col-md-4 col-12">
                             <button type="object" name="action_view_units_total" class="oe_stat_button" icon="fa-building-o">
                                 <div class="o_stat_info">
                                     <span class="o_stat_value"><field name="total_units" readonly="1"/></span>
@@ -190,17 +318,6 @@
                         </div>
                     </div>
 
-                    <!-- Occupancy Breakdown (Phase C2: Doughnut Chart + Click-to-Filter) -->
-                    <div class="o_edara_occupancy_section p-3 mt-2 bg-view border rounded shadow-sm">
-                        <!-- Keep individual KPI fields invisible in the view for form data access -->
-                        <field name="available_units" invisible="1"/>
-                        <field name="occupied_units" invisible="1"/>
-                        <field name="reserved_units" invisible="1"/>
-                        <field name="owner_occupied_units" invisible="1"/>
-                        <field name="sold_units" invisible="1"/>
-                        <field name="under_maintenance_units" invisible="1"/>
-                        <field name="occupancy_chart_data" widget="edara_occupancy_chart" readonly="1" class="w-100"/>
-                    </div>
 
                     <!-- Lease Lifecycle Statuses (Phase C5) -->
                     <div class="o_edara_lifecycle_section mt-3">
@@ -278,98 +395,7 @@
                         </div>
                     </div>
 
-                    <!-- 4. FINANCIAL OVERVIEW (Gated behind has_accounting_access) -->
-                    <div invisible="not has_accounting_access">
-                        <div class="o_horizontal_separator d-flex justify-content-between align-items-center flex-wrap gap-2 text-uppercase fw-bolder small">
-                            <span>Financial Overview</span>
-                            <div class="d-flex align-items-center gap-2" style="text-transform: none; font-weight: normal;">
-                                <field name="period_preset" required="1" class="mb-0" style="min-width: 140px;"/>
-                                <div invisible="period_preset != 'custom'" class="d-flex align-items-center gap-1">
-                                    <field name="date_from" readonly="period_preset != 'custom'" required="period_preset == 'custom'" class="mb-0" style="width: 125px;"/>
-                                    <span class="text-muted">–</span>
-                                    <field name="date_to" readonly="period_preset != 'custom'" required="period_preset == 'custom'" class="mb-0" style="width: 125px;"/>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-3 mt-1">
-                            <div class="col-lg-3 col-md-6 col-12">
-                                <button type="object" name="action_view_monthly_revenue" class="oe_stat_button" icon="fa-line-chart text-success">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="monthly_revenue" widget="monetary" readonly="1"/></span>
-                                        <span class="o_stat_text">Revenue (Period)</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-12">
-                                <button type="object" name="action_view_outstanding_receivables" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="outstanding_receivables" widget="monetary" readonly="1"/></span>
-                                        <span class="o_stat_text">Outstanding Receivables</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-12">
-                                <button type="object" name="action_view_payments_this_month" class="oe_stat_button" icon="fa-money text-success">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="recent_payments_count" readonly="1"/></span>
-                                        <span class="o_stat_text">Payments Recorded</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-12">
-                                <button type="object" name="action_view_maintenance_cost_this_month" class="oe_stat_button" icon="fa-wrench text-warning">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="maintenance_cost_this_month" widget="monetary" readonly="1"/></span>
-                                        <span class="o_stat_text">Maintenance Expenses</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Revenue Trend (Phase C3: 6-Month Bar Chart + Click-to-Filter) -->
-                        <div class="o_edara_revenue_trend_section p-3 mt-2 bg-view border rounded shadow-sm">
-                            <field name="revenue_trend_data" widget="edara_revenue_trend_chart" readonly="1" class="w-100"/>
-                        </div>
-
-                        <!-- Schedule & Collections -->
-                        <separator string="Schedule &amp; Collections"/>
-                        <div class="row g-3 mt-1">
-                            <div class="col-lg-3 col-md-6 col-6">
-                                <button type="object" name="action_view_schedule_due_today" class="oe_stat_button" icon="fa-calendar-o text-warning">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_due_today_count" readonly="1"/></span>
-                                        <span class="o_stat_text">Due Today</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-6">
-                                <button type="object" name="action_view_schedule_due_this_month" class="oe_stat_button" icon="fa-calendar text-primary">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_due_this_month_count" readonly="1"/></span>
-                                        <span class="o_stat_text">Due in Period</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-6">
-                                <button type="object" name="action_view_schedule_paid" class="oe_stat_button" icon="fa-check-circle text-success">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_paid_count" readonly="1"/></span>
-                                        <span class="o_stat_text">Paid</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="col-lg-3 col-md-6 col-6">
-                                <button type="object" name="action_view_schedule_overdue" class="oe_stat_button" icon="fa-exclamation-circle text-danger">
-                                    <div class="o_stat_info">
-                                        <span class="o_stat_value"><field name="schedule_overdue_count" readonly="1"/></span>
-                                        <span class="o_stat_text">Overdue</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 5. SECURITY DEPOSITS (Phase C6) -->
+                    <!-- 4. SECURITY DEPOSITS (Phase C6) -->
                     <separator string="Security Deposits"/>
                     <div class="row g-3 mt-1">
                         <div class="col-lg-4 col-md-4 col-12">
@@ -398,7 +424,7 @@
                         </div>
                     </div>
 
-                    <!-- 5b. SERVICE CHARGES PENDING INVOICING (Phase C8) -->
+                    <!-- 5. SERVICE CHARGES PENDING INVOICING (Phase C8) -->
                     <separator string="Service Charges Pending Invoicing"/>
                     <div class="row g-3 mt-1">
                         <div class="col-lg-6 col-md-6 col-12">
@@ -508,37 +534,10 @@
                         </div>
                     </div>
 
-                    <!-- 6. RECENT ACTIVITY -->
+                    <!-- 7. RECENT ACTIVITY -->
                     <separator string="Recent Activity"/>
                     <div class="o_edara_recent_activity p-3 mt-2 bg-view border rounded shadow-sm">
                         <field name="recent_activity_html" widget="html" readonly="1" class="w-100"/>
-                    </div>
-
-                    <!-- 7. QUICK ACTIONS & AUTOMATION -->
-                    <separator string="Quick Actions &amp; Automation"/>
-                    <div class="o_edara_quick_actions p-3 mt-2 bg-view border rounded shadow-sm">
-                        <!-- Automation Triggers -->
-                        <div class="o_quick_actions_group">
-                            <div class="o_quick_actions_title fw-bold text-muted small text-uppercase mb-2">Automation &amp; Operations</div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button type="object" name="action_manual_generate_due_invoices" class="btn btn-secondary"
-                                        confirm="Generate invoices now for every due, uninvoiced payment schedule line you can access?">
-                                    <i class="fa fa-file-text-o me-1"/> Generate Due Invoices
-                                </button>
-                                <button type="object" name="action_manual_process_lease_expiry" class="btn btn-secondary"
-                                        confirm="Expire every active contract past its end date, among those you can access?">
-                                    <i class="fa fa-clock-o me-1"/> Process Lease Expiry
-                                </button>
-                                <button type="object" name="action_manual_process_reminders" class="btn btn-secondary"
-                                        confirm="Send lease expiry, renewal, overdue payment, maintenance and SLA reminders now, for records you can access?">
-                                    <i class="fa fa-bell-o me-1"/> Process Reminders
-                                </button>
-                                <button type="object" name="action_manual_generate_recurring_maintenance" class="btn btn-secondary"
-                                        confirm="Generate maintenance requests now for every due, active recurring definition you can access?">
-                                    <i class="fa fa-repeat me-1"/> Generate Recurring Maintenance
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </form>
@@ -550,6 +549,7 @@
         <field name="res_model">edara.dashboard</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_edara_dashboard_form"/>
+        <field name="context">{'no_breadcrumbs': True}</field>
         <field name="target">current</field>
     </record>
 

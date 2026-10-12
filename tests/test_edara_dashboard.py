@@ -734,6 +734,45 @@ class TestEdaraDashboard(TransactionCase):
         action = dash.action_view_schedule_overdue()
         self.assertEqual(action['res_model'], 'edara.payment.schedule.line')
 
+    def test_collections_chart_overdue_bucket_and_drilldown(self):
+        """Schedule & Collections: an unpaid past-due line lands in its due-month bucket as overdue,
+        scheduled == overdue, nothing collected, and the drill-down returns exactly that line."""
+        today = date.today()
+        tenant = self.env['res.partner'].create({'name': 'Collections Tenant'})
+        branch = self.env['edara.branch'].create({
+            'name': 'Collections Branch', 'code': 'COLB', 'company_id': self.dash_company.id,
+        })
+        prop = self.env['edara.property'].create({'name': 'Coll Property', 'code': 'COLP', 'branch_id': branch.id})
+        bld = self.env['edara.building'].create({'name': 'Coll Building', 'code': 'COLBL', 'property_id': prop.id})
+        unit = self.env['edara.unit'].create({'name': 'D-COL-1', 'code': 'DCOL1', 'building_id': bld.id})
+        contract = self.env['edara.lease.contract'].create({
+            'name': 'LC-COLL-01', 'unit_id': unit.id, 'tenant_id': tenant.id,
+            'start_date': today - timedelta(days=90), 'end_date': today + timedelta(days=300),
+            'rent_amount': 900.0, 'deposit_required': False, 'state': 'active',
+        })
+        prev_month_last_day = today.replace(day=1) - timedelta(days=1)
+        line = self.env['edara.payment.schedule.line'].create({
+            'contract_id': contract.id, 'due_date': prev_month_last_day, 'amount': 900.0,
+        })
+        self.assertEqual(line.state, 'overdue')
+
+        dash = self.env['edara.dashboard'].create({'branch_id': branch.id})
+        data = json.loads(dash.collections_chart_data)
+        self.assertEqual(len(data['buckets']), 6)
+        bucket = data['buckets'][4]  # previous month
+        self.assertEqual((bucket['year'], bucket['month']), (prev_month_last_day.year, prev_month_last_day.month))
+        self.assertEqual((bucket['scheduled'], bucket['collected'], bucket['overdue'], bucket['upcoming']),
+                         (900.0, 0.0, 900.0, 0.0))
+        self.assertEqual(data['totals']['outstanding'], 900.0)
+        self.assertEqual(data['totals']['collection_rate'], 0.0)
+
+        action = dash.action_view_collections_bucket(4, 'overdue', data['currency_id'])
+        self.assertEqual(self.env['edara.payment.schedule.line'].search(action['domain']), line)
+        action = dash.action_view_collections_bucket(4, 'collected', data['currency_id'])
+        self.assertFalse(self.env['edara.payment.schedule.line'].search(action['domain']))
+        with self.assertRaises(UserError):
+            dash.action_view_collections_bucket(6, 'overdue', data['currency_id'])
+
     def test_phase_b_maintenance_attention(self):
         """Phase B: Maintenance attention distinguishes urgent & SLA breached and excludes unrelated."""
         admin = self.env.ref('base.user_admin')
@@ -1655,15 +1694,18 @@ class TestEdaraDashboard(TransactionCase):
             'tenant': tenant,
         }
 
-    def _create_c3_move(self, fixture, branch, move_type, date_val, amount, posted=True):
-        move = self.env['account.move'].create({
+    def _create_c3_move(self, fixture, branch, move_type, date_val, amount, posted=True, currency=None):
+        vals = {
             'move_type': move_type,
             'partner_id': fixture['tenant'].id,
             'invoice_date': date_val,
             'edara_branch_id': branch.id if branch else False,
             'company_id': fixture['company'].id,
             'invoice_line_ids': [(0, 0, {'name': 'Test Rent Line', 'quantity': 1, 'price_unit': amount})],
-        })
+        }
+        if currency:
+            vals['currency_id'] = currency.id
+        move = self.env['account.move'].create(vals)
         if posted:
             move.action_post()
         return move
@@ -3781,3 +3823,416 @@ class TestEdaraDashboard(TransactionCase):
         self.assertEqual(dash.period_preset, 'custom')
         self.assertEqual(dash.date_from, custom_from)
         self.assertEqual(dash.date_to, custom_to)
+
+    # -- Ticket U3: Dashboard UX Improvements Tests --
+
+    def test_u3_01_monthly_bucket_shape_and_boundaries(self):
+        """U3-01: Monthly period contains 6 buckets with index, label, year, month, value, currency info."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'revenue_trend_period': 'monthly',
+        })
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(data.get('period'), 'monthly')
+        self.assertIn('months', data)
+        self.assertEqual(len(data['months']), 6)
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+        for i, m in enumerate(data['months']):
+            self.assertEqual(m['index'], i)
+            expected_date = cur_month_start - relativedelta(months=5 - i)
+            self.assertEqual(m['year'], expected_date.year)
+            self.assertEqual(m['month'], expected_date.month)
+            self.assertTrue(m['label'])
+            self.assertIsInstance(m['value'], (int, float))
+        self.assertIn('currency_id', data)
+        self.assertIn('currency_precision', data)
+
+    def test_u3_02_yearly_bucket_shape_and_boundaries(self):
+        """U3-02: Yearly period contains 5 buckets with month: null, index 0..4, and 5-year boundaries."""
+        dash = self.env['edara.dashboard'].with_user(self.dash_admin).create({
+            'branch_id': self.branch.id,
+            'revenue_trend_period': 'yearly',
+        })
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(data.get('period'), 'yearly')
+        self.assertIn('months', data)
+        self.assertEqual(len(data['months']), 5)
+        today = fields.Date.context_today(self)
+        for i, b in enumerate(data['months']):
+            self.assertEqual(b['index'], i)
+            expected_year = today.year - (4 - i)
+            self.assertEqual(b['year'], expected_year)
+            self.assertIsNone(b['month'])
+            self.assertEqual(b['label'], str(expected_year))
+            self.assertIsInstance(b['value'], (int, float))
+
+    def test_u3_03_attention_previews_limited_to_three(self):
+        """U3-03: Previews for expiring leases, overdue payments, maintenance, pending renewals are capped at 3 items."""
+        today = fields.Date.context_today(self)
+        branch_u3 = self.env['edara.branch'].create({
+            'name': 'U3 Attention Branch', 'code': 'U3ATT', 'company_id': self.dash_company.id,
+        })
+        prop_u3 = self.env['edara.property'].create({
+            'name': 'U3 Attention Property', 'code': 'U3AP', 'branch_id': branch_u3.id,
+        })
+        bld_u3 = self.env['edara.building'].create({
+            'name': 'U3 Attention Building', 'code': 'U3AB', 'property_id': prop_u3.id,
+        })
+
+        # Create 4 expiring contracts
+        for i in range(4):
+            u = self.env['edara.unit'].create({'name': f'U3-Exp-{i}', 'code': f'U3E{i}', 'building_id': bld_u3.id})
+            t = self.env['res.partner'].create({'name': f'Tenant Exp {i}'})
+            c = self.env['edara.lease.contract'].create({
+                'unit_id': u.id, 'tenant_id': t.id,
+                'start_date': today - timedelta(days=300),
+                'end_date': today + timedelta(days=i + 1),
+                'rent_amount': 500, 'deposit_required': False,
+            })
+            c.action_activate()
+
+        # Create 4 overdue payment schedule lines
+        u_base = self.env['edara.unit'].create({'name': 'U3-Overdue', 'code': 'U3OD', 'building_id': bld_u3.id})
+        t_base = self.env['res.partner'].create({'name': 'Tenant OD'})
+        c_base = self.env['edara.lease.contract'].create({
+            'unit_id': u_base.id, 'tenant_id': t_base.id,
+            'start_date': today - timedelta(days=100),
+            'end_date': today + timedelta(days=200),
+            'rent_amount': 500, 'deposit_required': False,
+        })
+        c_base.sudo().write({'state': 'active'})
+        for i in range(4):
+            self.env['edara.payment.schedule.line'].create({
+                'contract_id': c_base.id,
+                'due_date': today - timedelta(days=10 + i),
+                'amount': 200,
+            })
+
+        # Create 4 urgent maintenance requests
+        for i in range(4):
+            self.env['edara.maintenance.request'].create({
+                'title': f'Urgent issue {i}',
+                'unit_id': u_base.id,
+                'property_id': prop_u3.id,
+                'branch_id': branch_u3.id,
+                'tenant_id': t_base.id,
+                'description': f'Urgent issue {i}',
+                'priority': 'urgent',
+                'state': 'assigned',
+            })
+
+        # Create 4 pending renewal requests
+        for i in range(4):
+            u_ren = self.env['edara.unit'].create({'name': f'U3-Ren-{i}', 'code': f'U3R{i}', 'building_id': bld_u3.id})
+            t_ren = self.env['res.partner'].create({'name': f'Tenant Ren {i}'})
+            c_ren = self.env['edara.lease.contract'].create({
+                'unit_id': u_ren.id, 'tenant_id': t_ren.id,
+                'start_date': today - timedelta(days=100),
+                'end_date': today + timedelta(days=200),
+                'rent_amount': 500, 'deposit_required': False,
+            })
+            c_ren.action_activate()
+            self.env['edara.renewal.request'].create({
+                'contract_id': c_ren.id,
+                'requested_start_date': today + timedelta(days=201),
+                'requested_end_date': today + timedelta(days=365 + i),
+                'requested_rent_amount': 600,
+                'state': 'submitted',
+            })
+
+        dash = self.env['edara.dashboard'].create({'branch_id': branch_u3.id})
+        self.assertTrue(dash.has_accounting_access)
+        # Full counters are at least 4
+        self.assertEqual(dash.expiring_soon_contracts_count, 4)
+        self.assertGreaterEqual(dash.schedule_overdue_count, 4)
+        self.assertEqual(dash.maintenance_urgent_count, 4)
+        self.assertEqual(dash.upcoming_renewals_count, 4)
+
+        # HTML previews have at most 3 items
+        exp_count = dash.expiring_leases_html.count('class="o_attention_item')
+        self.assertEqual(exp_count, 3)
+        od_count = dash.overdue_payments_html.count('class="o_attention_item')
+        self.assertEqual(od_count, 3)
+        maint_count = dash.maintenance_attention_html.count('class="o_attention_item')
+        self.assertEqual(maint_count, 3)
+        ren_count = dash.pending_renewals_html.count('class="o_attention_item')
+        self.assertEqual(ren_count, 3)
+
+    def test_u3_04_currency_discovery_and_branch_isolation(self):
+        """U3-04: Currencies are discovered efficiently per branch, and currency selector clears on branch mismatch."""
+        f = self._setup_c3_accounting_fixture()
+        curr_usd = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'USD')], limit=1)
+        curr_usd.write({'active': True})
+        curr_jod = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'JOD')], limit=1)
+        curr_jod.write({'active': True})
+        today = fields.Date.context_today(self)
+
+        # In branch A: post invoice in USD
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', today, 1000.0, currency=curr_usd)
+        # In branch B: post invoice in JOD
+        self._create_c3_move(f, f['branch_b'], 'out_invoice', today, 500.0, currency=curr_jod)
+
+        dash = self.env['edara.dashboard'].create({'branch_id': f['branch_a'].id})
+        avail_a = dash._get_available_currencies(f['branch_a'])
+        self.assertIn(curr_usd, avail_a)
+        self.assertNotIn(curr_jod, avail_a)
+
+        # Set currency to USD
+        dash.revenue_trend_currency_id = curr_usd
+        # Switch branch to branch B -> onchange clears revenue_trend_currency_id
+        dash.branch_id = f['branch_b']
+        dash._onchange_branch_id_revenue_trend()
+        self.assertFalse(dash.revenue_trend_currency_id)
+
+    def test_u3_05_jod_precision_and_refund_sign(self):
+        """U3-05: JOD invoices with 3 decimals and customer refunds (out_refund subtraction)."""
+        f = self._setup_c3_accounting_fixture()
+        curr_jod = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'JOD')], limit=1)
+        curr_jod.write({'active': True})
+        today = fields.Date.context_today(self)
+        cur_month_start = today.replace(day=1)
+
+        # In branch A: invoice 1000.125, refund 200.000 in current month
+        self._create_c3_move(f, f['branch_a'], 'out_invoice', cur_month_start, 1000.125, currency=curr_jod)
+        self._create_c3_move(f, f['branch_a'], 'out_refund', cur_month_start, 200.000, currency=curr_jod)
+
+        dash = self.env['edara.dashboard'].create({
+            'branch_id': f['branch_a'].id,
+            'revenue_trend_currency_id': curr_jod.id,
+            'revenue_trend_period': 'monthly',
+        })
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(data.get('currency'), 'JOD')
+        self.assertEqual(data.get('currency_precision'), 3)
+        self.assertAlmostEqual(data['months'][5]['value'], 800.125, places=3)
+        self.assertAlmostEqual(data['total_revenue'], 800.125, places=3)
+
+    def test_u3_06_drilldown_currency_validation_and_stale_rejection(self):
+        """U3-06: Drill-down includes clicked currency, resolves effective currency if omitted, asserts returned moves, and rejects invalid/stale currency with UserError."""
+        f = self._setup_c3_accounting_fixture()
+        curr_usd = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'USD')], limit=1)
+        curr_usd.write({'active': True})
+        curr_jod = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'JOD')], limit=1)
+        curr_jod.write({'active': True})
+        today = fields.Date.context_today(self)
+
+        inv_usd = self._create_c3_move(f, f['branch_a'], 'out_invoice', today, 500.0, currency=curr_usd)
+        inv_jod = self._create_c3_move(f, f['branch_a'], 'out_invoice', today, 300.0, currency=curr_jod)
+
+        dash = self.env['edara.dashboard'].create({
+            'branch_id': f['branch_a'].id,
+            'revenue_trend_currency_id': curr_usd.id,
+            'revenue_trend_period': 'monthly',
+        })
+
+        # 1. Drill-down on foreign currency bucket passes clicked currency and finds inv_usd
+        action = dash.action_view_revenue_trend_month(5, curr_usd.id)
+        self.assertIn(('currency_id', '=', curr_usd.id), action['domain'])
+        moves = self.env['account.move'].search(action['domain'])
+        self.assertIn(inv_usd, moves)
+        self.assertNotIn(inv_jod, moves)
+
+        # 2. currency_id=False (omitted/None) resolves to effective currency (curr_usd)
+        action_eff = dash.action_view_revenue_trend_month(5, None)
+        self.assertIn(('currency_id', '=', curr_usd.id), action_eff['domain'])
+        moves_eff = self.env['account.move'].search(action_eff['domain'])
+        self.assertIn(inv_usd, moves_eff)
+        self.assertNotIn(inv_jod, moves_eff)
+
+        # Stale/invalid currency raises UserError
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month(5, 999999)
+
+        # Invalid index raises UserError
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month(6, curr_usd.id)
+
+    def test_u3_07_prior_year_drilldown_clears_this_year_filter(self):
+        """U3-07: Drill-down on past year clears search_default_this_year, asserts returned prior-year invoice and refund with signed total."""
+        f = self._setup_c3_accounting_fixture()
+        curr_usd = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'USD')], limit=1)
+        curr_usd.write({'active': True})
+        today = fields.Date.context_today(self)
+
+        prior_year = today.year - 2
+        prior_index = 2
+
+        inv_prior = self._create_c3_move(f, f['branch_a'], 'out_invoice', date(prior_year, 4, 15), 1000.0, currency=curr_usd)
+        ref_prior = self._create_c3_move(f, f['branch_a'], 'out_refund', date(prior_year, 5, 20), 250.0, currency=curr_usd)
+        inv_curr = self._create_c3_move(f, f['branch_a'], 'out_invoice', date(today.year, 2, 1), 700.0, currency=curr_usd)
+
+        dash = self.env['edara.dashboard'].create({
+            'branch_id': f['branch_a'].id,
+            'revenue_trend_currency_id': curr_usd.id,
+            'revenue_trend_period': 'yearly',
+        })
+
+        # Chart bucket has 5-year trailing metadata and signed value (1000 - 250 = 750)
+        data = json.loads(dash.revenue_trend_data)
+        prior_bucket = data['months'][prior_index]
+        self.assertEqual(prior_bucket['year'], prior_year)
+        self.assertIsNone(prior_bucket['month'])
+        self.assertAlmostEqual(prior_bucket['value'], 750.0, places=2)
+
+        # Drill down on prior_index
+        action = dash.action_view_revenue_trend_month(prior_index, curr_usd.id)
+        ctx = action.get('context', {})
+        self.assertNotIn('search_default_this_year', ctx)
+
+        moves = self.env['account.move'].search(action['domain'])
+        self.assertIn(inv_prior, moves)
+        self.assertIn(ref_prior, moves)
+        self.assertNotIn(inv_curr, moves)
+
+        signed_total = sum((m.amount_untaxed if m.move_type == 'out_invoice' else -m.amount_untaxed) for m in moves)
+        self.assertAlmostEqual(signed_total, 750.0, places=2)
+
+    def test_u3_08_accounting_access_restrictions_and_empty_state(self):
+        """U3-08: User without accounting access receives empty chart state without crash and cannot drill down."""
+        viewer = new_test_user(
+            self.env,
+            login='u3_viewer_no_accounting',
+            groups='property_managment.group_edara_viewer',
+            company_id=self.dash_company.id,
+            company_ids=[(6, 0, [self.dash_company.id])],
+        )
+        dash = self.env['edara.dashboard'].with_user(viewer).create({'branch_id': self.branch.id})
+        self.assertFalse(dash.has_accounting_access)
+        data = json.loads(dash.revenue_trend_data)
+        self.assertEqual(data.get('total_revenue'), 0.0)
+        self.assertTrue(all(m['value'] == 0.0 for m in data['months']))
+
+        with self.assertRaises(UserError):
+            dash.action_view_revenue_trend_month(0, dash.currency_id)
+
+    def test_u3_09_multi_company_currency_isolation(self):
+        """U3-09: Available currencies, chart totals, and drill-down respect multi-company isolation."""
+        comp_a = self.env['res.company'].create({'name': 'U3 MC Comp A'})
+        comp_b = self.env['res.company'].create({'name': 'U3 MC Comp B'})
+        self.env['account.chart.template'].try_loading('generic_coa', company=comp_a, install_demo=False)
+        self.env['account.chart.template'].try_loading('generic_coa', company=comp_b, install_demo=False)
+
+        branch_a = self.env['edara.branch'].create({'name': 'U3 Branch A', 'code': 'U3BA', 'company_id': comp_a.id})
+        branch_b = self.env['edara.branch'].create({'name': 'U3 Branch B', 'code': 'U3BB', 'company_id': comp_b.id})
+
+        curr_usd = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'USD')], limit=1)
+        curr_usd.write({'active': True})
+        curr_eur = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'EUR')], limit=1)
+        curr_eur.write({'active': True})
+
+        today = fields.Date.context_today(self)
+
+        tenant_a = self.env['res.partner'].create({'name': 'Tenant MC A', 'company_id': comp_a.id})
+        tenant_b = self.env['res.partner'].create({'name': 'Tenant MC B', 'company_id': comp_b.id})
+
+        # Comp A invoice in USD
+        inv_a = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': tenant_a.id,
+            'invoice_date': today,
+            'edara_branch_id': branch_a.id,
+            'company_id': comp_a.id,
+            'currency_id': curr_usd.id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent A', 'quantity': 1, 'price_unit': 800.0})],
+        })
+        inv_a.action_post()
+
+        # Comp B invoice in EUR
+        inv_b = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': tenant_b.id,
+            'invoice_date': today,
+            'edara_branch_id': branch_b.id,
+            'company_id': comp_b.id,
+            'currency_id': curr_eur.id,
+            'invoice_line_ids': [(0, 0, {'name': 'Rent B', 'quantity': 1, 'price_unit': 600.0})],
+        })
+        inv_b.action_post()
+
+        # User A: restricted to Company A only
+        user_a = new_test_user(
+            self.env,
+            login='u3_user_comp_a',
+            groups='property_managment.group_edara_company_manager,account.group_account_user',
+            company_id=comp_a.id,
+            company_ids=[(6, 0, [comp_a.id])],
+        )
+
+        dash_a = self.env['edara.dashboard'].with_user(user_a).with_context(
+            allowed_company_ids=[comp_a.id]
+        ).create({'branch_id': branch_a.id, 'revenue_trend_currency_id': curr_usd.id})
+
+        avail_a = dash_a._get_available_currencies(branch_a)
+        self.assertIn(curr_usd, avail_a)
+        self.assertNotIn(curr_eur, avail_a)
+
+        data_a = json.loads(dash_a.revenue_trend_data)
+        self.assertEqual(data_a['months'][5]['value'], 800.0)
+
+        # Drill-down by User A:
+        action_a = dash_a.action_view_revenue_trend_month(5, curr_usd.id)
+        moves_a = self.env['account.move'].with_user(user_a).with_context(
+            allowed_company_ids=[comp_a.id]
+        ).search(action_a['domain'])
+        self.assertIn(inv_a, moves_a)
+        self.assertNotIn(inv_b, moves_a)
+
+        # User A cannot drill down with Comp B's currency
+        with self.assertRaises(UserError):
+            dash_a.action_view_revenue_trend_month(5, curr_eur.id)
+
+        # User AB: allowed both Company A and Company B
+        user_ab = new_test_user(
+            self.env,
+            login='u3_user_comp_ab',
+            groups='property_managment.group_edara_company_manager,account.group_account_user',
+            company_id=comp_a.id,
+            company_ids=[(6, 0, [comp_a.id, comp_b.id])],
+        )
+
+        # In context allowed_company_ids=[comp_a.id]
+        dash_ab_a = self.env['edara.dashboard'].with_user(user_ab).with_context(
+            allowed_company_ids=[comp_a.id]
+        ).create({'branch_id': branch_a.id})
+        avail_ab_a = dash_ab_a._get_available_currencies(branch_a)
+        self.assertIn(curr_usd, avail_ab_a)
+        self.assertNotIn(curr_eur, avail_ab_a)
+
+        # In context allowed_company_ids=[comp_b.id]
+        dash_ab_b = self.env['edara.dashboard'].with_user(user_ab).with_context(
+            allowed_company_ids=[comp_b.id]
+        ).create({'branch_id': branch_b.id})
+        avail_ab_b = dash_ab_b._get_available_currencies(branch_b)
+        self.assertIn(curr_eur, avail_ab_b)
+        self.assertNotIn(curr_usd, avail_ab_b)
+
+        # In context allowed_company_ids=[comp_a.id, comp_b.id]
+        dash_ab_both = self.env['edara.dashboard'].with_user(user_ab).with_context(
+            allowed_company_ids=[comp_a.id, comp_b.id]
+        ).create({'branch_id': branch_b.id, 'revenue_trend_currency_id': curr_eur.id})
+        data_ab_both = json.loads(dash_ab_both.revenue_trend_data)
+        self.assertEqual(data_ab_both['months'][5]['value'], 600.0)
+
+        action_ab_b = dash_ab_both.action_view_revenue_trend_month(5, curr_eur.id)
+        moves_ab_b = self.env['account.move'].with_user(user_ab).with_context(
+            allowed_company_ids=[comp_a.id, comp_b.id]
+        ).search(action_ab_b['domain'])
+        self.assertIn(inv_b, moves_ab_b)
+        self.assertNotIn(inv_a, moves_ab_b)
+
+    def test_u3_10_arabic_po_no_duplicate_identities(self):
+        """U3-10: Validates that i18n/ar.po has zero duplicate (msgctxt, msgid) entries."""
+        import os
+        import polib
+        po_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'i18n', 'ar.po'))
+        po = polib.pofile(po_path, check_for_duplicates=True)
+        identities = set()
+        duplicates = []
+        for entry in po:
+            key = (entry.msgctxt, entry.msgid)
+            if key in identities:
+                duplicates.append(key)
+            else:
+                identities.add(key)
+        self.assertEqual(len(duplicates), 0, f"Found duplicate PO entries: {duplicates}")

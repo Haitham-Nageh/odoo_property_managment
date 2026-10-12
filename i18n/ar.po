@@ -927,6 +927,7 @@ msgstr "تكرار الفوترة"
 #: model:ir.model.fields,field_description:property_managment.field_edara_service_charge__branch_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_service_charge_line__branch_id
 #: model:ir.model.fields,field_description:property_managment.field_edara_unit__branch_id
+#: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__branch_id
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_account_move_report_search
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_branch_form
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
@@ -1628,7 +1629,7 @@ msgstr "EDARA عقد الإيجار"
 #: model:ir.model.fields,field_description:property_managment.field_res_partner__edara_lease_contract_ids
 #: model:ir.model.fields,field_description:property_managment.field_res_users__edara_lease_contract_ids
 msgid "EDARA Lease Contracts"
-msgstr "EDARA عقد الإيجارs"
+msgstr "عقود الإيجار EDARA"
 
 #. module: property_managment
 #: model:ir.model,name:property_managment.model_edara_renewal_request
@@ -2123,7 +2124,7 @@ msgstr "إنشاء الفواتير المستحقة"
 #: code:addons/property_managment/models/edara_dashboard.py:0
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid "Generate Recurring Maintenance"
-msgstr "Generate الصيانة الدورية"
+msgstr "إنشاء الصيانة الدورية"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
@@ -2501,7 +2502,7 @@ msgstr "عقود الإيجار"
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_gantt
 msgid "Lease Contracts Timeline"
-msgstr "عقد الإيجارs Timeline"
+msgstr "الجدول الزمني لعقود الإيجار"
 
 #. module: property_managment
 #: model:ir.actions.act_window,name:property_managment.action_edara_lease_expiry_report
@@ -2750,6 +2751,7 @@ msgid "Month"
 msgstr "الشهر"
 
 #. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__revenue_trend_period__monthly
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__billing_frequency__monthly
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__frequency__monthly
 msgid "Monthly"
@@ -3051,7 +3053,7 @@ msgstr "الأيام المشغولة"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__occupied_units
 msgid "Occupied Units"
-msgstr "Occupied الوحدةs"
+msgstr "الوحدات المؤجّرة"
 
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_maintenance_request__occurrence_date
@@ -3198,6 +3200,8 @@ msgstr "المستحق:"
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_payment_schedule_line__state__overdue
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_payment_schedule_line_search
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.js:0
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
 msgid "Overdue"
 msgstr "متأخر"
 
@@ -3227,7 +3231,7 @@ msgstr "إشغال المالك"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__owner_occupied_units
 msgid "Owner Occupied Units"
-msgstr "Owner Occupied الوحدةs"
+msgstr "الوحدات التي يشغلها المالك"
 
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_property__ownership_ids
@@ -3697,7 +3701,7 @@ msgstr "تجديد العقد"
 #. module: property_managment
 #: model:ir.model,name:property_managment.model_edara_lease_renewal_wizard
 msgid "Renew Lease Contract"
-msgstr "Renew عقد الإيجار"
+msgstr "تجديد عقد الإيجار"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_form
@@ -3883,7 +3887,7 @@ msgstr "محجوز"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__reserved_units
 msgid "Reserved Units"
-msgstr "Reserved الوحدةs"
+msgstr "الوحدات المحجوزة"
 
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_maintenance_request__resolution_hours
@@ -3909,6 +3913,8 @@ msgid "Responsible User"
 msgstr "المستخدم المسؤول"
 
 #. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.js:0
 #: model:ir.ui.menu,name:property_managment.menu_edara_revenue_report
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_revenue_report_pivot
 msgid "Revenue"
@@ -4003,6 +4009,8 @@ msgstr ""
 #. module: property_managment
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__state__scheduled
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_lease_contract_search
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.js:0
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
 msgid "Scheduled"
 msgstr "مجدول"
 
@@ -4155,7 +4163,7 @@ msgstr "مباع"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__sold_units
 msgid "Sold Units"
-msgstr "Sold الوحدةs"
+msgstr "الوحدات المباعة"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.portal_my_leases
@@ -4454,6 +4462,7 @@ msgid "There is nothing left to collect for this deposit."
 msgstr "لا يوجد شيء متبقٍ لتحصيله لمبلغ التأمين هذا."
 
 #. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__period_preset__this_year
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_account_move_report_search
 msgid "This Year"
 msgstr "هذه السنة"
@@ -4503,7 +4512,7 @@ msgstr "المبلغ الإجمالي"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__total_buildings
 msgid "Total Buildings"
-msgstr "Total المبنىs"
+msgstr "إجمالي المباني"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_maintenance_cost_report_list
@@ -4537,7 +4546,7 @@ msgstr "إجمالي فواتير الموردين المُرَحَّلة"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__total_properties
 msgid "Total Properties"
-msgstr "Total العقارات"
+msgstr "إجمالي العقارات"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_rent_roll_list
@@ -4599,7 +4608,7 @@ msgstr "قيد الصيانة"
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__under_maintenance_units
 msgid "Under Maintenance Units"
-msgstr "Under Maintenance الوحدةs"
+msgstr "الوحدات قيد الصيانة"
 
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_account_bank_statement_line__edara_unit_id
@@ -4841,6 +4850,7 @@ msgid "Without Vendor Bill"
 msgstr "بدون فاتورة مورد"
 
 #. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__revenue_trend_period__yearly
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_lease_contract__billing_frequency__yearly
 #: model:ir.model.fields.selection,name:property_managment.selection__edara_recurring_maintenance__frequency__yearly
 msgid "Yearly"
@@ -5225,11 +5235,11 @@ msgstr "يتطلب الاهتمام"
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid ""
-"<i class=\"fa fa-clock-o text-warning me-2 fs-5\"/>\n"
-"                                        <span>Expiring Leases</span>"
+"<i class=\"fa fa-clock-o text-warning me-2 fs-6\"/>\n"
+"                                                    <span>Expiring Leases</span>"
 msgstr ""
-"<i class=\"fa fa-clock-o text-warning me-2 fs-5\"/>\n"
-"                                        <span>عقود تنتهي قريباً</span>"
+"<i class=\"fa fa-clock-o text-warning me-2 fs-6\"/>\n"
+"                                                    <span>عقود تنتهي قريباً</span>"
 
 
 #. module: property_managment
@@ -5260,11 +5270,11 @@ msgstr ""
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid ""
-"<i class=\"fa fa-exclamation-circle text-danger me-2 fs-5\"/>\n"
-"                                        <span>Overdue Payments</span>"
+"<i class=\"fa fa-exclamation-circle text-danger me-2 fs-6\"/>\n"
+"                                                    <span>Overdue Payments</span>"
 msgstr ""
-"<i class=\"fa fa-exclamation-circle text-danger me-2 fs-5\"/>\n"
-"                                        <span>الدفعات المتأخرة</span>"
+"<i class=\"fa fa-exclamation-circle text-danger me-2 fs-6\"/>\n"
+"                                                    <span>الدفعات المتأخرة</span>"
 
 
 #. module: property_managment
@@ -5288,11 +5298,11 @@ msgstr "عرض جميع الدفعات المتأخرة <i class=\"fa fa-arrow-r
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid ""
-"<i class=\"fa fa-wrench text-danger me-2 fs-5\"/>\n"
-"                                        <span>Maintenance Attention</span>"
+"<i class=\"fa fa-wrench text-danger me-2 fs-6\"/>\n"
+"                                                    <span>Maintenance Attention</span>"
 msgstr ""
-"<i class=\"fa fa-wrench text-danger me-2 fs-5\"/>\n"
-"                                        <span>طلبات صيانة تتطلب الاهتمام</span>"
+"<i class=\"fa fa-wrench text-danger me-2 fs-6\"/>\n"
+"                                                    <span>طلبات صيانة تتطلب الاهتمام</span>"
 
 
 #. module: property_managment
@@ -5304,11 +5314,11 @@ msgstr "عرض الطلبات العاجلة <i class=\"fa fa-arrow-right ms-1\"
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
 msgid ""
-"<i class=\"fa fa-refresh text-warning me-2 fs-5\"/>\n"
-"                                        <span>Pending Renewals</span>"
+"<i class=\"fa fa-refresh text-warning me-2 fs-6\"/>\n"
+"                                                    <span>Pending Renewals</span>"
 msgstr ""
-"<i class=\"fa fa-refresh text-warning me-2 fs-5\"/>\n"
-"                                        <span>التجديدات قيد الانتظار</span>"
+"<i class=\"fa fa-refresh text-warning me-2 fs-6\"/>\n"
+"                                                    <span>التجديدات قيد الانتظار</span>"
 
 
 #. module: property_managment
@@ -5367,8 +5377,8 @@ msgstr "<span class=\"o_stat_text\">عقود مسودة</span>"
 
 #. module: property_managment
 #: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
-msgid "Financial Overview"
-msgstr "نظرة عامة على المالية"
+msgid "<span>Financial Overview</span>"
+msgstr "<span>الملخص المالي</span>"
 
 
 #. module: property_managment
@@ -5802,3 +5812,140 @@ msgid ""
 msgstr ""
 "يجب أن تكون قيمة هدف %(dimension)s عددًا محدودًا وغير سالب، وأكبر من صفر عند"
 " التفعيل."
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_branch_filter_widget.js:0
+msgid "All Branches"
+msgstr "جميع الفروع"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/xml/edara_branch_filter_widget.xml:0
+msgid "Branch Filter"
+msgstr "تصفية الفروع"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__revenue_trend_currency_id
+msgid "Revenue Currency"
+msgstr "عملة الإيرادات"
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_dashboard__revenue_trend_currency_id
+msgid "Filter Revenue Trend to posted invoices in this specific currency."
+msgstr "تصفية اتجاه الإيرادات بالفواتير المرحلة بهذه العملة المحددة."
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__revenue_trend_period
+msgid "Revenue Period"
+msgstr "فترة الإيرادات"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_dashboard__available_currency_ids
+msgid "Available Revenue Currencies"
+msgstr "عملات الإيرادات المتاحة"
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_edara_dashboard__available_currency_ids
+msgid "Currencies present on posted customer invoices accessible to the current user."
+msgstr "العملات الموجودة في فواتير العملاء المرحلة والمتاحة للمستخدم الحالي."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "The selected currency is no longer valid. Please refresh the dashboard."
+msgstr "العملة المحددة لم تعد صالحة. يرجى تحديث لوحة التحكم."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Period index must be between 0 and 4."
+msgstr "يجب أن يكون مؤشر الفترة بين 0 و 4."
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.xml:0
+msgid "Revenue Trend (Trailing 5 Years)"
+msgstr "اتجاه الإيرادات (آخر 5 سنوات)"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_revenue_chart_field.xml:0
+msgid "No revenue in trailing 5 years"
+msgstr "لا توجد إيرادات في آخر 5 سنوات"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.view_edara_dashboard_form
+msgid "Automatic"
+msgstr "تلقائي"
+
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.js:0
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
+msgid "Collected"
+msgstr "محصّل"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.js:0
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
+msgid "Upcoming"
+msgstr "قادم"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
+msgid "Collection Rate"
+msgstr "نسبة التحصيل"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
+msgid "Schedule & Collections (Trailing 6 Months)"
+msgstr "الجدولة والتحصيل (آخر 6 أشهر)"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
+msgid "Schedule & Collections (Trailing 5 Years)"
+msgstr "الجدولة والتحصيل (آخر 5 سنوات)"
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_collections_chart_field.xml:0
+msgid "No scheduled payments in this period"
+msgstr "لا توجد دفعات مجدولة في هذه الفترة"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_dashboard.py:0
+msgid "Period index is out of range."
+msgstr "فهرس الفترة خارج النطاق."
+
+#. module: property_managment
+#. odoo-javascript
+#: code:addons/property_managment/static/src/js/edara_occupancy_chart_field.xml:0
+msgid "Under Maintenance:"
+msgstr "قيد الصيانة:"
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__period_preset__this_month
+msgid "This Month"
+msgstr "هذا الشهر"
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__period_preset__last_month
+msgid "Last Month"
+msgstr "الشهر الماضي"
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__period_preset__this_quarter
+msgid "This Quarter"
+msgstr "هذا الربع"
+
+#. module: property_managment
+#: model:ir.model.fields.selection,name:property_managment.selection__edara_dashboard__period_preset__custom
+msgid "Custom"
+msgstr "فترة مخصصة"

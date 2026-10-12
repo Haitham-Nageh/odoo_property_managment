@@ -6,6 +6,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import html_escape
 from odoo.tools.misc import format_date
+from odoo.tools.safe_eval import safe_eval
 
 # BD-003 (2026-09-22): ACTIVE contracts whose end_date falls within the next
 # 30 calendar days (today through today+30, inclusive of both boundaries).
@@ -82,6 +83,21 @@ class EdaraDashboard(models.TransientModel):
         string='Accessible Branches',
         help="Branches accessible to the current user under active record rules.",
     )
+    revenue_trend_currency_id = fields.Many2one(
+        'res.currency',
+        string='Revenue Currency',
+        help="Filter Revenue Trend to posted invoices in this specific currency.",
+    )
+    revenue_trend_period = fields.Selection([
+        ('monthly', 'Monthly'),
+        ('yearly', 'Yearly'),
+    ], string='Revenue Period', default='monthly', required=True)
+    available_currency_ids = fields.Many2many(
+        'res.currency',
+        compute='_compute_available_currencies',
+        string='Available Revenue Currencies',
+        help="Currencies present on posted customer invoices accessible to the current user.",
+    )
     period_preset = fields.Selection([
         ('this_month', 'This Month'),
         ('last_month', 'Last Month'),
@@ -143,6 +159,7 @@ class EdaraDashboard(models.TransientModel):
     recent_activity_html = fields.Html(compute='_compute_kpis', sanitize=False)
     occupancy_chart_data = fields.Text(compute='_compute_kpis')
     revenue_trend_data = fields.Text(compute='_compute_kpis')
+    collections_chart_data = fields.Text(compute='_compute_kpis')
 
     currency_id = fields.Many2one('res.currency', compute='_compute_kpis')
     monthly_revenue = fields.Monetary(compute='_compute_kpis', currency_field='currency_id')
@@ -203,6 +220,53 @@ class EdaraDashboard(models.TransientModel):
         for dashboard in self:
             dashboard.accessible_branch_ids = accessible_branches
 
+    @api.depends('branch_id')
+    def _compute_available_currencies(self):
+        for dashboard in self:
+            dashboard.available_currency_ids = dashboard._get_available_currencies(dashboard.branch_id)
+
+    def _get_available_currencies(self, branch=None):
+        comp = self.env.company
+        comp_curr = comp.currency_id
+        if not (self.env['account.move'].has_access('read') and self.env['account.payment'].has_access('read')):
+            return comp_curr
+
+        branch_id = branch.id if branch else False
+        domain = [
+            ('state', '=', 'posted'),
+            ('move_type', 'in', ('out_invoice', 'out_refund')),
+        ]
+        if branch_id:
+            domain.append(('edara_branch_id', '=', branch_id))
+
+        groups = self.env['account.move']._read_group(domain, groupby=['currency_id'])
+        curr_records = self.env['res.currency'].concat(*[c for c, in groups if c])
+        if not curr_records:
+            return comp_curr
+        # Deterministic sorting: company currency first, then alphabetical by name, then by id
+        sorted_list = sorted(curr_records, key=lambda c: (c != comp_curr, c.name or '', c.id))
+        return self.env['res.currency'].concat(*sorted_list)
+
+    def _resolve_effective_currency(self):
+        self.ensure_one()
+        comp_curr = self.env.company.currency_id
+        avail = self._get_available_currencies(self.branch_id)
+        user_sel = self.revenue_trend_currency_id
+        if user_sel and user_sel in avail:
+            return user_sel
+        if comp_curr in avail:
+            return comp_curr
+        if avail:
+            return avail[0]
+        return comp_curr
+
+    @api.onchange('branch_id')
+    def _onchange_branch_id_revenue_trend(self):
+        if self.revenue_trend_currency_id:
+            avail = self._get_available_currencies(self.branch_id)
+            if self.revenue_trend_currency_id not in avail:
+                self.revenue_trend_currency_id = False
+
     @api.onchange('period_preset')
     def _onchange_period_preset(self):
         today = fields.Date.context_today(self)
@@ -250,6 +314,8 @@ class EdaraDashboard(models.TransientModel):
         month_start = today.replace(day=1)
         if 'period_preset' in fields_list and 'period_preset' not in res:
             res['period_preset'] = 'this_month'
+        if 'revenue_trend_period' in fields_list and 'revenue_trend_period' not in res:
+            res['revenue_trend_period'] = 'monthly'
         if 'date_from' in fields_list and 'date_from' not in res:
             res['date_from'] = month_start
         if 'date_to' in fields_list and 'date_to' not in res:
@@ -260,6 +326,8 @@ class EdaraDashboard(models.TransientModel):
     def create(self, vals_list):
         today = fields.Date.context_today(self)
         for vals in vals_list:
+            if 'revenue_trend_period' not in vals:
+                vals['revenue_trend_period'] = 'monthly'
             preset = vals.get('period_preset', 'this_month')
             d_from, d_to = _preset_dates(preset, today)
             if d_from and 'date_from' not in vals:
@@ -268,7 +336,7 @@ class EdaraDashboard(models.TransientModel):
                 vals['date_to'] = d_to
         return super().create(vals_list)
 
-    @api.depends('branch_id', 'period_preset', 'date_from', 'date_to')
+    @api.depends('branch_id', 'period_preset', 'date_from', 'date_to', 'revenue_trend_currency_id', 'revenue_trend_period')
     def _compute_kpis(self):
         """Live snapshot, recomputed on every read - same non-stored,
         on-demand pattern as edara.property._compute_financial_summary.
@@ -396,14 +464,14 @@ class EdaraDashboard(models.TransientModel):
             # Independent lookahead window (today through today + 30 days)
             expiring_soon_domain = branch_domain + _expiring_soon_domain(today)
             expiring_soon_count = Contract.search_count(expiring_soon_domain)
-            expiring_soon_records = Contract.search(expiring_soon_domain, order='end_date asc, id asc', limit=5)
+            expiring_soon_records = Contract.search(expiring_soon_domain, order='end_date asc, id asc', limit=3)
             expiring_leases_html = dashboard._render_expiring_leases_html(expiring_soon_records, today)
             expiring_without_renewal_count = Contract.search_count(
                 expiring_soon_domain + [('successor_contract_id', '=', False)]
             )
 
             if has_accounting_access:
-                overdue_payments_html = dashboard._render_overdue_payments_html(overdue_lines[:5], today, comp)
+                overdue_payments_html = dashboard._render_overdue_payments_html(overdue_lines[:3], today, comp)
             else:
                 overdue_payments_html = False
 
@@ -445,7 +513,7 @@ class EdaraDashboard(models.TransientModel):
             attention_maint = sorted(
                 maint_urgent_candidates | sla_breached_recs | sla_at_risk_recs,
                 key=_maint_urgency_rank
-            )[:5]
+            )[:3]
             maintenance_attention_html = dashboard._render_maintenance_attention_html(attention_maint)
 
             rec_domain = [('active', '=', True), ('next_date', '<=', today)]
@@ -454,7 +522,7 @@ class EdaraDashboard(models.TransientModel):
             recurring_maintenance_due_count = Recurring.search_count(rec_domain)
 
             renewal_domain = branch_domain + [('state', '=', 'submitted')]
-            pending_renewals = Renewal.search(renewal_domain, order='id desc', limit=5)
+            pending_renewals = Renewal.search(renewal_domain, order='id desc', limit=3)
             upcoming_renewals_count = Renewal.search_count(renewal_domain)
             pending_renewals_html = dashboard._render_pending_renewals_html(pending_renewals, comp)
 
@@ -538,49 +606,89 @@ class EdaraDashboard(models.TransientModel):
             }
             occupancy_chart_data = json.dumps(occupancy_data)
 
-            # Phase C3: Trailing 6 calendar months Revenue Trend
-            cur_month_start = today.replace(day=1)
-            window_start = cur_month_start - relativedelta(months=5)
-            window_end = (cur_month_start + relativedelta(months=1)) - timedelta(days=1)
+            # Phase C3 & U3: Revenue Trend (Trailing 6 Months or Trailing 5 Years)
+            eff_curr = dashboard._resolve_effective_currency()
+            period = dashboard.revenue_trend_period or 'monthly'
 
+            if period == 'yearly':
+                window_start = date(today.year - 4, 1, 1)
+                window_end = date(today.year, 12, 31)
+            else:
+                cur_month_start = today.replace(day=1)
+                window_start = cur_month_start - relativedelta(months=5)
+                window_end = (cur_month_start + relativedelta(months=1)) - timedelta(days=1)
+
+            trend_totals = {}
             if has_accounting_access:
                 trend_domain = [
                     ('state', '=', 'posted'),
                     ('move_type', 'in', ('out_invoice', 'out_refund')),
+                    ('currency_id', '=', eff_curr.id),
                     ('invoice_date', '>=', window_start),
                     ('invoice_date', '<=', window_end),
                 ] + move_branch_domain
-                trend_groups = Move._read_group(
-                    trend_domain, ['invoice_date:month'], ['amount_untaxed_signed:sum']
-                )
-                trend_totals = {
-                    (d.year, d.month): round(val or 0.0, 2)
-                    for d, val in trend_groups
-                    if d
-                }
-            else:
-                trend_totals = {}
+                if period == 'yearly':
+                    trend_groups = Move._read_group(
+                        trend_domain, ['invoice_date:year', 'move_type'], ['amount_untaxed:sum']
+                    )
+                    for d, m_type, val in trend_groups:
+                        if not d:
+                            continue
+                        signed_val = (val or 0.0) if m_type == 'out_invoice' else -(val or 0.0)
+                        key = d.year
+                        trend_totals[key] = trend_totals.get(key, 0.0) + signed_val
+                else:
+                    trend_groups = Move._read_group(
+                        trend_domain, ['invoice_date:month', 'move_type'], ['amount_untaxed:sum']
+                    )
+                    for d, m_type, val in trend_groups:
+                        if not d:
+                            continue
+                        signed_val = (val or 0.0) if m_type == 'out_invoice' else -(val or 0.0)
+                        key = (d.year, d.month)
+                        trend_totals[key] = trend_totals.get(key, 0.0) + signed_val
 
-            trend_months = []
+            trend_buckets = []
             total_trend_revenue = 0.0
-            for idx in range(6):
-                months_ago = 5 - idx
-                m_start = cur_month_start - relativedelta(months=months_ago)
-                val = trend_totals.get((m_start.year, m_start.month), 0.0) if has_accounting_access else 0.0
-                total_trend_revenue += val
-                trend_months.append({
-                    'index': idx,
-                    'label': format_date(self.env, m_start, date_format='MMM yyyy'),
-                    'year': m_start.year,
-                    'month': m_start.month,
-                    'value': val,
-                })
+            precision = eff_curr.decimal_places
+
+            if period == 'yearly':
+                for idx in range(5):
+                    years_ago = 4 - idx
+                    target_year = today.year - years_ago
+                    raw_val = trend_totals.get(target_year, 0.0) if has_accounting_access else 0.0
+                    val = round(raw_val, precision)
+                    total_trend_revenue += val
+                    trend_buckets.append({
+                        'index': idx,
+                        'label': str(target_year),
+                        'year': target_year,
+                        'month': None,
+                        'value': val,
+                    })
+            else:
+                for idx in range(6):
+                    months_ago = 5 - idx
+                    m_start = cur_month_start - relativedelta(months=months_ago)
+                    raw_val = trend_totals.get((m_start.year, m_start.month), 0.0) if has_accounting_access else 0.0
+                    val = round(raw_val, precision)
+                    total_trend_revenue += val
+                    trend_buckets.append({
+                        'index': idx,
+                        'label': format_date(self.env, m_start, date_format='MMM yyyy'),
+                        'year': m_start.year,
+                        'month': m_start.month,
+                        'value': val,
+                    })
 
             revenue_trend_data = json.dumps({
-                'currency': comp.currency_id.name or '',
-                'currency_symbol': comp.currency_id.symbol or '',
-                'total_revenue': round(total_trend_revenue, 2),
-                'months': trend_months,
+                'currency': eff_curr.name or '',
+                'currency_symbol': eff_curr.symbol or '',
+                'currency_id': eff_curr.id,
+                'currency_precision': precision,
+                'period': period,
+                'total_revenue': round(total_trend_revenue, precision),
+                'months': trend_buckets,
             })
 
             dashboard.update({
@@ -595,6 +703,8 @@ class EdaraDashboard(models.TransientModel):
                 'under_maintenance_units': under_maintenance_units,
                 'occupancy_chart_data': occupancy_chart_data,
                 'revenue_trend_data': revenue_trend_data,
+                'collections_chart_data': dashboard._get_collections_chart_data(
+                    eff_curr, period, today, branch_domain, has_accounting_access),
                 'draft_contracts_count': contract_counts['draft'],
                 'scheduled_contracts_count': contract_counts['scheduled'],
                 'active_contracts_count': contract_counts['active'],
@@ -1280,34 +1390,176 @@ class EdaraDashboard(models.TransientModel):
             ('invoice_date', '>=', d_from), ('invoice_date', '<=', d_to),
         ])
 
-    def action_view_revenue_trend_month(self, month_index=None):
-        """Phase C3: Opens native Revenue Report filtered to the exact calendar
-        month bucket corresponding to month_index (0..5, where 0 is 5 months ago
-        and 5 is current month). Fully server-validated and branch-aware."""
+    def action_view_revenue_trend_month(self, month_index=None, currency_id=None):
+        """Phase C3 & U3: Opens native Revenue Report filtered to the exact calendar
+        bucket corresponding to month_index. Fully server-validated, branch-aware,
+        and currency-aware. Clears search_default_this_year to allow historical drill-down."""
         self.ensure_one()
         self._require_accounting_access()
         if month_index is None:
             month_index = self.env.context.get('month_index')
+        if currency_id is None:
+            currency_id = self.env.context.get('currency_id')
+
+        # Validate currency
+        if not currency_id:
+            currency_id = self._resolve_effective_currency().id
+        try:
+            curr_id = int(currency_id)
+        except (TypeError, ValueError):
+            raise UserError(_("The selected currency is no longer valid. Please refresh the dashboard."))
+
+        avail_currencies = self._get_available_currencies(self.branch_id)
+        if curr_id not in avail_currencies.ids:
+            raise UserError(_("The selected currency is no longer valid. Please refresh the dashboard."))
+
+        # Validate period index
         try:
             month_index = int(month_index)
         except (TypeError, ValueError):
             raise UserError(_("Invalid month index."))
-        if month_index < 0 or month_index > 5:
-            raise UserError(_("Month index must be between 0 and 5."))
+
+        period = self.revenue_trend_period or 'monthly'
+        if period == 'yearly':
+            if month_index < 0 or month_index > 4:
+                raise UserError(_("Period index must be between 0 and 4."))
+        else:
+            if month_index < 0 or month_index > 5:
+                raise UserError(_("Month index must be between 0 and 5."))
 
         today = fields.Date.context_today(self)
-        cur_month_start = today.replace(day=1)
-        months_ago = 5 - month_index
-        m_start = cur_month_start - relativedelta(months=months_ago)
-        m_end = (m_start + relativedelta(months=1)) - timedelta(days=1)
+        if period == 'yearly':
+            years_ago = 4 - month_index
+            target_year = today.year - years_ago
+            b_start = date(target_year, 1, 1)
+            b_end = date(target_year, 12, 31)
+        else:
+            cur_month_start = today.replace(day=1)
+            months_ago = 5 - month_index
+            b_start = cur_month_start - relativedelta(months=months_ago)
+            b_end = (b_start + relativedelta(months=1)) - timedelta(days=1)
 
         domain = [
             ('state', '=', 'posted'),
             ('move_type', 'in', ('out_invoice', 'out_refund')),
-            ('invoice_date', '>=', m_start),
-            ('invoice_date', '<=', m_end),
+            ('currency_id', '=', curr_id),
+            ('invoice_date', '>=', b_start),
+            ('invoice_date', '<=', b_end),
         ]
-        return self._quick_action('action_edara_revenue_report', domain)
+        action = self._quick_action('action_edara_revenue_report', domain)
+        ctx = action.get('context', {})
+        if isinstance(ctx, str):
+            try:
+                ctx = safe_eval(ctx)
+            except Exception:
+                ctx = {}
+        ctx = dict(ctx) if isinstance(ctx, dict) else {}
+        ctx.pop('search_default_this_year', None)
+        action['context'] = ctx
+        return action
+
+    # ------------------------------------------------------------------
+    # Schedule & Collections chart
+    # Source: edara.payment.schedule.line (scheduled amount, due_date, state, invoice_id)
+    # joined to its invoice's paid share. Scheduled != revenue: it is the contractual
+    # amount due in the bucket (by due_date), cancelled lines excluded.
+    # ------------------------------------------------------------------
+    @api.model
+    def _collections_ranges(self, period, today):
+        """Inclusive (start, end) per bucket; same trailing window as the revenue trend."""
+        if period == 'yearly':
+            return [(date(today.year - 4 + i, 1, 1), date(today.year - 4 + i, 12, 31)) for i in range(5)]
+        first = today.replace(day=1) - relativedelta(months=5)
+        return [(first + relativedelta(months=i),
+                 first + relativedelta(months=i + 1) - timedelta(days=1)) for i in range(6)]
+
+    def _get_collections_chart_data(self, eff_curr, period, today, branch_domain, has_accounting_access):
+        self.ensure_one()
+        precision = eff_curr.decimal_places
+        ranges = self._collections_ranges(period, today)
+        buckets = [{
+            'index': i,
+            'label': str(s.year) if period == 'yearly' else format_date(self.env, s, date_format='MMM yyyy'),
+            'year': s.year,
+            'month': None if period == 'yearly' else s.month,
+            'scheduled': 0.0, 'collected': 0.0, 'overdue': 0.0, 'upcoming': 0.0,
+        } for i, (s, _e) in enumerate(ranges)]
+
+        if has_accounting_access:
+            Schedule = self.env['edara.payment.schedule.line']
+            lines = Schedule.search([
+                ('currency_id', '=', eff_curr.id), ('state', '!=', 'cancelled'),
+                ('due_date', '>=', ranges[0][0]), ('due_date', '<=', ranges[-1][1]),
+            ] + branch_domain)
+            # search_read (not browse().read) so invoices hidden by record rules are skipped, not raised.
+            invoices = {m['id']: m for m in self.env['account.move'].search_read(
+                [('id', 'in', lines.invoice_id.ids)], ['amount_total', 'amount_residual'])}
+            for line in lines:
+                idx = next(i for i, (s, e) in enumerate(ranges) if s <= line.due_date <= e)
+                inv = invoices.get(line.invoice_id.id)
+                share = 0.0
+                if inv and inv['amount_total']:
+                    # Proportional to the invoice's paid share, so taxes/partial payments never overstate.
+                    share = min(max((inv['amount_total'] - inv['amount_residual']) / inv['amount_total'], 0.0), 1.0)
+                collected = line.amount * share
+                outstanding = line.amount - collected
+                b = buckets[idx]
+                b['scheduled'] += line.amount
+                b['collected'] += collected
+                b['overdue' if line.due_date < today else 'upcoming'] += outstanding
+
+        totals = dict.fromkeys(('scheduled', 'collected', 'overdue', 'upcoming'), 0.0)
+        for b in buckets:
+            for key in totals:
+                b[key] = round(b[key], precision)
+                totals[key] += b[key]
+        totals = {k: round(v, precision) for k, v in totals.items()}
+        totals['outstanding'] = round(totals['overdue'] + totals['upcoming'], precision)
+        totals['collection_rate'] = (
+            round(totals['collected'] / totals['scheduled'] * 100, 1) if totals['scheduled'] else None)
+        return json.dumps({
+            'currency': eff_curr.name or '',
+            'currency_symbol': eff_curr.symbol or '',
+            'currency_id': eff_curr.id,
+            'currency_precision': precision,
+            'period': period,
+            'totals': totals,
+            'buckets': buckets,
+        })
+
+    def action_view_collections_bucket(self, bucket_index=None, measure=None, currency_id=None):
+        """Drill-down for one bar segment of the Schedule & Collections chart.
+
+        measure: collected -> lines with money received (paid/partial); overdue -> past-due lines
+        with a balance; upcoming -> not-yet-due lines with a balance; anything else -> all lines
+        scheduled in the bucket."""
+        self.ensure_one()
+        self._require_accounting_access()
+        try:
+            curr_id = int(currency_id or self._resolve_effective_currency().id)
+            idx = int(bucket_index)
+        except (TypeError, ValueError):
+            raise UserError(_("The selected currency is no longer valid. Please refresh the dashboard."))
+        if curr_id not in self._get_available_currencies(self.branch_id).ids:
+            raise UserError(_("The selected currency is no longer valid. Please refresh the dashboard."))
+        period = self.revenue_trend_period or 'monthly'
+        today = fields.Date.context_today(self)
+        ranges = self._collections_ranges(period, today)
+        if not 0 <= idx < len(ranges):
+            raise UserError(_("Period index is out of range."))
+        b_start, b_end = ranges[idx]
+        domain = [
+            ('currency_id', '=', curr_id), ('state', '!=', 'cancelled'),
+            ('due_date', '>=', b_start), ('due_date', '<=', b_end),
+        ]
+        open_states = ('draft', 'invoiced', 'partial', 'overdue')
+        if measure == 'collected':
+            domain.append(('state', 'in', ('paid', 'partial')))
+        elif measure == 'overdue':
+            domain += [('state', 'in', open_states), ('due_date', '<', today)]
+        elif measure == 'upcoming':
+            domain += [('state', 'in', open_states), ('due_date', '>=', today)]
+        return self._quick_action('action_edara_payment_schedule_line', domain)
 
     def action_view_outstanding_receivables(self):
         """Same domain as the Outstanding Receivables KPI (all-time, not month-bound)."""

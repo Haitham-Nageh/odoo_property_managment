@@ -6,7 +6,10 @@
             <div class="o_edara_revenue_trend_header d-flex align-items-center justify-content-between mb-3 pb-2">
                 <div class="d-flex align-items-center gap-2">
                     <i class="fa fa-bar-chart text-success fs-5"/>
-                    <span class="fw-bold fs-6 text-dark">Revenue Trend (Trailing 6 Months)</span>
+                    <span class="fw-bold fs-6 text-dark">
+                        <t t-if="chartData.period === 'yearly'">Revenue Trend (Trailing 5 Years)</t>
+                        <t t-else="">Revenue Trend (Trailing 6 Months)</t>
+                    </span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge bg-light text-dark border px-2 py-1">
@@ -20,7 +23,10 @@
             <t t-if="isAllZero">
                 <div class="o_edara_chart_empty_state text-center py-4 text-muted">
                     <i class="fa fa-bar-chart fa-3x mb-2 text-muted opacity-50"/>
-                    <div class="fw-semibold">No revenue in trailing 6 months</div>
+                    <div class="fw-semibold">
+                        <t t-if="chartData.period === 'yearly'">No revenue in trailing 5 years</t>
+                        <t t-else="">No revenue in trailing 6 months</t>
+                    </div>
                     <div class="small text-muted">Revenue trend will appear once customer invoices are posted.</div>
                 </div>
             </t>

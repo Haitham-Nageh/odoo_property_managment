@@ -55,6 +55,9 @@ export class EdaraRevenueTrendChartField extends Component {
             return {
                 currency: "",
                 currency_symbol: "",
+                currency_id: null,
+                currency_precision: 2,
+                period: "monthly",
                 total_revenue: 0,
                 months: [],
             };
@@ -65,6 +68,9 @@ export class EdaraRevenueTrendChartField extends Component {
             return {
                 currency: "",
                 currency_symbol: "",
+                currency_id: null,
+                currency_precision: 2,
+                period: "monthly",
                 total_revenue: 0,
                 months: [],
             };
@@ -102,18 +108,23 @@ export class EdaraRevenueTrendChartField extends Component {
         const currencySymbol = data.currency_symbol || data.currency || "";
 
         const config = {
-            type: "bar",
+            type: "line",
             data: {
                 labels: months.map((m) => m.label),
                 datasets: [
                     {
-                        label: "Revenue",
+                        label: _t("Revenue"),
                         data: months.map((m) => m.value),
-                        backgroundColor: "#10B981",
-                        hoverBackgroundColor: "#059669",
-                        borderRadius: 4,
-                        borderSkipped: false,
-                        maxBarThickness: 48,
+                        borderColor: "#10B981",
+                        backgroundColor: "rgba(16, 185, 129, 0.12)",
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointHitRadius: 12,
+                        pointBackgroundColor: "#10B981",
+                        pointHoverBackgroundColor: "#059669",
                     },
                 ],
             },
@@ -129,9 +140,10 @@ export class EdaraRevenueTrendChartField extends Component {
                         callbacks: {
                             label: (context) => {
                                 const val = context.parsed.y != null ? context.parsed.y : 0;
+                                const precision = data.currency_precision != null ? data.currency_precision : 2;
                                 const formatted = val.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
+                                    minimumFractionDigits: precision,
+                                    maximumFractionDigits: precision,
                                 });
                                 const labelPrefix = _t("Revenue: ");
                                 return ` ${labelPrefix}${currencySymbol ? currencySymbol + " " : ""}${formatted}`;
@@ -141,6 +153,7 @@ export class EdaraRevenueTrendChartField extends Component {
                 },
                 scales: {
                     x: {
+                        offset: true,
                         grid: {
                             display: false,
                         },
@@ -185,7 +198,9 @@ export class EdaraRevenueTrendChartField extends Component {
         if (this.isProcessingClick) {
             return;
         }
-        if (typeof monthIndex !== "number" || monthIndex < 0 || monthIndex > 5) {
+        const data = this.chartData;
+        const maxIndex = data.period === "yearly" ? 4 : 5;
+        if (typeof monthIndex !== "number" || monthIndex < 0 || monthIndex > maxIndex) {
             return;
         }
         this.isProcessingClick = true;
@@ -197,10 +212,11 @@ export class EdaraRevenueTrendChartField extends Component {
             if (!resId) {
                 return;
             }
+            const currencyId = data.currency_id || null;
             const action = await this.orm.call(
                 "edara.dashboard",
                 "action_view_revenue_trend_month",
-                [[resId], monthIndex],
+                [[resId], monthIndex, currencyId],
                 { context: this.props.record.context }
             );
             if (action) {

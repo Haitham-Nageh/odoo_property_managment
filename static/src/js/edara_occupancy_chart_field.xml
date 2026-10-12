@@ -3,7 +3,7 @@
     <t t-name="property_managment.EdaraOccupancyChartField">
         <div class="o_edara_occupancy_widget w-100">
             <!-- Header with Title and Under Maintenance Operational Indicator -->
-            <div class="o_edara_occupancy_header d-flex align-items-center justify-content-between mb-3 pb-2">
+            <div class="o_edara_occupancy_header d-flex align-items-center justify-content-between mb-2 pb-1">
                 <div class="d-flex align-items-center gap-2">
                     <i class="fa fa-pie-chart text-primary fs-5"/>
                     <span class="fw-bold fs-6 text-dark">Occupancy Distribution</span>
