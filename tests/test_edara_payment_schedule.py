@@ -739,8 +739,8 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
         self.assertFalse(any(line.branch_id == branch_b for line in viewer_visible))
 
         # Grouped counts via read_group respect record rules
-        viewer_grouped = viewer_model.read_group([], ['state'], ['state'])
-        viewer_counts = {g['state']: g['state_count'] for g in viewer_grouped}
+        viewer_grouped = viewer_model.read_group([], ['state'], ['__count'])
+        viewer_counts = dict(viewer_grouped)  # Odoo 20 read_group returns (state, count) tuples
         self.assertEqual(viewer_counts.get('paid', 0), 1)
         self.assertEqual(viewer_counts.get('overdue', 0), 1)
         self.assertEqual(viewer_counts.get('draft', 0), 1)
@@ -758,8 +758,8 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
         manager_test_lines = manager_model.search([('id', 'in', test_line_ids)])
         self.assertEqual(len(manager_test_lines), 6)
 
-        manager_grouped = manager_model.read_group([('id', 'in', test_line_ids)], ['state'], ['state'])
-        manager_counts = {g['state']: g['state_count'] for g in manager_grouped}
+        manager_grouped = manager_model.read_group([('id', 'in', test_line_ids)], ['state'], ['__count'])
+        manager_counts = dict(manager_grouped)  # Odoo 20 read_group returns (state, count) tuples
         self.assertEqual(manager_counts.get('paid', 0), 3)    # 1 from A + 2 from B
         self.assertEqual(manager_counts.get('overdue', 0), 2) # 1 from A + 1 from B
         self.assertEqual(manager_counts.get('draft', 0), 1)   # 1 from A + 0 from B
@@ -814,8 +814,8 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
 
         # Fallback read_group path for Contract A produces identical counts
         fallback_a = self.env['edara.payment.schedule.line'].read_group(
-            domain_a, ['state'], ['state'])
-        fallback_counts_a = {g['state']: g['state_count'] for g in fallback_a}
+            domain_a, ['state'], ['__count'])
+        fallback_counts_a = dict(fallback_a)  # Odoo 20 read_group returns (state, count) tuples
         self.assertEqual(fallback_counts_a.get('paid', 0), 1)
         self.assertEqual(fallback_counts_a.get('overdue', 0), 1)
         self.assertEqual(fallback_counts_a.get('draft', 0), 1)
@@ -831,8 +831,8 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
 
         # Fallback read_group path for Contract B produces identical counts
         fallback_b = self.env['edara.payment.schedule.line'].read_group(
-            domain_b, ['state'], ['state'])
-        fallback_counts_b = {g['state']: g['state_count'] for g in fallback_b}
+            domain_b, ['state'], ['__count'])
+        fallback_counts_b = dict(fallback_b)  # Odoo 20 read_group returns (state, count) tuples
         self.assertEqual(fallback_counts_b.get('paid', 0), 2)
         self.assertEqual(fallback_counts_b.get('overdue', 0), 1)
         self.assertEqual(fallback_counts_b.get('draft', 0), 0)
@@ -851,8 +851,8 @@ class TestEdaraPaymentScheduleFilterShortcuts(TransactionCase):
         self.assertEqual(counts_global.get('draft', 0), 1)   # 1 (A) + 0 (B)
 
         fallback_global = self.env['edara.payment.schedule.line'].read_group(
-            domain_global, ['state'], ['state'])
-        fallback_counts_global = {g['state']: g['state_count'] for g in fallback_global}
+            domain_global, ['state'], ['__count'])
+        fallback_counts_global = dict(fallback_global)  # Odoo 20 read_group returns (state, count) tuples
         self.assertEqual(fallback_counts_global, counts_global)
 
     def test_contract_action_navigation_domain_and_context(self):

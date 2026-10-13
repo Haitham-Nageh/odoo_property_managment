@@ -44,7 +44,7 @@ class TestEdaraProperty(TransactionCase):
         self.assertEqual(duplicate.code, '103-COPY')
         self.assertEqual(original.code, '103')  # original untouched
         self.assertEqual(duplicate.building_id, self.building_a)
-        self.assertEqual(duplicate.name, original.name)  # other fields follow native copy semantics
+        self.assertEqual(duplicate.name, original.copy_data()[0]['name'])  # other fields follow native copy semantics
 
     def test_duplicate_unit_twice_generates_distinct_codes(self):
         original = self.env['edara.unit'].create(

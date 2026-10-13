@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Odoo 20: portal home tiles are portal.entry records (the old
+    portal_client_category <div> was removed from portal.portal_my_home).
+    Each card is shown only when its placeholder counter is > 0, see
+    EdaraPortal._prepare_portal_counter_values.
+-->
+<odoo noupdate="1">
+    <record id="portal_entry_edara_dashboard" model="portal.entry">
+        <field name="name">Dashboard</field>
+        <field name="description">Your lease, rent, balance and requests at a glance</field>
+        <field name="url">/my/dashboard</field>
+        <field name="placeholder_count">edara_tenant_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="10"/>
+    </record>
+    <record id="portal_entry_edara_leases" model="portal.entry">
+        <field name="name">My Lease</field>
+        <field name="description">View your lease, unit and request a renewal</field>
+        <field name="url">/my/leases</field>
+        <field name="placeholder_count">lease_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="11"/>
+    </record>
+    <record id="portal_entry_edara_units" model="portal.entry">
+        <field name="name">My Unit</field>
+        <field name="description">Details about the unit(s) you lease</field>
+        <field name="url">/my/units</field>
+        <field name="placeholder_count">edara_tenant_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="12"/>
+    </record>
+    <record id="portal_entry_edara_billing" model="portal.entry">
+        <field name="name">Billing</field>
+        <field name="description">Invoices, payment history and outstanding balance</field>
+        <field name="url">/my/billing</field>
+        <field name="placeholder_count">edara_tenant_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="13"/>
+    </record>
+    <record id="portal_entry_edara_maintenance" model="portal.entry">
+        <field name="name">Maintenance Requests</field>
+        <field name="description">Report an issue with your unit or follow up on one</field>
+        <field name="url">/my/maintenance</field>
+        <field name="placeholder_count">edara_tenant_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="14"/>
+    </record>
+    <record id="portal_entry_edara_documents" model="portal.entry">
+        <field name="name">Documents</field>
+        <field name="description">Files attached to your lease, unit or requests</field>
+        <field name="url">/my/documents</field>
+        <field name="placeholder_count">edara_tenant_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="15"/>
+    </record>
+    <record id="portal_entry_edara_notifications" model="portal.entry">
+        <field name="name">Notifications</field>
+        <field name="description">Updates about your lease, payments and requests</field>
+        <field name="url">/my/notifications</field>
+        <field name="placeholder_count">edara_tenant_count</field>
+        <field name="category">edara_category</field>
+        <field name="sequence" eval="16"/>
+    </record>
+</odoo>

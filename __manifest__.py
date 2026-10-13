@@ -1,6 +1,6 @@
 {
     'name': 'EDARA Property Management',
-    'version': '19.0.1.5.0',
+    'version': '20.0.1.5.0',
     'category': 'Real Estate/Property Management',
     'summary': 'Professional property, lease and tenant management built natively on Odoo Accounting.',
     'description': """
@@ -24,12 +24,11 @@ top of native Odoo Accounting, Portal, Contacts and Security.
     ],
     'data': [
         'security/edara_security.xml',
-        'security/ir.model.access.csv',
-        'security/edara_record_rules.xml',
         'data/edara_sequences.xml',
         'data/edara_analytic_plan.xml',
         'data/edara_activity_types.xml',
         'data/edara_cron.xml',
+        'data/portal_entry_data.xml',
         'data/edara_unit_type_data.xml',
         'data/edara_maintenance_category_data.xml',
         'views/dashboard_views.xml',
@@ -55,6 +54,7 @@ top of native Odoo Accounting, Portal, Contacts and Security.
         'views/res_config_settings_views.xml',
         'views/portal_templates.xml',
         'views/edara_menus.xml',
+        'security/ir.access.csv',
     ],
     'assets': {
         'web.assets_backend': [

@@ -8,16 +8,16 @@ from odoo.addons.portal.controllers.portal import pager as portal_pager
 
 class EdaraPortal(CustomerPortal):
 
-    def _prepare_home_portal_values(self, counters):
-        values = super()._prepare_home_portal_values(counters)
+    def _prepare_portal_counter_values(self, counter):
+        # Odoo 20: portal home counters are resolved per counter name (portal.entry records).
         partner = request.env.user.partner_id
-        if 'lease_count' in counters:
-            values['lease_count'] = request.env['edara.lease.contract'].search_count(
-                [('tenant_id', '=', partner.id)])
-        if 'maintenance_count' in counters:
-            values['maintenance_count'] = request.env['edara.maintenance.request'].search_count(
-                [('tenant_id', '=', partner.id)])
-        return values
+        if counter == 'lease_count':
+            return 'edara.lease.contract', [('tenant_id', '=', partner.id)], 'read'
+        if counter == 'maintenance_count':
+            return 'edara.maintenance.request', [('tenant_id', '=', partner.id)], 'read'
+        if counter == 'edara_tenant_count':
+            return 'res.partner', [('id', '=', partner.id), ('is_edara_tenant', '=', True)], 'sudo'
+        return super()._prepare_portal_counter_values(counter)
 
     def _edara_tenant_active_units(self):
         partner = request.env.user.partner_id

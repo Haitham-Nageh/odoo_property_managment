@@ -1040,7 +1040,10 @@ class EdaraDashboard(models.TransientModel):
             payment_domain = [
                 ('payment_type', '=', 'inbound'),
                 ('partner_type', '=', 'customer'),
-                ('state', '=', 'paid'),
+                # Odoo 20 payment states: a payment is settled once reconciled, or when it
+                # was posted straight to a cash/bank account (no outstanding account).
+                '|', ('state', '=', 'reconciled'),
+                '&', ('state', '=', 'paid'), ('outstanding_account_id.account_type', '=', 'asset_cash'),
             ]
             if branch:
                 branch_invoices = self.env['account.move'].search([('edara_branch_id', '=', branch.id)])

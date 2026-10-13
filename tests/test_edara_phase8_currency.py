@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from odoo.tests import TransactionCase, tagged
 
@@ -30,7 +30,7 @@ class TestEdaraPhase8Currency(TransactionCase):
             cls.currencies[code] = cur
             if cur != cls.company_cur:
                 E['res.currency.rate'].search([('currency_id', '=', cur.id), ('company_id', '=', cls.company.id)]).unlink()
-                for d, r in ((OLD_DATE, OLD_RATE), (cls.today, NEW_RATE)):
+                for d, r in ((OLD_DATE, OLD_RATE), (cls.today - timedelta(days=1), NEW_RATE)):  # Odoo 20: rate applies from the next day
                     E['res.currency.rate'].create(
                         {'currency_id': cur.id, 'company_id': cls.company.id, 'name': d, 'rate': r})
         cls.branch = E['edara.branch'].create({'name': 'P8 Branch', 'code': 'P8B'})

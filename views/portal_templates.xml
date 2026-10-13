@@ -1,56 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="portal_my_home_edara" name="My Lease / Maintenance" inherit_id="portal.portal_my_home"
-              customize_show="True" priority="40">
-        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
-            <t t-set="portal_client_category_enable" t-value="True"/>
-        </xpath>
-        <div id="portal_client_category" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Dashboard</t>
-                <t t-set="url" t-value="'/my/dashboard'"/>
-                <t t-set="text">Your lease, rent, balance and requests at a glance</t>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">My Lease</t>
-                <t t-set="url" t-value="'/my/leases'"/>
-                <t t-set="text">View your lease, unit and request a renewal</t>
-                <t t-set="placeholder_count" t-value="'lease_count'"/>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">My Unit</t>
-                <t t-set="url" t-value="'/my/units'"/>
-                <t t-set="text">Details about the unit(s) you lease</t>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Billing</t>
-                <t t-set="url" t-value="'/my/billing'"/>
-                <t t-set="text">Invoices, payment history and outstanding balance</t>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Maintenance Requests</t>
-                <t t-set="url" t-value="'/my/maintenance'"/>
-                <t t-set="text">Report an issue with your unit or follow up on one</t>
-                <t t-set="placeholder_count" t-value="'maintenance_count'"/>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Documents</t>
-                <t t-set="url" t-value="'/my/documents'"/>
-                <t t-set="text">Files attached to your lease, unit or requests</t>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Notifications</t>
-                <t t-set="url" t-value="'/my/notifications'"/>
-                <t t-set="text">Updates about your lease, payments and requests</t>
-            </t>
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="title">My Profile</t>
-                <t t-set="url" t-value="'/my/account'"/>
-                <t t-set="text">Update your contact details</t>
-            </t>
-        </div>
-    </template>
-
     <!-- ================= My Lease ================= -->
 
     <template id="portal_my_leases" name="My Leases">
@@ -275,7 +224,7 @@
                     <div class="card p-3 h-100">
                         <h5>Outstanding Balance</h5>
                         <p class="mb-0 fs-4">
-                            <t t-esc="'%.2f' % outstanding"/> <t t-out="currency.symbol"/>
+                            <t t-out="'%.2f' % outstanding"/> <t t-out="currency.symbol"/>
                         </p>
                     </div>
                 </div>
@@ -300,7 +249,7 @@
             </t>
             <ul t-if="notifications" class="list-group">
                 <li t-foreach="notifications" t-as="notification" class="list-group-item">
-                    <span t-field="notification.date"/> - <span t-raw="notification.body"/>
+                    <span t-field="notification.date"/> - <span t-out="notification.body"/>
                 </li>
             </ul>
         </t>
@@ -354,7 +303,7 @@
     <template id="portal_billing" name="My Billing">
         <t t-call="portal.portal_layout">
             <h3>Billing</h3>
-            <p class="fs-4">Outstanding: <t t-esc="'%.2f' % outstanding"/> <t t-out="currency.symbol"/></p>
+            <p class="fs-4">Outstanding: <t t-out="'%.2f' % outstanding"/> <t t-out="currency.symbol"/></p>
             <t t-if="not moves">
                 <p class="alert alert-warning">You do not have any invoices yet.</p>
             </t>
@@ -420,7 +369,7 @@
             </t>
             <ul t-if="notifications" class="list-group">
                 <li t-foreach="notifications" t-as="notification" class="list-group-item">
-                    <span t-field="notification.date"/> - <span t-raw="notification.body"/>
+                    <span t-field="notification.date"/> - <span t-out="notification.body"/>
                 </li>
             </ul>
         </t>

@@ -1380,7 +1380,9 @@ class TestEdaraDashboard(TransactionCase):
             'date': today,
         })
         pay_in_process.action_post()
-        self.assertEqual(pay_in_process.state, 'in_process')
+        # Odoo 20: a posted payment waiting on its outstanding account is 'paid' (not yet 'reconciled')
+        self.assertEqual(pay_in_process.state, 'paid')
+        self.assertNotEqual(pay_in_process.outstanding_account_id.account_type, 'asset_cash')
 
         dash = self.env['edara.dashboard'].create({'branch_id': f['branch'].id})
         self.assertNotIn(f'action-account.action_account_payments/{pay_in_process.id}', dash.recent_activity_html)

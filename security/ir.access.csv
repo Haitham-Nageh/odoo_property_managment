@@ -1,0 +1,83 @@
+id,name,model_id,group_id/id,operation,domain
+rule_edara_branch_assigned_only,EDARA Branch: assigned branches only,edara.branch,property_managment.group_edara_viewer,r,"['|', ('user_ids', 'in', [user.id]), ('manager_id', '=', user.id)]"
+rule_edara_branch_assigned_only_1,EDARA Branch: assigned branches only,edara.branch,property_managment.group_edara_branch_manager,ru,"['|', ('user_ids', 'in', [user.id]), ('manager_id', '=', user.id)]"
+rule_edara_branch_company_manager_all,EDARA Branch: company manager sees all branches,edara.branch,property_managment.group_edara_company_manager,crud,
+rule_edara_branch_company,EDARA Branch: multi-company,edara.branch,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_property_assigned_only,EDARA Property: assigned branches only,edara.property,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_property_assigned_only_1,EDARA Property: assigned branches only,edara.property,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_property_assigned_only_2,EDARA Property: assigned branches only,edara.property,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_property_company_manager_all,EDARA Property: company manager sees all,edara.property,property_managment.group_edara_company_manager,crud,
+rule_edara_property_company,EDARA Property: multi-company,edara.property,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_building_assigned_only,EDARA Building: assigned branches only,edara.building,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_building_assigned_only_1,EDARA Building: assigned branches only,edara.building,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_building_assigned_only_2,EDARA Building: assigned branches only,edara.building,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_building_company_manager_all,EDARA Building: company manager sees all,edara.building,property_managment.group_edara_company_manager,crud,
+rule_edara_building_company,EDARA Building: multi-company,edara.building,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_unit_assigned_only,EDARA Unit: assigned branches only,edara.unit,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_unit_assigned_only_1,EDARA Unit: assigned branches only,edara.unit,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_unit_assigned_only_2,EDARA Unit: assigned branches only,edara.unit,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_unit_company_manager_all,EDARA Unit: company manager sees all,edara.unit,property_managment.group_edara_company_manager,crud,
+rule_edara_unit_portal_own,EDARA Unit: portal tenant sees only their leased unit(s),edara.unit,property_managment.group_edara_portal_tenant,r,"[('lease_contract_ids.tenant_id', '=', user.partner_id.id)]"
+rule_edara_unit_company,EDARA Unit: multi-company,edara.unit,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_ownership_assigned_only,EDARA Ownership: assigned branches only,edara.ownership,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_ownership_assigned_only_1,EDARA Ownership: assigned branches only,edara.ownership,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_ownership_company_manager_all,EDARA Ownership: company manager sees all,edara.ownership,property_managment.group_edara_company_manager,crud,
+rule_edara_ownership_company,EDARA Ownership: multi-company,edara.ownership,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_lease_contract_assigned_only,EDARA Lease Contract: assigned branches only,edara.lease.contract,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_lease_contract_assigned_only_1,EDARA Lease Contract: assigned branches only,edara.lease.contract,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_lease_contract_assigned_only_2,EDARA Lease Contract: assigned branches only,edara.lease.contract,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_lease_contract_company_manager_all,EDARA Lease Contract: company manager sees all,edara.lease.contract,property_managment.group_edara_company_manager,crud,
+rule_edara_lease_contract_portal_own,EDARA Lease Contract: portal tenant sees only their own,edara.lease.contract,property_managment.group_edara_portal_tenant,r,"[('tenant_id', '=', user.partner_id.id)]"
+rule_edara_lease_contract_company,EDARA Lease Contract: multi-company,edara.lease.contract,,crud,"[('company_id', 'in', company_ids)]"
+access_edara_lease_renewal_wizard,edara.lease.renewal.wizard,edara.lease.renewal.wizard,property_managment.group_edara_property_manager,crud,
+rule_edara_schedule_line_assigned_only,EDARA Payment Schedule Line: assigned branches only,edara.payment.schedule.line,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_schedule_line_assigned_only_1,EDARA Payment Schedule Line: assigned branches only,edara.payment.schedule.line,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_schedule_line_assigned_only_2,EDARA Payment Schedule Line: assigned branches only,edara.payment.schedule.line,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_schedule_line_company_manager_all,EDARA Payment Schedule Line: company manager sees all,edara.payment.schedule.line,property_managment.group_edara_company_manager,crud,
+rule_edara_schedule_line_company,EDARA Payment Schedule Line: multi-company,edara.payment.schedule.line,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_deposit_assigned_only,EDARA Deposit: assigned branches only,edara.deposit,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_deposit_assigned_only_1,EDARA Deposit: assigned branches only,edara.deposit,property_managment.group_edara_accountant,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_deposit_company_manager_all,EDARA Deposit: company manager sees all,edara.deposit,property_managment.group_edara_company_manager,cru,
+rule_edara_deposit_assigned_only_2,EDARA Deposit: assigned branches only,edara.deposit,property_managment.group_edara_branch_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_deposit_company,EDARA Deposit: multi-company,edara.deposit,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_deposit_transaction_assigned_only,EDARA Deposit Transaction: assigned branches only,edara.deposit.transaction,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_deposit_transaction_assigned_only_1,EDARA Deposit Transaction: assigned branches only,edara.deposit.transaction,property_managment.group_edara_accountant,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_deposit_transaction_company_manager_all,EDARA Deposit Transaction: company manager sees all,edara.deposit.transaction,property_managment.group_edara_company_manager,cru,
+rule_edara_deposit_transaction_assigned_only_2,EDARA Deposit Transaction: assigned branches only,edara.deposit.transaction,property_managment.group_edara_branch_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_deposit_transaction_company,EDARA Deposit Transaction: multi-company,edara.deposit.transaction,,crud,"[('company_id', 'in', company_ids)]"
+access_edara_deposit_transaction_wizard_accountant,edara.deposit.transaction.wizard.accountant,edara.deposit.transaction.wizard,property_managment.group_edara_accountant,crud,
+access_edara_deposit_transaction_wizard_branch_manager,edara.deposit.transaction.wizard.branch_manager,edara.deposit.transaction.wizard,property_managment.group_edara_branch_manager,crud,
+rule_edara_service_charge_assigned_only,EDARA Service Charge: assigned branches only,edara.service.charge,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_service_charge_assigned_only_1,EDARA Service Charge: assigned branches only,edara.service.charge,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_service_charge_assigned_only_2,EDARA Service Charge: assigned branches only,edara.service.charge,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_service_charge_company_manager_all,EDARA Service Charge: company manager sees all,edara.service.charge,property_managment.group_edara_company_manager,crud,
+rule_edara_service_charge_company,EDARA Service Charge: multi-company,edara.service.charge,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_service_charge_line_assigned_only,EDARA Service Charge Line: assigned branches only,edara.service.charge.line,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_service_charge_line_assigned_only_1,EDARA Service Charge Line: assigned branches only,edara.service.charge.line,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_service_charge_line_assigned_only_2,EDARA Service Charge Line: assigned branches only,edara.service.charge.line,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_service_charge_line_company_manager_all,EDARA Service Charge Line: company manager sees all,edara.service.charge.line,property_managment.group_edara_company_manager,crud,
+rule_edara_service_charge_line_company,EDARA Service Charge Line: multi-company,edara.service.charge.line,,crud,"[('company_id', 'in', company_ids)]"
+access_edara_service_charge_not_payable_wizard_branch_manager,edara.service.charge.not.payable.wizard.branch_manager,edara.service.charge.not.payable.wizard,property_managment.group_edara_branch_manager,crud,
+rule_edara_maintenance_request_assigned_only,EDARA Maintenance Request: assigned branches only,edara.maintenance.request,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_maintenance_request_assigned_only_1,EDARA Maintenance Request: assigned branches only,edara.maintenance.request,property_managment.group_edara_maintenance,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_maintenance_request_assigned_only_2,EDARA Maintenance Request: assigned branches only,edara.maintenance.request,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_maintenance_request_assigned_only_3,EDARA Maintenance Request: assigned branches only,edara.maintenance.request,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_maintenance_request_company_manager_all,EDARA Maintenance Request: company manager sees all,edara.maintenance.request,property_managment.group_edara_company_manager,crud,
+rule_edara_maintenance_request_portal_own,EDARA Maintenance Request: portal tenant sees only their own,edara.maintenance.request,property_managment.group_edara_portal_tenant,cr,"[('tenant_id', '=', user.partner_id.id)]"
+rule_edara_maintenance_request_company,EDARA Maintenance Request: multi-company,edara.maintenance.request,,crud,"[('company_id', 'in', company_ids)]"
+rule_edara_renewal_request_assigned_only,EDARA Renewal Request: assigned branches only,edara.renewal.request,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_renewal_request_assigned_only_1,EDARA Renewal Request: assigned branches only,edara.renewal.request,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_renewal_request_assigned_only_2,EDARA Renewal Request: assigned branches only,edara.renewal.request,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_renewal_request_company_manager_all,EDARA Renewal Request: company manager sees all,edara.renewal.request,property_managment.group_edara_company_manager,crud,
+rule_edara_renewal_request_portal_own,EDARA Renewal Request: portal tenant sees only their own,edara.renewal.request,property_managment.group_edara_portal_tenant,cr,"[('tenant_id', '=', user.partner_id.id)]"
+rule_edara_renewal_request_company,EDARA Renewal Request: multi-company,edara.renewal.request,,crud,"[('company_id', 'in', company_ids)]"
+access_edara_dashboard_viewer,edara.dashboard.viewer,edara.dashboard,property_managment.group_edara_viewer,cru,
+rule_edara_recurring_maintenance_assigned_only,EDARA Recurring Maintenance: assigned branches only,edara.recurring.maintenance,property_managment.group_edara_viewer,r,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_recurring_maintenance_assigned_only_1,EDARA Recurring Maintenance: assigned branches only,edara.recurring.maintenance,property_managment.group_edara_property_manager,cru,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_recurring_maintenance_assigned_only_2,EDARA Recurring Maintenance: assigned branches only,edara.recurring.maintenance,property_managment.group_edara_branch_manager,crud,"['|', ('branch_id.user_ids', 'in', [user.id]), ('branch_id.manager_id', '=', user.id)]"
+rule_edara_recurring_maintenance_company_manager_all,EDARA Recurring Maintenance: company manager sees all,edara.recurring.maintenance,property_managment.group_edara_company_manager,crud,
+rule_edara_recurring_maintenance_company,EDARA Recurring Maintenance: multi-company,edara.recurring.maintenance,,crud,"[('company_id', 'in', company_ids)]"
+access_edara_unit_type_viewer,edara.unit.type.viewer,edara.unit.type,property_managment.group_edara_viewer,r,
+access_edara_unit_type_branch_manager,edara.unit.type.branch_manager,edara.unit.type,property_managment.group_edara_branch_manager,crud,
+access_edara_maintenance_category_viewer,edara.maintenance.category.viewer,edara.maintenance.category,property_managment.group_edara_viewer,r,
+access_edara_maintenance_category_branch_manager,edara.maintenance.category.branch_manager,edara.maintenance.category,property_managment.group_edara_branch_manager,crud,
