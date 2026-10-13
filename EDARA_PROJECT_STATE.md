@@ -16,15 +16,108 @@ This section is the current source of truth. Sections further down (e.g. "Curren
 - **EDARA PMS development through P2 is complete.** This does NOT mean the project is fully finished — while Branch Removal architecture is resolved (decision: KEEP BOTH; removal is not planned; see ADR-001), Property Terminology and Owner Portal remain explicitly DEFERRED and have not been started. See "## Deferred Architecture Decisions (2026-10-05)" below.
 - **Quality Roadmap (Q1-Q4)**: registered 2026-10-06. **Status update (2026-10-07): Q1, Q2, Q3, and Q4 are all now COMPLETE/CLOSED.** Q1 — Final Code Review ran and produced a categorized findings report; Q2 — Quality Findings Remediation addressed the validated P1/P2 findings (P1-01 deposit transaction guard, P1-02 service-charge-line invoice guard, P2-01 recurring-maintenance batch isolation), each analyzed, implemented, and finally audited per-ticket; Q3 — Final Regression & Quality Gate PASSED (verdict: READY WITH NON-BLOCKING FINDINGS; no P0/P1/P2 regressions, all closed fixes re-verified intact at HEAD `ae823ca`); **Q4 — User Manual is CLOSED** (see "### Q4 — User Manual" below for full detail). The Quality Roadmap pipeline (Q1→Q2→Q3→Q4→Final Product Readiness) has reached its last step; the project is now ready for the **Final Product Readiness** decision/review. This operationalized and superseded the previous open-ended timing on the "# Final Project Quality Gate" section (which had been scheduled to wait for Property Terminology/Owner Portal); those two items remain separately deferred business/architecture decisions, independent of the now-complete Q1-Q4 pipeline.
 
-## Current Status Addendum (2026-10-12) — Dashboard Redesign — Authoritative for the Git state and the dashboard
+## Current Status Addendum (2026-10-12, after Tickets C / U4 / U5) — Authoritative
+
+This is the newest status block. It supersedes the "Current Status (2026-10-06)" Git/Tests bullets above and the Git statements in the dashboard addendum below (which was written before the dashboard work was committed). Older sections stay as history.
+
+- **Git**: branch `main`, HEAD `d9a587133adea157b18a96616655b5c6ca0ae4f9` ("Separate contract overview from schedule navigation"), working tree clean, in sync with `origin/main` (verified when this block was written).
+- **Committed checkpoints (newest first)**:
+  - Tickets U4 + U5: `d9a587133adea157b18a96616655b5c6ca0ae4f9`
+  - Ticket C: `9367d8a51b3f5952e22812b3643b772dbc56ab98`
+  - Ticket U3 dashboard analytics and maintenance overview: `ab96b0c`; dashboard layout/charts/Arabic: `86f59b4`
+  - Ticket U2 configurable branch maintenance SLA: `f214669`
+  - FR-3 "Verify Full Test Suite 714/714": `0bffcdb`
+
+### Completed (status as given by the project owner; commits cited where Git shows them)
+- **Foundation / functional**: FR-1 P3 Financial / Data Hardening — CLOSED; Pre-FR-2 Test Fixture Cleanup — CLOSED; FR-2 Final Arabic Translation Completion — CLOSED; FR-3 Live Full Test Execution — CLOSED (`0bffcdb` records 714/714).
+- **Pre-FR-4 — Product Cleanup & UX Architecture Analysis**: A Dashboard UX Cleanup — CLOSED; F Maintenance Navigation — CLOSED; D Floor Validation — CLOSED; Ticket C Optional Property/Building/Unit Codes — CLOSED; Ticket B Dynamic Branch Filter Buttons — CLOSED; Ticket E Configurable Unit Type + Maintenance Category — CLOSED; Ticket U1 Payment Schedule Counters & Styling — CLOSED; Ticket U2 SLA Investigation — CLOSED (implemented as configurable branch maintenance SLA, `f214669`); Ticket U3 Dashboard Improvements — CLOSED (details in the next section); Ticket U4 Rental Timeline Navigation — CLOSED; Ticket U5 Contract Overview and Schedule View Separation — CLOSED.
+
+### Ticket C — Optional Property / Building / Unit codes (`9367d8a`)
+- The `code` fields on `edara.property`, `edara.building` and `edara.unit` are **kept and optional** (`required=True` removed; the fields were not removed). The database NOT NULL is dropped by the module upgrade.
+- Empty and whitespace-only values are normalized to `False` / SQL NULL on create and write by the new abstract mixin `edara.optional.code.mixin` (`models/edara_optional_code_mixin.py`), inherited by the three models. Non-empty codes are stored untouched.
+- The existing unique constraints are unchanged (`unique(company_id, code)` for Property, `unique(property_id, code)` for Building, `unique(building_id, code)` for Unit). NULLs never collide, so any number of code-less records can coexist, while duplicate non-empty codes are still rejected within the same scope.
+- `edara.unit.copy()` only generates the `-COPY` suffix when the original unit has a code; a code-less unit copies to a code-less unit.
+- Reported results (supplied by the project owner; not executed by the assistant that wrote this entry): focused tests 51/51 and the full module regression suite 815/815.
+
+### Ticket U4 — Schedule navigation (`d9a5871`)
+- The existing menu `menu_edara_lease_timeline` was renamed from "Lease Timeline" to **Schedule** and moved to a direct child of the EDARA root menu. It reuses `action_edara_lease_timeline`. Sequence 25: between Contracts (20) and Finance (30).
+- Arabic: the menu source tag moved to the existing "Schedule" entry ("الجدول الزمني"). On a database that already had the old translation stored, the Arabic menu name is not overwritten by a plain upgrade (an `--i18n-overwrite` upgrade or a manual edit is needed); fresh installs get the new text.
+
+### Ticket U5 — Contract Overview vs Schedule (`d9a5871`)
+- New **Contract Overview** menu (`menu_edara_contract_overview`, sequence 10) under Contracts, before Renewal Requests (20), with the new action `action_edara_contract_overview` on the existing `edara.lease.contract` model, the existing search view, and `view_mode = list,kanban,form` (List and Kanban are the switcher modes; Form opens records).
+- `action_edara_lease_timeline` (Schedule) is now `view_mode = gantt,calendar,form` (Gantt and Calendar switcher modes; Form opens records). No view definitions were deleted or duplicated.
+- Renewal Requests stays under Contracts, unchanged. No new model, no duplicated contract data, no security change.
+- Arabic: "Contract Overview" → "نظرة عامة على العقود".
+- Validation: the module upgrade succeeded against `odoo19_enterprise_dev`, and the project owner manually verified the UI. The full regression suite was **not** re-run after U4/U5.
+
+### Full Module Regression — 2026-10-13 — PASS (815/815)
+- **Result**: **PASS** — Odoo reported `0 failed, 0 error(s) of 815 tests when loading database 'odoo19_enterprise_dev'`; 815 post-install tests in 841.6 s; skipped: none reported; process exit code 0.
+- **Code under test**: `main` at `d9a587133adea157b18a96616655b5c6ca0ae4f9`, i.e. after Tickets C, U4 and U5 were committed. This is the first full run after those tickets, and it **supersedes the earlier user-reported 815/815** (which predated the U4/U5 menu changes) as the current verified result. Older counts elsewhere in this file (685 methods on 2026-10-06; 714/714 in `0bffcdb`) are historical and unchanged.
+- **Command**: `odoo-bin -c <existing development config> -d odoo19_enterprise_dev -u property_managment --test-enable --test-tags /property_managment --stop-after-init --logfile <regression log>` (run from PowerShell with the project's bundled Python).
+- **Database**: the existing development database `odoo19_enterprise_dev`; the run re-applied the module upgrade through `-u property_managment`. No database was created, dropped or reset.
+- **Scope**: the `/property_managment` tag covers the whole module, including the HTTP portal tests, which ran on the configured port 8070.
+- **Log notes**: the 14 `ERROR` log lines were emitted by tests that deliberately exercise failure paths (11 invoice-generation failures, 1 late-fee failure, 2 constraint-violation queries) and did not cause any failed test. Warnings: access-rule checks, deprecated `t-raw`, a `read_group` deprecation in a test file, and the usual `addons_path` notice. The regression report found no warning that affects test reliability.
+- **Log**: `D:\Odoo\Projects\Odoo 19.0e.20260801\logs\property_managment_full_regression_20261013_112851.log`; the full command, process timing (PID 13476, 11:28:52–11:43:51) and configuration details are in that log and the adjacent `property_managment_full_regression_20261013_112851.meta.txt`. Both are outside the repository and untracked.
+
+### Portal User Lifecycle & Service Charge Safeguards — IMPLEMENTED & VERIFIED 2026-10-13 (PASS WITH LIMITATIONS; 843/843 PASS)
+- **Status**: **Implemented and verified; ticket ready for closure.** Final independent read-only verification verdict: **PASS WITH LIMITATIONS**; no known blocking defect. Follow-up permission fix applied, focused tests passed (44/44), and full module regression passed with zero failed tests and zero errors (843/843). Translation cleanup and a real concurrency test are open follow-ups (see "Remaining limitations" below).
+- **Core Business Rules Implemented**:
+  - **Portal Eligibility & Precedence**: Tenants with an `active` contract qualify for portal access. `scheduled` contracts do not grant access until start date arrives and activation succeeds. Failed activation never grants access. An active contract always takes precedence over end dates and grace evaluation.
+  - **Outstanding Obligations**: Evaluated at tenant level without extra ledger/subsystems. Qualifying blockers include: customer invoices (`out_invoice`) with `edara_invoice_type` in `('rent', 'late_fee', 'service_charge', 'ad_hoc')` that are not cancelled and not cleanly settled (clean settlement = `posted` and `payment_state in ('paid', 'reversed')`); overdue uninvoiced rent schedule lines (`due_date <= today` on `terminated`/`expired`/`renewed` contracts); and pending service charge lines with empty `invoice_id`. Security deposits are explicitly excluded.
+  - **Grace Period & Settled Date**: Configurable company setting `edara_portal_grace_days` on `res.company` / `res.config.settings` (default 30 days, range 0–3650). Tracked on `res.partner.edara_portal_settled_date`. Active contracts preserve access and clear settled date. New blockers clear settled date. Once blockers clear, settled date is stamped only if qualifying invoice history exists; otherwise, latest effective contract end date is used. Anchor = `max(latest_contract_end, settled_date)`. Access remains active through `anchor + grace_days`, archiving only when `today > grace_end`. Zero-day grace archives the day after the anchor.
+  - **User Lifecycle & Provisioning**: Field `res.users.edara_portal_lifecycle_archived` distinguishes lifecycle archival from deliberate manual archival. Lifecycle archival writes `active=False` and `edara_portal_lifecycle_archived=True` atomically. Manual archive (`write({'active': False})` without marker) automatically resets the flag to `False`. Automatic reactivation only touches users whose lifecycle flag remains `True`; manually archived users are never automatically reactivated. Internal users are never modified. No placeholder accounts or phone logins; missing/invalid email or login conflicts create deduplicated follow-up activities (`mail.activity`) without blocking contract activation.
+  - **Follow-up Permission Fix**: `_schedule_edara_portal_activity` uses `self.sudo()` for both the deduplication read (`activity_ids`) and `activity_schedule(...)`, preserving assignee (`user_id`), deadline, activity type, summary, note and target partner. `_get_edara_activity_user` reads `edara_lease_contract_ids` through `self.sudo()` and returns only the selected assignee (branch manager of the latest contract, else `base.user_admin`). This lets a regular property manager (no `res.partner` write access) activate a contract for a tenant with a missing/invalid email or login conflict. Test `test_28_property_manager_contract_activation_creates_activity_without_email` runs `action_activate` via `with_user(property_manager_user)` (non-superuser) and asserts successful activation, no placeholder user, and a "Portal Provisioning: Missing Email" activity assigned to the branch manager. Side effect: the activity's `create_uid` is the superuser; its assigned `user_id` remains the branch manager. The reviewer did not independently verify that `test_28` fails when the fix is removed.
+  - **Service Charge Safeguards**:
+    - Unlinking uninvoiced service charge lines is blocked unless invoked through an audited privileged route with `edara_allow_service_charge_line_unlink` in context.
+    - Unlinking a service charge header is blocked while lines exist.
+    - Allocation regeneration computes proposed allocations first and refuses regeneration with a descriptive `UserError` if any existing `(unit, tenant)` pair would disappear, explicitly listing dropped pairs. Amount modifications for existing pairs remain permitted.
+    - Line fields `tenant_id`, `unit_id`, and `charge_id` are immutable for non-superusers; line amount edits remain allowed.
+    - "Remove as Not Payable" transient wizard (`edara.service.charge.not.payable.wizard`) requires a reason, logs an audited note in the tenant partner's chatter (`mail.thread`), and unlinks the line through the privileged route. Access restricted to branch managers; accountants are read-only.
+  - **Scheduled Evaluator**: Daily cron `_cron_cleanup_expired_portal_tenants()` processes tenants with active or archived portal users, retries unprovisioned active tenants, runs per-tenant evaluations within isolated savepoints (`cr.savepoint()`), and deduplicates follow-up activities.
+  - **Arabic Translations (partial)**: 32 entries were added to `i18n/ar.po` for this ticket (file now 945 entries, zero duplicate `(msgctxt, msgid)` keys). Coverage is **not complete**: some added `msgid`s do not match the current code strings and some are stale, so certain constraint, guard, regeneration and wizard chatter messages fall back to English (see "Remaining limitations").
+- **Focused Test Results**:
+  - `TestEdaraPortalProvisioning`: 16/16 PASS.
+  - `TestEdaraPortalLifecycle`: 28/28 PASS (including non-superuser PM contract activation test `test_28`).
+  - Total focused: 44/44 PASS (0 failed, 0 errors).
+- **Full Module Regression Result**:
+  - **Result**: **PASS** — Odoo reported `0 failed, 0 error(s) of 843 tests when loading database 'odoo19_enterprise_dev'`; 843 post-install tests in 303.44 s, 174,888 queries; process exit code 0.
+  - **Command**: `& "D:\Odoo\Projects\Odoo 19.0e.20260801\python\python.exe" "D:\Odoo\Projects\Odoo 19.0e.20260801\server\odoo-bin" -c "D:\Odoo\Projects\Odoo 19.0e.20260801\config\odoo-enterprise-dev.conf" -d odoo19_enterprise_dev -u property_managment --test-enable --test-tags /property_managment --stop-after-init --logfile "D:\Odoo\Projects\Odoo 19.0e.20260801\logs\property_managment_full_regression_portal_lifecycle_20261013_155440.log"`
+  - **Log**: `D:\Odoo\Projects\Odoo 19.0e.20260801\logs\property_managment_full_regression_portal_lifecycle_20261013_155440.log`.
+- **Concurrency & Transaction Safety Analysis**:
+  - Atomic user writes ensure `active` and `edara_portal_lifecycle_archived` are updated in a single SQL operation.
+  - Manual archive detection in `res.users.write` resets the lifecycle flag if an external caller deactivates the user without explicitly passing `edara_portal_lifecycle_archived=True`.
+  - Cron evaluator wraps each tenant in `with self.env.cr.savepoint():` so individual failures or serialization conflicts are caught and logged without aborting the batch or leaving partial mutations.
+  - *Limitation / Untested Scenario*: manual archival versus a simultaneous lifecycle update has **not** been verified with a real two-connection concurrency test. The sequential tests, the source and PostgreSQL `REPEATABLE READ` behaviour (a conflicting `UPDATE` fails and the per-tenant savepoint is rolled back) support the design but are not proof of concurrent correctness.
+- **Remaining limitations / follow-up work**:
+  - **Concurrency**: as above; no real concurrent test exists.
+  - **Arabic translations**: `i18n/ar.po` has entries whose `msgid` does not match the current code (e.g. grace-days constraint, service-charge unlink/regeneration/immutable-field guards, wizard chatter note) and stale entries (e.g. "Portal Grace Days", "Confirm Removal"); those messages show in English. Translation cleanup is a separate follow-up task.
+  - **Testing**: `test_28` passed but was not proven to fail without the `sudo()` fix; coverage gaps remain for `in_payment`/`partial`/`reversed` states, credit notes and real payments (tests force `payment_state`).
+  - **Behaviour notes**: the cron runs as a single transaction with a savepoint per tenant (no per-tenant commit); completed follow-up activities are recreated on the next run while the cause persists; regeneration no longer creates a second line for a (unit, tenant) pair that already has an invoiced line.
+- **Scope notes**: no SQL migration or historical backfill; no accounting reconciliation hooks or hold ledger; maintenance-request and payment-schedule features untouched; the cron method name `_cron_cleanup_expired_portal_tenants` is kept for the `noupdate` scheduled-action record. Company/child-contact logins and portal maintenance requests were not implemented.
+- **Regression log note**: the log has no command line or exit-status line; the command and exit code 0 are as recorded by the run's operator. The `odoo.tests.stats` counter (967) is broader than the 843 post-install tests and has run about 122–124 above it in all recent runs.
+
+### Next planned work
+- ✅ **Full 714+ Regression — COMPLETE 2026-10-13: 815/815 PASS** (see the regression entry above).
+- ✅ **Portal User Lifecycle & Service Charge Safeguards — COMPLETE 2026-10-13: 843/843 PASS** (see the entry above).
+- **FR-4 — Production Deployment Architecture — NEXT** (not started), then **FR-5 — Final Product Readiness Gate**.
+- Still independent and deferred: Property Terminology (business decision) and Owner Portal.
+
+### Inconsistencies / unresolved items found while updating this file
+- The FR-x / Pre-FR-x / Ticket B-E / U1-U5 naming used above does not appear in the older sections of this file (they use Q1-Q4 and "Final Product Readiness"); the older "Remaining Roadmap (2026-10-06)" tree still lists "Final Product Readiness" as NEXT. It is kept as history; the roadmap tree dated 2026-10-12 supersedes it, and FR-5 is the current form of that gate.
+- Test counts differ across sources and have no single authoritative record: this file's older sections say 685 discovered methods (2026-10-06), `0bffcdb` records 714/714, and Ticket C was reported as 815/815. The "714+" label for the next regression is therefore a lower bound, not an expected count.
+- The header of this file still says "Odoo 19.0 Community"; the project runs on Odoo 19 Enterprise (`odoo19_enterprise_dev`). Not changed here.
+- Ticket U2 is named "SLA Investigation" in the roadmap but the commit (`f214669`) implements configurable branch maintenance SLA; kept as reported.
+- The accounting notes in the dashboard addendum below (gross billing, today's-rate deposit valuation, company-scope difference) are still open observations, not defects.
+
+## Dashboard Redesign Detail (2026-10-12, Ticket U3) — originally written before the commit; Git statements corrected below
 
 This addendum supersedes the "Current Status (2026-10-06)" Git/Tests bullets above for the dashboard work. The file had not been updated since 2026-10-07, so the U2 (configurable branch maintenance SLA, `f214669`) and dashboard commits below are recorded here for the first time; the older sections are kept as history.
 
-- **Git**: branch `main`, HEAD `86f59b4` ("Improve EDARA dashboard layout, charts, and Arabic translations"), in sync with `origin/main`. The work described below is **NOT committed and NOT pushed** — commit/push is pending an explicit user decision. Nothing is staged.
-- **Uncommitted tracked files**: `__manifest__.py`, `i18n/ar.po`, `models/edara_dashboard.py`, `static/src/scss/edara_dashboard.scss`, `tests/test_edara_dashboard.py`, `tests/test_edara_service_charge.py`, `views/dashboard_views.xml`, `views/service_charge_views.xml`, `EDARA_PROJECT_STATE.md` (this file).
-- **Untracked new files**: `static/src/js/edara_lifecycle_bar_field.js/.xml`, `static/src/js/edara_deposit_donut_field.js/.xml`, `static/src/js/edara_service_invoice_field.js/.xml`.
+- **Git**: the work described below was committed and pushed as `ab96b0c` ("Improve EDARA dashboard analytics and maintenance overview"), on top of `86f59b4`. (An earlier version of this entry recorded it as uncommitted.)
+- **Files in `ab96b0c`**: `__manifest__.py`, `i18n/ar.po`, `models/edara_dashboard.py`, `static/src/scss/edara_dashboard.scss`, `tests/test_edara_dashboard.py`, `tests/test_edara_service_charge.py`, `views/dashboard_views.xml`, `views/service_charge_views.xml`, `EDARA_PROJECT_STATE.md`.
+- **New widget files in `ab96b0c`**: `static/src/js/edara_lifecycle_bar_field.js/.xml`, `static/src/js/edara_deposit_donut_field.js/.xml`, `static/src/js/edara_service_invoice_field.js/.xml`.
 
-### Dashboard improvements completed (uncommitted unless stated)
+### Dashboard improvements completed (committed in `ab96b0c` unless stated)
 - **Lease lifecycle bar** (`edara_lifecycle_bar` widget, field `lifecycle_chart_data`): one proportional bar over the seven lease states grouped Live (Active, Scheduled) / Pre-live (Draft) / Historical (Renewed, Terminated, Expired, Cancelled). Every non-zero segment shows its count inside; the percentage is shown inside a segment only when its share is >= 15% (`MIN_PERCENT_SHARE` in the widget). The legend lists all seven statuses (zero-count ones dimmed, no bar width) with count **and** percentage; the tooltip carries label, count and percentage. Active and Expired segments use black text because white fails 4.5:1 on those fills (3.77 / 3.19); the palette itself is unchanged. The seven status actions (`action_view_contracts_*`) and the branch context are unchanged.
 - **Security Deposits donut** (`edara_deposit_donut` widget, field `deposit_chart_data`): amounts in company currency, three disjoint categories — *Deposits Still Held* (`state = held` on a lease that is not terminated/expired/cancelled), *Deposits Awaiting Settlement* (`balance > 0` on a terminated/expired/cancelled lease — the pre-existing "Unsettled on Closed Leases" definition), *Deposits Settled or Returned* (sum of refund + deduction transactions, deposits with any refund/deduction). Per deposit, collected = balance + refunded + deducted, so the three amounts add up to *Total Collected* (the donut centre). Still Held + Awaiting equals the pre-existing Total Held KPI. Segment/legend clicks open `action_view_deposits_still_held`, `action_view_deposits_unsettled_closed` (pre-existing) and `action_view_deposits_settled`, each with the branch filter. The pre-existing KPI fields stay on the view as hidden helpers.
 - **Billing Invoices / Invoice Amount / Invoice Activity** (`edara_service_invoice` widget, field `service_invoice_chart_data`, action `action_view_service_invoices`, act_window `action_edara_service_charge_invoices`): scope = posted customer invoices (`move_type = out_invoice`) with `edara_invoice_type = service_charge`, `payment_state != reversed`, current company, branch filter when set; counted per invoice (an invoice linked from several service-charge lines counts once); amount = stored `amount_total_signed` (company currency) summed in SQL; the monthly chart groups the same set by `invoice_date` over the last six calendar months (zero months included). Hidden from users without native Accounting read access; the action enforces `_require_accounting_access()`. Label corrected to **Billing Invoices** (Arabic: **الفواتير الصادرة**). The pre-existing *Pending Invoice* / *Uninvoiced Amount* metrics (service charges in state `allocated`; uninvoiced service-charge-line amount) are unchanged and remain as the small "Awaiting Invoicing" row.
@@ -33,7 +126,7 @@ This addendum supersedes the "Current Status (2026-10-06)" Git/Tests bullets abo
 
 ### Verification status
 - **Browser**: the user manually tested the latest UI in their browser and confirmed it works as intended (report from the user; not automated and not recorded as screenshots here).
-- **Automated tests**: on the isolated database `edara_dashboard_validation_20261008`, focused tests (4/4) and the dashboard regression set (129/129) passed for the earlier iteration of this redesign (flat strips + lifecycle labels). The newest code — deposit donut, invoice metrics/chart, `test_u5_*`, the invoice test in `test_edara_service_charge.py`, and the rewritten `test_u4_04` — has **not** been run under Odoo yet. Only static checks (XML/SCSS/JS syntax, translation coverage, view inventory) were done on it.
+- **Automated tests**: on the isolated database `edara_dashboard_validation_20261008`, focused tests (4/4) and the dashboard regression set (129/129) passed for the earlier iteration of this redesign (flat strips + lifecycle labels). The newest code — deposit donut, invoice metrics/chart, `test_u5_*` (dashboard tests of that stream, unrelated to Ticket U5 navigation), the invoice test in `test_edara_service_charge.py`, and the rewritten `test_u4_04` — was only statically checked (XML/SCSS/JS syntax, translation coverage, view inventory) by the assistant that wrote it; the project owner later reported the full module suite at 815/815 as part of Ticket C validation.
 - **Accounting**: the deposit and invoice formulas were reviewed statically against the models and Odoo's `payment_state` logic on 2026-10-12; they were **not runtime-tested against real accounting data**.
 
 ### Remaining limitations / accounting notes (found in the 2026-10-12 pre-commit review; none judged a defect)
@@ -3327,7 +3420,29 @@ Discovered during the Full Product Quality & Gap Audit (2026-10-06) as confirmed
 ### Owner Portal
 **Status: GAP / DEFERRED.** No owner portal implementation currently exists (verified: zero `owner_portal`/`owner.portal` matches anywhere in the repository). Owner Portal is **not** waiting for a future Branch-vs-Property architecture decision anymore — that architecture question is resolved by **ADR-001** (scoping is confirmed to follow `res.partner → edara.ownership → edara.property → edara.building → edara.unit → edara.lease.contract`). Owner Portal remains deferred because: (1) Property terminology is still an open business/UX decision; (2) UX/navigation architecture is still being finalized; and (3) Owner Portal implementation itself has not started.
 
-## Remaining Roadmap (2026-10-06 update — supersedes the 2026-10-05 tree below)
+## Remaining Roadmap (2026-10-12 update — supersedes the 2026-10-06 tree below)
+
+```text
+CURRENT
+  │
+  ├── ✅ FR-1 P3 Financial / Data Hardening · Pre-FR-2 Test Fixture Cleanup · FR-2 Arabic Translation Completion · FR-3 Live Full Test Execution
+  │
+  ├── ✅ Pre-FR-4 Product Cleanup & UX Architecture Analysis: A, F, D, Ticket C (9367d8a), B, E, U1, U2, U3 (ab96b0c), U4 + U5 (d9a5871)
+  │
+  ├── ✅ Full 714+ Regression — COMPLETE 2026-10-13: 815/815 PASS (after C / U4 / U5, `d9a5871`)
+  │
+  ├── ✅ Portal User Lifecycle & Service Charge Safeguards — COMPLETE 2026-10-13: 843/843 PASS (PASS WITH LIMITATIONS)
+  │
+  ├── 🔵 FR-4 — Production Deployment Architecture — NEXT (not started)
+  │
+  ├── 🔵 FR-5 — Final Product Readiness Gate
+  │
+  ├── 🔵 Property Terminology — Business Decision (independent; still deferred)
+  │
+  └── 🔵 Owner Portal (independent; still deferred)
+```
+
+## Remaining Roadmap (2026-10-06 update — HISTORICAL, superseded by the 2026-10-12 tree above)
 
 ```text
 CURRENT

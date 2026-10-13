@@ -53,3 +53,8 @@ class ResConfigSettings(models.TransientModel):
         string='SLA Notifications Enabled',
         help="Enable automated notifications when maintenance SLA targets approach or breach. "
              "Enabled by default and controlled independently from target activation.")
+
+    edara_portal_grace_days = fields.Integer(
+        related='company_id.edara_portal_grace_days', readonly=False,
+        string='Portal Grace Period (Days)',
+        help="Number of days tenant retains portal access after contract ends or obligations are settled.")

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_edara_service_charge_not_payable_wizard_form" model="ir.ui.view">
+        <field name="name">edara.service.charge.not.payable.wizard.form</field>
+        <field name="model">edara.service.charge.not.payable.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Remove Service Charge Line as Not Payable">
+                <group>
+                    <field name="line_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="charge_id"/>
+                    <field name="unit_id"/>
+                    <field name="tenant_id"/>
+                    <field name="amount"/>
+                    <field name="reason" placeholder="State why this service charge line is not payable..."/>
+                </group>
+                <footer>
+                    <button string="Remove Line" type="object" name="action_confirm" class="btn-danger"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_edara_service_charge_not_payable_wizard" model="ir.actions.act_window">
+        <field name="name">Remove as Not Payable</field>
+        <field name="res_model">edara.service.charge.not.payable.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

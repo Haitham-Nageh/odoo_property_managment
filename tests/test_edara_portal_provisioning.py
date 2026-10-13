@@ -79,7 +79,7 @@ class TestEdaraPortalProvisioning(HttpCase):
             'partner_id': partner.id,
             'group_ids': [(6, 0, [self.portal_group.id])],
         })
-        user.sudo().write({'active': False})
+        user.sudo().write({'active': False, 'edara_portal_lifecycle_archived': True})
         self.assertFalse(user.active)
 
         contract = self.env['edara.lease.contract'].create({
@@ -211,6 +211,7 @@ class TestEdaraPortalProvisioning(HttpCase):
         })
         contract.action_activate()
         contract.sudo().write({'state': 'expired'})
+        contract.schedule_line_ids.unlink()
 
         user = self.env['res.users'].sudo().search([('partner_id', '=', partner.id)])[0]
         self.assertTrue(user.active)
@@ -232,6 +233,7 @@ class TestEdaraPortalProvisioning(HttpCase):
         })
         contract_old.action_activate()
         contract_old.sudo().write({'state': 'expired'})
+        contract_old.schedule_line_ids.unlink()
 
         contract_active = self.env['edara.lease.contract'].create({
             'unit_id': self.unit_2.id,
@@ -263,6 +265,7 @@ class TestEdaraPortalProvisioning(HttpCase):
         })
         contract_old.action_activate()
         contract_old.sudo().write({'state': 'expired'})
+        contract_old.schedule_line_ids.unlink()
 
         self.env['res.partner']._cron_cleanup_expired_portal_tenants()
         user = self.env['res.users'].sudo().search([('partner_id', '=', partner.id), ('active', '=', False)])

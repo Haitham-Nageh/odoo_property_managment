@@ -48,6 +48,18 @@ class ResCompany(models.Model):
         help="Enable automated notifications when maintenance SLA targets approach or breach. "
              "Enabled by default and controlled independently from target activation.")
 
+    edara_portal_grace_days = fields.Integer(
+        string='Portal Grace Period (Days)',
+        default=30,
+        help="Number of days tenant retains portal access after contract ends or obligations are settled.",
+    )
+
+    @api.constrains('edara_portal_grace_days')
+    def _check_edara_portal_grace_days(self):
+        for company in self:
+            if company.edara_portal_grace_days < 0 or company.edara_portal_grace_days > 3650:
+                raise ValidationError(_("The portal grace period must be between 0 and 3650 days."))
+
     @api.constrains('edara_sla_response_enabled', 'edara_sla_response_hours',
                     'edara_sla_resolution_enabled', 'edara_sla_resolution_hours')
     def _check_edara_sla_targets(self):

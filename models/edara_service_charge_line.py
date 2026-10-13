@@ -1,5 +1,5 @@
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 
 class EdaraServiceChargeLine(models.Model):
@@ -39,7 +39,36 @@ class EdaraServiceChargeLine(models.Model):
             raise UserError(_(
                 "An invoiced service charge line cannot be deleted, to preserve the "
                 "link between the allocation and its invoice history."))
+        if not self.env.context.get('edara_allow_service_charge_line_unlink'):
+            raise UserError(_(
+                "Service charge lines cannot be deleted directly. Use the 'Remove as Not Payable' "
+                "action or regenerate the allocation."))
         return super().unlink()
+
+    def write(self, vals):
+        if not self.env.is_superuser():
+            immutable_fields = {'tenant_id', 'unit_id', 'charge_id'}
+            if immutable_fields & set(vals.keys()):
+                raise UserError(_(
+                    "Modifying the tenant, unit, or service charge of an allocation line is not permitted."))
+        return super().write(vals)
+
+    def action_remove_not_payable(self):
+        self.ensure_one()
+        if self.invoice_id:
+            raise UserError(_("An invoiced service charge line cannot be removed."))
+        if not self.env.user.has_group('property_managment.group_edara_branch_manager'):
+            raise AccessError(_("Only branch managers and higher can remove service charge lines as not payable."))
+        return {
+            'name': _("Remove as Not Payable"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'edara.service.charge.not.payable.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_line_id': self.id,
+            },
+        }
 
     def _create_invoice(self):
         """MAT-FIND-015: no EDARA role implies a native Accounting group (by

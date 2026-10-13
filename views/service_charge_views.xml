@@ -58,6 +58,9 @@
                                     <field name="amount"/>
                                     <field name="currency_id" column_invisible="1"/>
                                     <field name="invoice_id"/>
+                                    <button name="action_remove_not_payable" type="object" string="Remove as Not Payable"
+                                            icon="fa-times-circle" invisible="invoice_id"
+                                            groups="property_managment.group_edara_branch_manager"/>
                                 </list>
                             </field>
                         </page>

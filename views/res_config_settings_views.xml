@@ -60,6 +60,12 @@
                             <field name="edara_sla_notifications_enabled"/>
                         </setting>
                     </block>
+                    <block title="Portal Access" name="edara_portal_setting_container">
+                        <setting id="edara_portal_grace_days_setting"
+                                 help="Number of days tenant retains portal access after contract ends or obligations are settled. Default is 30 days.">
+                            <field name="edara_portal_grace_days"/>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

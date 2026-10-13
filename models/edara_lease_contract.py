@@ -270,9 +270,9 @@ class EdaraLeaseContract(models.Model):
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('edara.lease.contract') or _('New')
         contracts = super().create(vals_list)
-        live_contracts = contracts.filtered(lambda c: c.state in LIVE_STATES)
-        if live_contracts:
-            live_contracts.mapped('tenant_id')._provision_edara_portal_tenant()
+        active_contracts = contracts.filtered(lambda c: c.state == 'active')
+        if active_contracts:
+            active_contracts.mapped('tenant_id')._provision_edara_portal_tenant()
         return contracts
 
     @api.constrains('start_date', 'end_date')
@@ -341,7 +341,7 @@ class EdaraLeaseContract(models.Model):
             for contract in live:
                 contract._generate_schedule_lines()
         if 'state' in vals or 'tenant_id' in vals:
-            self.filtered(lambda c: c.state in LIVE_STATES).mapped('tenant_id')._provision_edara_portal_tenant()
+            self.filtered(lambda c: c.state == 'active').mapped('tenant_id')._provision_edara_portal_tenant()
         return res
 
     def action_activate(self):
@@ -363,7 +363,8 @@ class EdaraLeaseContract(models.Model):
             # 'rented' once a lease covers today, 'reserved' while only a scheduled one exists.
             contract.unit_id.occupancy_status = contract.unit_id._lease_occupancy_state()
             contract._generate_schedule_lines()
-            contract.tenant_id._provision_edara_portal_tenant()
+            if contract.state == 'active':
+                contract.tenant_id._provision_edara_portal_tenant()
 
     def _check_can_start(self):
         self.ensure_one()

@@ -41,6 +41,7 @@ top of native Odoo Accounting, Portal, Contacts and Security.
         'views/unit_views.xml',
         'wizard/edara_lease_renewal_wizard_views.xml',
         'wizard/edara_deposit_transaction_wizard_views.xml',
+        'wizard/edara_service_charge_not_payable_wizard_views.xml',
         'views/payment_schedule_line_views.xml',
         'views/deposit_views.xml',
         'views/service_charge_views.xml',

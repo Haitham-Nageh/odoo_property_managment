@@ -54,6 +54,11 @@ class EdaraServiceCharge(models.Model):
             else:
                 charge.state = 'allocated'
 
+    def unlink(self):
+        if any(charge.line_ids for charge in self):
+            raise UserError(_("Cannot delete a service charge that has allocation lines. Remove or clear the lines first."))
+        return super().unlink()
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -63,7 +68,6 @@ class EdaraServiceCharge(models.Model):
 
     def action_generate_allocation(self):
         self.ensure_one()
-        self.line_ids.filtered(lambda l: not l.invoice_id).unlink()
         units = self.building_id.unit_ids.filtered('active')
         if not units:
             raise UserError(_("This building has no units to allocate a service charge to."))
@@ -72,14 +76,32 @@ class EdaraServiceCharge(models.Model):
             for unit in units
         }
         eligible_units = units.filtered(lambda u: tenant_by_unit[u])
-        if not eligible_units:
+        existing_uninvoiced = self.line_ids.filtered(lambda l: not l.invoice_id)
+        if not eligible_units and not existing_uninvoiced:
             raise UserError(_("None of this building's units currently have an active tenant to charge."))
-        amounts = self._compute_allocation(eligible_units)
+
+        amounts = self._compute_allocation(eligible_units) if eligible_units else {}
+        proposed_pairs = {(unit.id, tenant_by_unit[unit].id) for unit in amounts}
+        dropped_lines = [l for l in existing_uninvoiced if (l.unit_id.id, l.tenant_id.id) not in proposed_pairs]
+        if dropped_lines:
+            dropped_desc = ", ".join(
+                f"{l.unit_id.display_name} ({l.tenant_id.display_name})" for l in dropped_lines
+            )
+            raise UserError(_(
+                "Cannot regenerate allocation: the following (unit, tenant) pairs would be dropped: %s. "
+                "Use 'Remove as Not Payable' to resolve them before regenerating.",
+                dropped_desc,
+            ))
+
+        existing_uninvoiced.with_context(edara_allow_service_charge_line_unlink=True).unlink()
+        invoiced_pairs = {(l.unit_id.id, l.tenant_id.id) for l in self.line_ids.filtered('invoice_id')}
         vals_list = [
             (0, 0, {'unit_id': unit.id, 'tenant_id': tenant_by_unit[unit].id, 'amount': amount})
             for unit, amount in amounts.items()
+            if (unit.id, tenant_by_unit[unit].id) not in invoiced_pairs
         ]
-        self.line_ids = vals_list
+        if vals_list:
+            self.line_ids = vals_list
 
     def _compute_allocation(self, units):
         self.ensure_one()

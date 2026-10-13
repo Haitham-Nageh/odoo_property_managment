@@ -3591,6 +3591,7 @@ msgstr ""
 
 #. module: property_managment
 #: model:ir.model.fields,field_description:property_managment.field_edara_deposit_transaction_wizard__description
+#: model:ir.model.fields,field_description:property_managment.field_edara_service_charge_not_payable_wizard__reason
 msgid "Reason"
 msgstr "السبب"
 
@@ -6091,3 +6092,200 @@ msgstr "فواتير رسوم الخدمات"
 #: model:ir.ui.menu,name:property_managment.menu_edara_contract_overview
 msgid "Contract Overview"
 msgstr "نظرة عامة على العقود"
+
+#. module: property_managment
+#: model:ir.model,name:property_managment.model_edara_service_charge_not_payable_wizard
+msgid "Remove Service Charge Line as Not Payable"
+msgstr "إزالة بند رسوم الخدمة كغير قابل للدفع"
+
+#. module: property_managment
+#: model:ir.actions.act_window,name:property_managment.action_edara_service_charge_not_payable_wizard
+msgid "Remove as Not Payable"
+msgstr "إزالة كغير قابل للدفع"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_portal_grace_days
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_portal_grace_days
+msgid "Portal Grace Period (Days)"
+msgstr "فترة السماح للبوابة (أيام)"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_partner__edara_portal_settled_date
+msgid "Portal Settled Date"
+msgstr "تاريخ تسوية البوابة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_users__edara_portal_lifecycle_archived
+msgid "Lifecycle Archived"
+msgstr "مؤرشف عبر دورة الحياة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_company__edara_portal_grace_days
+msgid "Portal Grace Days (Days)"
+msgstr "فترة سماح البوابة (أيام)"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_res_config_settings__edara_portal_grace_days
+msgid "Portal Grace Days"
+msgstr "فترة سماح البوابة"
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_company__edara_portal_grace_days
+msgid ""
+"Number of days a tenant retains portal access after all qualifying lease "
+"contracts have ended and all qualifying obligations are settled."
+msgstr ""
+"عدد الأيام التي يحتفظ فيها المستأجر بالوصول إلى البوابة بعد انتهاء جميع "
+"عقود الإيجار المؤهلة وتسوية جميع الالتزامات المؤهلة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_company.py:0
+msgid "Portal grace days must be between 0 and 3650 days."
+msgstr "يجب أن تكون فترة سماح البوابة بين 0 و 3650 يومًا."
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid "Portal Access"
+msgstr "الوصول إلى البوابة"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid "Retention and grace period for tenant portal users"
+msgstr "فترة الاحتفاظ والسماح لمستخدمي بوابة المستأجرين"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.res_config_settings_view_form
+msgid "Days of portal access retained after contract end and obligations settlement."
+msgstr "أيام الوصول إلى البوابة المحتفظ بها بعد انتهاء العقد وتسوية الالتزامات."
+
+#. module: property_managment
+#: model:ir.model.fields,help:property_managment.field_res_users__edara_portal_lifecycle_archived
+msgid ""
+"Indicates the portal user was archived by the automated lifecycle cleanup "
+"rather than manually by an administrator."
+msgstr ""
+"يشير إلى أن مستخدم البوابة تمت أرشفته بواسطة التنظيف الآلي لدورة الحياة "
+"وليس يدويًا بواسطة المسؤول."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_partner.py:0
+msgid "Portal Provisioning: Missing Email"
+msgstr "تهيئة البوابة: البريد الإلكتروني مفقود"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_partner.py:0
+msgid "Tenant %s has an active contract but no email address configured. Add an email to provision portal access."
+msgstr "المستأجر %s لديه عقد نشط ولكن لم يتم ضبط بريد إلكتروني له. يرجى إضافة بريد إلكتروني لتهيئة الوصول إلى البوابة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_partner.py:0
+msgid "Portal Provisioning: Invalid Email"
+msgstr "تهيئة البوابة: بريد إلكتروني غير صالح"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_partner.py:0
+msgid "Tenant %(name)s has an invalid email '%(email)s'. Correct the email to provision portal access."
+msgstr "المستأجر %(name)s لديه بريد إلكتروني غير صالح '%(email)s'. يرجى تصحيح البريد الإلكتروني لتهيئة الوصول إلى البوابة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_partner.py:0
+msgid "Portal Provisioning: Login Conflict"
+msgstr "تهيئة البوابة: تعارض في اسم الدخول"
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/res_partner.py:0
+msgid "Login '%(login)s' for tenant %(name)s is already in use by another user account. Resolve the conflict to provision portal access."
+msgstr "اسم الدخول '%(login)s' للمستأجر %(name)s مستخدم بالفعل لحساب مستخدم آخر. يرجى حل التعارض لتهيئة الوصول إلى البوابة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_service_charge.py:0
+msgid "Cannot delete service charge '%(charge)s' because it has %(count)d existing charge lines. Delete or remove the lines first."
+msgstr "لا يمكن حذف رسوم الخدمات '%(charge)s' لوجود %(count)d بند رسوم مرتبط بها. يرجى حذف أو إزالة البنود أولاً."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_service_charge.py:0
+msgid ""
+"Cannot regenerate allocation: the following unit/tenant allocations would be lost:\n"
+"%(dropped)s\n"
+"Remove individual lines as not payable if they are no longer owed."
+msgstr ""
+"لا يمكن إعادة إنشاء التوزيع: ستفقد توزيعات الوحدات/المستأجرين التالية:\n"
+"%(dropped)s\n"
+"يرجى إزالة البنود الفردية كغير قابلة للدفع إذا لم تعد مستحقة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_service_charge_line.py:0
+msgid "Invoiced service charge lines cannot be deleted. Credit note the invoice or reverse the transaction."
+msgstr "لا يمكن حذف بنود رسوم الخدمات المفوترة. يرجى إنشاء إشعار دائن للفاتورة أو عكس المعاملة."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_service_charge_line.py:0
+msgid "Service charge lines cannot be deleted directly. Use the 'Remove as Not Payable' action if this line is no longer owed."
+msgstr "لا يمكن حذف بنود رسوم الخدمات مباشرة. استخدم إجراء 'إزالة كغير قابل للدفع' إذا لم يعد هذا البند مستحقًا."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/models/edara_service_charge_line.py:0
+msgid "Cannot modify immutable field '%(field)s' on service charge line."
+msgstr "لا يمكن تعديل الحقل غير القابل للتغيير '%(field)s' في بند رسوم الخدمات."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/wizard/edara_service_charge_not_payable_wizard.py:0
+msgid "Only branch managers and higher can remove service charge lines as not payable."
+msgstr "يمكن لمديري الفروع فقط ومن هم أعلى إزالة بنود رسوم الخدمات كغير قابلة للدفع."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/wizard/edara_service_charge_not_payable_wizard.py:0
+msgid "The selected service charge line no longer exists."
+msgstr "بند رسوم الخدمات المحدد لم يعد موجودًا."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/wizard/edara_service_charge_not_payable_wizard.py:0
+msgid "An invoiced service charge line cannot be removed as not payable."
+msgstr "لا يمكن إزالة بند رسوم خدمات مفوتر كغير قابل للدفع."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/wizard/edara_service_charge_not_payable_wizard.py:0
+msgid "A reason is required to remove this service charge line."
+msgstr "السبب مطلوب لإزالة بند رسوم الخدمات هذا."
+
+#. module: property_managment
+#. odoo-python
+#: code:addons/property_managment/wizard/edara_service_charge_not_payable_wizard.py:0
+msgid ""
+"Service charge line for %(charge)s (Unit: %(unit)s, Amount: %(amount)s %(currency)s) was removed as not payable.\n"
+"Reason: %(reason)s"
+msgstr ""
+"تمت إزالة بند رسوم الخدمات لـ %(charge)s (الوحدة: %(unit)s، المبلغ: %(amount)s %(currency)s) كغير قابل للدفع.\n"
+"السبب: %(reason)s"
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.edara_service_charge_not_payable_wizard_view_form
+msgid "State why this service charge line is not payable by the tenant (e.g. vacated early, disputed, billing waiver)..."
+msgstr "وضح سبب عدم قابلية دفع بند رسوم الخدمات هذا من قبل المستأجر (مثل: الإخلاء المبكر، نزاع، إعفاء من الفوترة)..."
+
+#. module: property_managment
+#: model_terms:ir.ui.view,arch_db:property_managment.edara_service_charge_not_payable_wizard_view_form
+msgid "Confirm Removal"
+msgstr "تأكيد الإزالة"
+
+#. module: property_managment
+#: model:ir.model.fields,field_description:property_managment.field_edara_service_charge_not_payable_wizard__line_id
+msgid "Service Charge Line"
+msgstr "بند رسوم الخدمات"
+

@@ -1,8 +1,15 @@
-from odoo import api, models
+from odoo import api, fields, models
 
 
 class ResUsers(models.Model):
     _inherit = 'res.users'
+
+    edara_portal_lifecycle_archived = fields.Boolean(
+        string='Lifecycle Archived',
+        default=False,
+        copy=False,
+        help="Indicates whether this portal user was archived by the automated lifecycle cleanup job.",
+    )
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -11,6 +18,11 @@ class ResUsers(models.Model):
         return users
 
     def write(self, vals):
+        if 'active' in vals:
+            if not vals['active'] and 'edara_portal_lifecycle_archived' not in vals:
+                vals = dict(vals, edara_portal_lifecycle_archived=False)
+            elif vals['active']:
+                vals = dict(vals, edara_portal_lifecycle_archived=False)
         res = super().write(vals)
         if 'group_ids' in vals or 'partner_id' in vals or 'active' in vals:
             self._sync_edara_portal_tenant_group()
@@ -19,8 +31,9 @@ class ResUsers(models.Model):
     def _sync_edara_portal_tenant_group(self):
         """When a res.users record is created or updated with base.group_portal,
         automatically grant property_managment.group_edara_portal_tenant if the user's
-        linked partner has any live EDARA lease contract (scheduled or active).
+        linked partner has an active EDARA lease contract.
         Handles Scenario B (user created or granted portal access first).
+        Internal users are never modified.
         """
         portal_group = self.env.ref('base.group_portal', raise_if_not_found=False)
         edara_portal_group = self.env.ref('property_managment.group_edara_portal_tenant', raise_if_not_found=False)
@@ -28,11 +41,13 @@ class ResUsers(models.Model):
             return
 
         for user in self.sudo():
+            if user.has_group('base.group_user'):
+                continue
             if portal_group in user.group_ids and edara_portal_group not in user.group_ids:
                 if user.partner_id:
-                    has_live_lease = self.env['edara.lease.contract'].sudo().search_count([
+                    has_active_lease = self.env['edara.lease.contract'].sudo().search_count([
                         ('tenant_id', '=', user.partner_id.id),
-                        ('state', 'in', ['scheduled', 'active']),
+                        ('state', '=', 'active'),
                     ]) > 0
-                    if has_live_lease:
+                    if has_active_lease:
                         user.write({'group_ids': [(4, edara_portal_group.id)]})
