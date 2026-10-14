@@ -13,7 +13,11 @@ def _today():
 @tagged('post_install', '-at_install')
 class TestEdaraNotificationsBase(TransactionCase):
     """Shared fixtures for Notifications & Reminders Automation (2026-09-22) +
-    MAT-FIND-007 business-level manual triggers."""
+    MAT-FIND-007 business-level manual triggers.
+
+    Reminder count assertions run as this fixture's branch manager so a
+    populated development database's real leases/renewals cannot affect them.
+    """
 
     @classmethod
     def setUpClass(cls):
@@ -62,7 +66,7 @@ class TestEdaraLeaseExpiryReminders(TestEdaraNotificationsBase):
 
     def test_eligible_lease_within_30_days_receives_reminder(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=25))
-        sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        sent = self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(sent, 1)
         activities = contract.activity_ids.filtered(lambda a: a.activity_type_id == self.lease_expiry_type)
         self.assertEqual(len(activities), 1)
@@ -71,29 +75,29 @@ class TestEdaraLeaseExpiryReminders(TestEdaraNotificationsBase):
 
     def test_non_eligible_lease_outside_window_no_reminder(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=60))
-        sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        sent = self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(sent, 0)
         self.assertFalse(contract.activity_ids.filtered(lambda a: a.activity_type_id == self.lease_expiry_type))
 
     def test_reminder_boundary_exact_30_days_included(self):
         """BD-003's own inclusive boundary (today..today+30) is reused as-is."""
         contract = self._make_contract(end_date=_today() + timedelta(days=30))
-        sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        sent = self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(sent, 1)
 
     def test_reminder_boundary_31_days_not_yet_eligible(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=31))
-        sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        sent = self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(sent, 0)
 
     def test_urgent_window_escalates_after_wider_window_already_sent(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=25))
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(contract.last_expiry_reminder_days, 30)
         # Simulate the calendar advancing 20 days, into the urgent (7-day) window.
         later = _today() + timedelta(days=20)
         with patch.object(fields.Date, 'context_today', staticmethod(lambda record, timestamp=None: later)):
-            sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+            sent = self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(sent, 1)
         self.assertEqual(contract.last_expiry_reminder_days, 7)
         activities = contract.activity_ids.filtered(lambda a: a.activity_type_id == self.lease_expiry_type)
@@ -101,8 +105,8 @@ class TestEdaraLeaseExpiryReminders(TestEdaraNotificationsBase):
 
     def test_repeated_cron_same_day_does_not_duplicate(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=25))
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         activities = contract.activity_ids.filtered(lambda a: a.activity_type_id == self.lease_expiry_type)
         self.assertEqual(len(activities), 1)
 
@@ -110,28 +114,28 @@ class TestEdaraLeaseExpiryReminders(TestEdaraNotificationsBase):
         """Manual trigger reuses the exact same cron method - see
         edara.dashboard.action_manual_process_reminders()."""
         contract = self._make_contract(end_date=_today() + timedelta(days=10))
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         activities = contract.activity_ids.filtered(lambda a: a.activity_type_id == self.lease_expiry_type)
         self.assertEqual(len(activities), 1)
 
     def test_non_active_contract_not_reminded(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=10))
         contract.action_terminate('done early')
-        sent = self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        sent = self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(sent, 0)
 
     def test_tenant_notified_via_chatter(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=10))
         before = len(contract.message_ids)
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         after = contract.message_ids
         self.assertGreater(len(after), before)
         self.assertIn(self.tenant, after[:len(after) - before].mapped('partner_ids'))
 
     def test_reminder_never_changes_rent_or_dates(self):
         contract = self._make_contract(end_date=_today() + timedelta(days=10), rent_amount=1234)
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         self.assertEqual(contract.rent_amount, 1234)
         self.assertEqual(contract.end_date, _today() + timedelta(days=10))
 
@@ -146,7 +150,7 @@ class TestEdaraRenewalReminders(TestEdaraNotificationsBase):
             'requested_start_date': date(2031, 1, 1), 'requested_end_date': date(2031, 12, 31),
             'requested_rent_amount': 1100,
         })
-        sent = self.env['edara.renewal.request']._cron_send_renewal_reminders()
+        sent = self.env['edara.renewal.request'].with_user(self.branch_manager)._cron_send_renewal_reminders()
         self.assertEqual(sent, 1)
         activities = request.activity_ids.filtered(lambda a: a.activity_type_id == self.renewal_type)
         self.assertEqual(activities.user_id, self.branch_manager)
@@ -159,7 +163,7 @@ class TestEdaraRenewalReminders(TestEdaraNotificationsBase):
             'requested_rent_amount': 1100,
         })
         request.action_approve()
-        sent = self.env['edara.renewal.request']._cron_send_renewal_reminders()
+        sent = self.env['edara.renewal.request'].with_user(self.branch_manager)._cron_send_renewal_reminders()
         self.assertEqual(sent, 0)
 
     def test_repeated_processing_does_not_duplicate(self):
@@ -169,8 +173,8 @@ class TestEdaraRenewalReminders(TestEdaraNotificationsBase):
             'requested_start_date': date(2031, 1, 1), 'requested_end_date': date(2031, 12, 31),
             'requested_rent_amount': 1100,
         })
-        self.env['edara.renewal.request']._cron_send_renewal_reminders()
-        self.env['edara.renewal.request']._cron_send_renewal_reminders()
+        self.env['edara.renewal.request'].with_user(self.branch_manager)._cron_send_renewal_reminders()
+        self.env['edara.renewal.request'].with_user(self.branch_manager)._cron_send_renewal_reminders()
         activities = request.activity_ids.filtered(lambda a: a.activity_type_id == self.renewal_type)
         self.assertEqual(len(activities), 1)
 
@@ -181,12 +185,37 @@ class TestEdaraRenewalReminders(TestEdaraNotificationsBase):
             'requested_start_date': date(2031, 1, 1), 'requested_end_date': date(2031, 12, 31),
             'requested_rent_amount': 1500,
         })
-        self.env['edara.renewal.request']._cron_send_renewal_reminders()
+        self.env['edara.renewal.request'].with_user(self.branch_manager)._cron_send_renewal_reminders()
         self.assertEqual(contract.rent_amount, 1000)
 
 
 @tagged('post_install', '-at_install')
 class TestEdaraOverduePaymentReminders(TestEdaraNotificationsBase):
+
+    def test_reminder_refreshes_uninvoiced_line_after_day_rollover(self):
+        contract = self._make_contract(start_date=_today(), end_date=_today() + timedelta(days=60))
+        line = contract.schedule_line_ids[:1]
+        self.assertEqual(line.state, 'draft')
+        self.env.flush_all()
+        tomorrow = _today() + timedelta(days=1)
+        with patch.object(fields.Date, 'context_today', staticmethod(lambda record, timestamp=None: tomorrow)):
+            self.env['edara.payment.schedule.line'].with_user(self.branch_manager)._cron_send_overdue_reminders()
+        self.assertEqual(line.state, 'overdue')
+        self.assertTrue(line.activity_ids.filtered(lambda a: a.activity_type_id == self.overdue_type))
+        self.assertFalse(contract.schedule_line_ids[1:].filtered(lambda l: l.state == 'overdue'))
+
+    def test_reminder_refreshes_unpaid_invoice_after_day_rollover(self):
+        contract = self._make_contract(start_date=_today(), end_date=_today() + timedelta(days=60))
+        line = contract.schedule_line_ids[:1]
+        invoice = line._create_invoice()
+        self.assertEqual(line.state, 'invoiced')
+        self.env.flush_all()
+        tomorrow = _today() + timedelta(days=1)
+        with patch.object(fields.Date, 'context_today', staticmethod(lambda record, timestamp=None: tomorrow)):
+            self.env['edara.payment.schedule.line'].with_user(self.branch_manager)._cron_send_overdue_reminders()
+        self.assertEqual(line.state, 'overdue')
+        self.assertTrue(line.activity_ids.filtered(lambda a: a.activity_type_id == self.overdue_type))
+        self.assertEqual(line.invoice_id, invoice)
 
     def setUp(self):
         super().setUp()
@@ -205,7 +234,7 @@ class TestEdaraOverduePaymentReminders(TestEdaraNotificationsBase):
     def test_current_line_not_reminded(self):
         contract = self._make_contract(
             start_date=_today() + timedelta(days=10), end_date=_today() + timedelta(days=400))
-        sent = self.env['edara.payment.schedule.line']._cron_send_overdue_reminders()
+        sent = self.env['edara.payment.schedule.line'].with_user(self.branch_manager)._cron_send_overdue_reminders()
         self.assertEqual(sent, 0)
 
     def test_repeated_processing_is_idempotent(self):
@@ -228,7 +257,7 @@ class TestEdaraOverduePaymentReminders(TestEdaraNotificationsBase):
         line = contract.schedule_line_ids[:1]
         line._create_invoice()
         self.assertNotEqual(line.state, 'overdue')
-        sent = self.env['edara.payment.schedule.line']._cron_send_overdue_reminders()
+        sent = self.env['edara.payment.schedule.line'].with_user(self.branch_manager)._cron_send_overdue_reminders()
         self.assertEqual(sent, 0)
 
 
@@ -398,7 +427,7 @@ class TestEdaraNotificationSecurityAndIsolation(TestEdaraNotificationsBase):
             {'name': 'NOT-102', 'code': 'NOT102', 'building_id': self.building.id})
         contract = self._make_contract(unit_id=other_unit.id, tenant_id=other_tenant.id,
                                         end_date=_today() + timedelta(days=10))
-        self.env['edara.lease.contract']._cron_send_expiry_reminders()
+        self.env['edara.lease.contract'].with_user(self.branch_manager)._cron_send_expiry_reminders()
         messages = contract.message_ids
         self.assertNotIn(self.tenant, messages.mapped('partner_ids'))
 

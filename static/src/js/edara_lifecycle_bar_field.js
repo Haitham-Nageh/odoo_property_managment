@@ -3,7 +3,7 @@
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { useService } from "@web/core/utils/hooks";
-import { Component } from "@odoo/owl";
+import { Component, useProps } from "@odoo/owl";
 
 const ALLOWED_METHODS = [
     "action_view_contracts_active",
@@ -21,9 +21,9 @@ const EMPTY = { total: 0, groups: [] };
 
 export class EdaraLifecycleBarField extends Component {
     static template = "property_managment.EdaraLifecycleBarField";
-    static props = {
+    props = useProps({
         ...standardFieldProps,
-    };
+    });
 
     setup() {
         this.action = useService("action");

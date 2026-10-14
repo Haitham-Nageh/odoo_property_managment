@@ -24,19 +24,19 @@
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                             invisible="active"/>
                     <div class="oe_button_box" name="button_box">
-                        <button type="object" name="action_view_buildings" class="oe_stat_button" icon="fa-building">
+                        <button type="object" name="action_view_buildings" class="oe_stat_button" icon="business">
                             <field name="building_count" widget="statinfo" string="Buildings"/>
                         </button>
-                        <button type="object" name="action_view_units" class="oe_stat_button" icon="fa-home">
+                        <button type="object" name="action_view_units" class="oe_stat_button" icon="home">
                             <field name="unit_count" widget="statinfo" string="Units"/>
                         </button>
-                        <button type="object" name="action_view_expenses" class="oe_stat_button" icon="fa-money"
+                        <button type="object" name="action_view_expenses" class="oe_stat_button" icon="payments"
                                 invisible="not has_accounting_access">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Expenses</span>
                             </div>
                         </button>
-                        <button type="object" name="action_view_invoices" class="oe_stat_button" icon="fa-file-text-o"
+                        <button type="object" name="action_view_invoices" class="oe_stat_button" icon="description"
                                 invisible="not has_accounting_access">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Invoices</span>

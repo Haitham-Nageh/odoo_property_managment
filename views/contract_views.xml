@@ -137,16 +137,16 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button type="object" name="action_view_schedule_lines" class="oe_stat_button" icon="fa-calendar">
+                        <button type="object" name="action_view_schedule_lines" class="oe_stat_button" icon="calendar_today">
                             <field name="schedule_line_count" widget="statinfo" string="Schedule"/>
                         </button>
-                        <button type="object" name="action_view_deposit" class="oe_stat_button" icon="fa-shield"
+                        <button type="object" name="action_view_deposit" class="oe_stat_button" icon="security"
                                 invisible="not deposit_required">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Deposit</span>
                             </div>
                         </button>
-                        <button type="object" name="action_view_renewal_requests" class="oe_stat_button" icon="fa-refresh">
+                        <button type="object" name="action_view_renewal_requests" class="oe_stat_button" icon="autorenew">
                             <field name="renewal_request_count" widget="statinfo" string="Renewals"/>
                         </button>
                     </div>

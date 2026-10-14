@@ -5,20 +5,20 @@
             <div class="o_edara_invoice_metrics">
                 <button type="button" class="o_edara_invoice_metric" t-on-click="() => this.openInvoices()">
                     <span class="o_invoice_metric_label">Billing Invoices</span>
-                    <span class="o_invoice_metric_value"><t t-esc="chartData.count"/></span>
+                    <span class="o_invoice_metric_value"><t t-esc="this.chartData.count"/></span>
                 </button>
                 <button type="button" class="o_edara_invoice_metric" t-on-click="() => this.openInvoices()">
                     <span class="o_invoice_metric_label">Invoice Amount</span>
-                    <span class="o_invoice_metric_value"><t t-esc="formatAmount(chartData.amount)"/></span>
+                    <span class="o_invoice_metric_value"><t t-esc="this.formatAmount(this.chartData.amount)"/></span>
                 </button>
             </div>
             <div class="o_edara_invoice_chart_head">
                 <span class="o_invoice_chart_title">Invoice Activity</span>
                 <span class="o_invoice_chart_caption">By Month</span>
             </div>
-            <t t-if="hasActivity">
+            <t t-if="this.hasActivity">
                 <div class="o_edara_invoice_canvas position-relative">
-                    <canvas t-ref="canvas"/>
+                    <canvas t-ref="this.canvasRef"/>
                 </div>
             </t>
             <t t-else="">

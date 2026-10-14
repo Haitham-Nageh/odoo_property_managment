@@ -23,7 +23,7 @@
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                             invisible="active"/>
                     <div class="oe_button_box" name="button_box">
-                        <button type="object" name="action_view_properties" class="oe_stat_button" icon="fa-building-o">
+                        <button type="object" name="action_view_properties" class="oe_stat_button" icon="business">
                             <field name="property_count" widget="statinfo" string="Properties"/>
                         </button>
                     </div>

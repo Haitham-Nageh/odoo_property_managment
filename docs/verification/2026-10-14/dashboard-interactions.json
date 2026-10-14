@@ -1,0 +1,132 @@
+{
+  "checks": [
+    {
+      "name": "all_branches_units",
+      "status": "PASS"
+    },
+    {
+      "name": "branch_controls_enabled",
+      "status": "PASS",
+      "detail": [
+        {
+          "text": "جميع الفروع",
+          "disabled": false
+        },
+        {
+          "text": "DEMO - Al Quds Branch",
+          "disabled": false
+        },
+        {
+          "text": "DEMO - Ramallah Branch",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "branch_DEMO - Ramallah Branch",
+      "status": "PASS",
+      "detail": {
+        "unit_count": "7"
+      }
+    },
+    {
+      "name": "branch_DEMO - Al Quds Branch",
+      "status": "PASS",
+      "detail": {
+        "unit_count": "5"
+      }
+    },
+    {
+      "name": "branch_All Branches",
+      "status": "PASS",
+      "detail": {
+        "unit_count": "12"
+      }
+    },
+    {
+      "name": "overdue_kpi_26",
+      "status": "PASS"
+    },
+    {
+      "name": "maintenance_expense_450",
+      "status": "PASS"
+    },
+    {
+      "name": "reporting_period_changed",
+      "status": "PASS"
+    },
+    {
+      "name": "charts_render_after_branch_changes",
+      "status": "PASS",
+      "detail": [
+        {
+          "width": 1008,
+          "height": 190
+        },
+        {
+          "width": 1008,
+          "height": 200
+        },
+        {
+          "width": 220,
+          "height": 220
+        },
+        {
+          "width": 150,
+          "height": 150
+        },
+        {
+          "width": 1536,
+          "height": 150
+        }
+      ]
+    },
+    {
+      "name": "occupancy_drilldown_available_units",
+      "status": "PASS"
+    },
+    {
+      "name": "schedule_all_43",
+      "status": "PASS"
+    },
+    {
+      "name": "schedule_shortcut_paid",
+      "status": "PASS",
+      "detail": {
+        "rows": 4
+      }
+    },
+    {
+      "name": "schedule_shortcut_clear_paid",
+      "status": "PASS"
+    },
+    {
+      "name": "schedule_shortcut_overdue",
+      "status": "PASS",
+      "detail": {
+        "rows": 26
+      }
+    },
+    {
+      "name": "schedule_shortcut_clear_overdue",
+      "status": "PASS"
+    },
+    {
+      "name": "schedule_shortcut_draft",
+      "status": "PASS",
+      "detail": {
+        "rows": 13
+      }
+    },
+    {
+      "name": "schedule_shortcut_clear_draft",
+      "status": "PASS"
+    },
+    {
+      "name": "no_interaction_console_errors",
+      "status": "PASS",
+      "detail": []
+    }
+  ],
+  "errors": []
+}

@@ -104,7 +104,7 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button type="object" name="action_view_vendor_bill" class="oe_stat_button" icon="fa-money"
+                        <button type="object" name="action_view_vendor_bill" class="oe_stat_button" icon="payments"
                                 invisible="not vendor_bill_id or not has_accounting_access">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Vendor Bill</span>

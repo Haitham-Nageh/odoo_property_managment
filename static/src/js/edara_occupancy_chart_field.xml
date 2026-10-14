@@ -5,23 +5,23 @@
             <!-- Header with Title and Under Maintenance Operational Indicator -->
             <div class="o_edara_occupancy_header d-flex align-items-center justify-content-between mb-2 pb-1">
                 <div class="d-flex align-items-center gap-2">
-                    <i class="fa fa-pie-chart text-primary fs-5"/>
+                    <i class="oi text-primary fs-5" data-icon="pie_chart"/>
                     <span class="fw-bold fs-6 text-dark">Occupancy Distribution</span>
                 </div>
-                <div t-if="chartData.under_maintenance"
+                <div t-if="this.chartData.under_maintenance"
                      class="o_operational_indicator btn btn-sm btn-outline-warning d-flex align-items-center gap-2"
                      role="button"
-                     t-att-title="underMaintenanceTitle"
-                     t-on-click="() => this.onSliceClick(chartData.under_maintenance.action_method)">
-                    <i class="fa fa-wrench"/>
-                    <span>Under Maintenance: <strong><t t-esc="chartData.under_maintenance.count"/></strong></span>
+                     t-att-title="this.underMaintenanceTitle"
+                     t-on-click="() => this.onSliceClick(this.chartData.under_maintenance.action_method)">
+                    <i class="oi" data-icon="build"/>
+                    <span>Under Maintenance: <strong><t t-esc="this.chartData.under_maintenance.count"/></strong></span>
                 </div>
             </div>
 
             <!-- Zero / Empty State -->
-            <t t-if="chartData.total === 0">
+            <t t-if="this.chartData.total === 0">
                 <div class="o_edara_chart_empty_state text-center py-4 text-muted">
-                    <i class="fa fa-pie-chart fa-3x mb-2 text-muted opacity-50"/>
+                    <i class="oi oi-3x mb-2 text-muted opacity-50" data-icon="pie_chart"/>
                     <div class="fw-semibold">No units in portfolio</div>
                     <div class="small text-muted">Occupancy distribution will appear once units are added.</div>
                 </div>
@@ -32,19 +32,19 @@
                 <div class="o_edara_occupancy_body row align-items-center g-3">
                     <div class="col-12 col-md-5 d-flex justify-content-center">
                         <div class="o_edara_chart_canvas_wrapper position-relative">
-                            <canvas t-ref="canvas"/>
+                            <canvas t-ref="this.canvasRef"/>
                             <div class="o_edara_doughnut_center text-center">
-                                <span class="fs-4 fw-bold text-dark"><t t-esc="chartData.total"/></span>
-                                <span class="text-muted small d-block"><t t-esc="totalUnitsLabel"/></span>
+                                <span class="fs-4 fw-bold text-dark"><t t-esc="this.chartData.total"/></span>
+                                <span class="text-muted small d-block"><t t-esc="this.totalUnitsLabel"/></span>
                             </div>
                         </div>
                     </div>
                     <div class="col-12 col-md-7">
                         <div class="o_edara_occupancy_legend d-flex flex-column gap-2">
-                            <div t-foreach="chartData.slices" t-as="slice" t-key="slice.status"
+                            <div t-foreach="this.chartData.slices" t-as="slice" t-key="slice.status"
                                  class="o_occupancy_legend_item d-flex align-items-center justify-content-between p-2 rounded"
                                  role="button"
-                                 t-att-title="getSliceTitle(slice)"
+                                 t-att-title="this.getSliceTitle(slice)"
                                  t-on-click="() => this.onSliceClick(slice.action_method)">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="o_legend_color_dot" t-attf-style="background-color: {{ slice.color }}"/>
@@ -52,7 +52,7 @@
                                 </div>
                                 <div class="d-flex align-items-center gap-3">
                                     <span class="badge bg-light text-dark border px-2 py-1"><t t-esc="slice.count"/></span>
-                                    <span class="text-muted small text-end" style="min-width: 45px;"><t t-esc="getPercentage(slice.count)"/>%</span>
+                                    <span class="text-muted small text-end" style="min-width: 45px;"><t t-esc="this.getPercentage(slice.count)"/>%</span>
                                 </div>
                             </div>
                         </div>

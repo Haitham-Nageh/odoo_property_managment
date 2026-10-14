@@ -2,28 +2,28 @@
 <templates xml:space="preserve">
     <t t-name="property_managment.EdaraDepositDonutField">
         <div class="o_edara_deposit_widget w-100">
-            <t t-if="isEmpty">
+            <t t-if="this.isEmpty">
                 <div class="o_edara_deposit_empty text-muted small py-2">No security deposits collected</div>
             </t>
             <t t-else="">
                 <div class="o_edara_deposit_body">
                     <div class="o_edara_deposit_canvas position-relative">
-                        <canvas t-ref="canvas"/>
+                        <canvas t-ref="this.canvasRef"/>
                         <div class="o_edara_doughnut_center text-center">
-                            <span class="o_deposit_center_amount fw-bold"><t t-esc="centerAmount"/></span>
-                            <span class="text-muted small d-block"><t t-esc="totalLabel"/></span>
+                            <span class="o_deposit_center_amount fw-bold"><t t-esc="this.centerAmount"/></span>
+                            <span class="text-muted small d-block"><t t-esc="this.totalLabel"/></span>
                         </div>
                     </div>
                     <div class="o_edara_deposit_legend">
-                        <button t-foreach="chartData.slices" t-as="slice" t-key="slice.status"
+                        <button t-foreach="this.chartData.slices" t-as="slice" t-key="slice.status"
                                 type="button"
                                 class="o_edara_deposit_item"
-                                t-att-title="sliceTitle(slice)"
+                                t-att-title="this.sliceTitle(slice)"
                                 t-on-click="() => this.onSliceClick(slice.action_method)">
                             <span class="o_legend_color_dot" t-attf-style="background-color: {{ slice.color }}"/>
                             <span class="o_deposit_item_label"><t t-esc="slice.label"/></span>
-                            <span class="o_deposit_item_amount"><t t-esc="formatAmount(slice.amount)"/></span>
-                            <span class="o_deposit_item_count text-muted"><t t-esc="countLabel(slice)"/></span>
+                            <span class="o_deposit_item_amount"><t t-esc="this.formatAmount(slice.amount)"/></span>
+                            <span class="o_deposit_item_count text-muted"><t t-esc="this.countLabel(slice)"/></span>
                         </button>
                     </div>
                 </div>

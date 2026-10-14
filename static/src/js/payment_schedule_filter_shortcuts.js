@@ -20,7 +20,7 @@ import { registry } from "@web/core/registry";
 import { listView } from "@web/views/list/list_view";
 import { ListController } from "@web/views/list/list_controller";
 import { useBus } from "@web/core/utils/hooks";
-import { useState, onWillStart, onWillUnmount, status } from "@odoo/owl";
+import { proxy, onWillStart, onWillUnmount, status } from "@odoo/owl";
 
 const SHORTCUT_FILTER_NAMES = ["paid", "overdue", "draft"];
 
@@ -40,7 +40,7 @@ export class EdaraPaymentScheduleFilterShortcutsController extends ListControlle
         this._pendingScope = null;
         this._currentScopeKey = null;
 
-        this.state = useState({
+        this.state = proxy({
             counts: {
                 draft: 0,
                 paid: 0,

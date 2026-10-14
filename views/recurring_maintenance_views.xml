@@ -45,7 +45,7 @@
             <form string="Recurring Maintenance">
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button type="object" name="action_view_generated_requests" class="oe_stat_button" icon="fa-wrench">
+                        <button type="object" name="action_view_generated_requests" class="oe_stat_button" icon="build">
                             <div class="o_stat_info">
                                 <span class="o_stat_value"><field name="generated_request_count"/></span>
                                 <span class="o_stat_text">Generated Requests</span>

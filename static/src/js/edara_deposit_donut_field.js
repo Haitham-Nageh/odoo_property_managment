@@ -4,7 +4,7 @@ import { loadBundle } from "@web/core/assets";
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { useService } from "@web/core/utils/hooks";
-import { Component, onWillStart, useEffect, useRef } from "@odoo/owl";
+import { Component, onWillStart, useEffect, signal, useProps } from "@odoo/owl";
 import { cookie } from "@web/core/browser/cookie";
 import { getBorderWhite } from "@web/core/colors/colors";
 import { _t } from "@web/core/l10n/translation";
@@ -22,14 +22,20 @@ const EMPTY = { total: 0, currency: "", currency_symbol: "", currency_precision:
 
 export class EdaraDepositDonutField extends Component {
     static template = "property_managment.EdaraDepositDonutField";
-    static props = {
+    props = useProps({
         ...standardFieldProps,
-    };
+    });
 
     setup() {
         this.action = useService("action");
         this.orm = useService("orm");
-        this.canvasRef = useRef("canvas");
+        const ref = signal.ref();
+        Object.defineProperty(ref, "el", {
+            get() {
+                return ref();
+            },
+        });
+        this.canvasRef = ref;
         this.chart = null;
         this.isProcessingClick = false;
 

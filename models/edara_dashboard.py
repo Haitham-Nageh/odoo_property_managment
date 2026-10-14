@@ -243,7 +243,7 @@ class EdaraDashboard(models.TransientModel):
             domain.append(('edara_branch_id', '=', branch_id))
 
         groups = self.env['account.move']._read_group(domain, groupby=['currency_id'])
-        curr_records = self.env['res.currency'].concat(*[c for c, in groups if c])
+        curr_records = self.env['res.currency'].concat([c for c, in groups if c])
         if not curr_records:
             return comp_curr
         # Deterministic sorting: company currency first, then alphabetical by name, then by id
@@ -760,7 +760,7 @@ class EdaraDashboard(models.TransientModel):
         if not contracts:
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
-                '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
+                '<i class="oi text-success fs-5 mb-1 d-block" data-icon="check_circle"/>'
                 f'<span>{_("No leases expiring soon")}</span>'
                 '</div>'
             )
@@ -794,8 +794,8 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="me-2 text-truncate">'
                 f'<div class="fw-bold text-dark text-truncate">{tenant_name} '
                 f'<span class="text-muted fw-normal small">({contract_ref})</span></div>'
-                f'<div class="text-muted small text-truncate"><i class="fa fa-building-o me-1"/>{unit_info}</div>'
-                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>{expiry_line}</div>'
+                f'<div class="text-muted small text-truncate"><i class="oi me-1" data-icon="business"/>{unit_info}</div>'
+                f'<div class="text-muted small"><i class="oi me-1" data-icon="calendar_today"/>{expiry_line}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0">'
                 f'{badge}'
@@ -808,7 +808,7 @@ class EdaraDashboard(models.TransientModel):
         if not lines:
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
-                '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
+                '<i class="oi text-success fs-5 mb-1 d-block" data-icon="check_circle"/>'
                 f'<span>{_("No overdue payments")}</span>'
                 '</div>'
             )
@@ -833,7 +833,7 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="me-2 text-truncate">'
                 f'<div class="fw-bold text-dark text-truncate">{tenant_name} '
                 f'<span class="text-muted fw-normal small">({contract_ref}{unit_str})</span></div>'
-                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>{due_line}</div>'
+                f'<div class="text-muted small"><i class="oi me-1" data-icon="calendar_today"/>{due_line}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0">'
                 f'<div class="fw-bold text-danger">{amt_str}</div>'
@@ -847,7 +847,7 @@ class EdaraDashboard(models.TransientModel):
         if not requests:
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
-                '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
+                '<i class="oi text-success fs-5 mb-1 d-block" data-icon="check_circle"/>'
                 f'<span>{_("No maintenance requiring attention")}</span>'
                 '</div>'
             )
@@ -878,7 +878,7 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="me-2 text-truncate">'
                 f'<div class="fw-bold text-dark text-truncate">{title} '
                 f'<span class="text-muted fw-normal small">({ref})</span></div>'
-                f'<div class="text-muted small text-truncate"><i class="fa fa-wrench me-1"/>{unit_info}</div>'
+                f'<div class="text-muted small text-truncate"><i class="oi me-1" data-icon="build"/>{unit_info}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0 d-flex flex-column gap-1 align-items-end">'
                 f'{badges_html}'
@@ -891,7 +891,7 @@ class EdaraDashboard(models.TransientModel):
         if not renewals:
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
-                '<i class="fa fa-check-circle text-success fs-5 mb-1 d-block"/>'
+                '<i class="oi text-success fs-5 mb-1 d-block" data-icon="check_circle"/>'
                 f'<span>{_("No pending renewal decisions")}</span>'
                 '</div>'
             )
@@ -914,7 +914,7 @@ class EdaraDashboard(models.TransientModel):
                 f'<div class="me-2 text-truncate">'
                 f'<div class="fw-bold text-dark text-truncate">{tenant_name} '
                 f'<span class="text-muted fw-normal small">({contract_ref}{unit_str})</span></div>'
-                f'<div class="text-muted small"><i class="fa fa-calendar me-1"/>{requested_line}</div>'
+                f'<div class="text-muted small"><i class="oi me-1" data-icon="calendar_today"/>{requested_line}</div>'
                 f'</div>'
                 f'<div class="text-end flex-shrink-0">'
                 f'<div class="fw-bold text-primary">{rent_str}</div>'
@@ -961,7 +961,8 @@ class EdaraDashboard(models.TransientModel):
                 'subtitle': f"{tenant_name}{unit_str}",
                 'badge_label': _('Terminated'),
                 'badge_class': 'bg-danger-subtle text-danger border border-danger-subtle',
-                'icon_class': 'fa fa-ban text-danger',
+                'icon': 'block',
+                'icon_class': 'text-danger',
                 'icon_bg': 'bg-danger-subtle',
             })
 
@@ -998,7 +999,8 @@ class EdaraDashboard(models.TransientModel):
                 'subtitle': unit_str.strip(),
                 'badge_label': _('Completed'),
                 'badge_class': 'bg-success-subtle text-success border border-success-subtle',
-                'icon_class': 'fa fa-wrench text-success',
+                'icon': 'build',
+                'icon_class': 'text-success',
                 'icon_bg': 'bg-success-subtle',
             })
 
@@ -1016,7 +1018,8 @@ class EdaraDashboard(models.TransientModel):
                 if is_approved
                 else 'bg-danger-subtle text-danger border border-danger-subtle'
             )
-            icon_class = 'fa fa-check-circle text-success' if is_approved else 'fa fa-times-circle text-danger'
+            icon = 'check_circle' if is_approved else 'cancel'
+            icon_class = 'text-success' if is_approved else 'text-danger'
             icon_bg = 'bg-success-subtle' if is_approved else 'bg-danger-subtle'
 
             contract_str = ren.contract_id.name or _('Contract')
@@ -1030,6 +1033,7 @@ class EdaraDashboard(models.TransientModel):
                 'subtitle': tenant_str,
                 'badge_label': status_label,
                 'badge_class': badge_class,
+                'icon': icon,
                 'icon_class': icon_class,
                 'icon_bg': icon_bg,
             })
@@ -1077,14 +1081,15 @@ class EdaraDashboard(models.TransientModel):
                     'subtitle': subtitle,
                     'badge_label': _('Paid'),
                     'badge_class': 'bg-primary-subtle text-primary border border-primary-subtle',
-                    'icon_class': 'fa fa-money text-primary',
+                    'icon': 'payments',
+                    'icon_class': 'text-primary',
                     'icon_bg': 'bg-primary-subtle',
                 })
 
         if not activities:
             return (
                 '<div class="o_edara_empty_state text-center text-muted py-3">'
-                '<i class="fa fa-history text-muted fs-5 mb-1 d-block"/>'
+                '<i class="oi text-muted fs-5 mb-1 d-block" data-icon="history"/>'
                 f'<span>{_("No recent activity")}</span>'
                 '</div>'
             )
@@ -1113,7 +1118,7 @@ class EdaraDashboard(models.TransientModel):
             items.append(
                 f'<a href="{url}" class="o_activity_item text-reset">'
                 f'<div class="o_activity_icon {icon_bg}">'
-                f'<i class="{icon_class}"/>'
+                f'<i class="oi {icon_class}" data-icon="{act["icon"]}"></i>'
                 f'</div>'
                 f'<div class="o_activity_content me-2 text-truncate">'
                 f'<span class="fw-semibold text-dark">{title}</span>'

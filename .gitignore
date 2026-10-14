@@ -10,3 +10,6 @@ venv/
 .vscode/
 .idea/
 "@ | Out-File -Encoding utf8 .gitignore
+
+# Local tool permissions can contain credentials; keep them out of Git.
+/.claude/settings.local.json

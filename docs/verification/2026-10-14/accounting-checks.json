@@ -1,0 +1,109 @@
+{
+  "maintenance_before": [
+    {
+      "id": 867,
+      "name": false,
+      "state": "draft",
+      "amount_total": 450.0,
+      "date": "2026-10-13",
+      "invoice_date": "2026-10-13"
+    }
+  ],
+  "maintenance_after": [
+    {
+      "id": 867,
+      "name": "BILL/2026/10/0001",
+      "state": "posted",
+      "amount_total": 450.0,
+      "date": "2026-10-13",
+      "invoice_date": "2026-10-13"
+    }
+  ],
+  "maintenance_lines": [
+    {
+      "id": 1659,
+      "account_id": [
+        674,
+        "Property Maintenance Expenses"
+      ],
+      "debit": 450.0,
+      "credit": 0.0,
+      "currency_id": [
+        89,
+        "ILS"
+      ],
+      "amount_currency": 450.0,
+      "analytic_distribution": {
+        "205": 100.0
+      }
+    },
+    {
+      "id": 1660,
+      "account_id": [
+        14,
+        "Accounts Payable"
+      ],
+      "debit": 0.0,
+      "credit": 450.0,
+      "currency_id": [
+        89,
+        "ILS"
+      ],
+      "amount_currency": -450.0,
+      "analytic_distribution": false
+    }
+  ],
+  "duplicate_bill_prevented": true,
+  "repeated_completion_blocked": true,
+  "schedule_refreshed_count": 4,
+  "schedule_changes": [
+    {
+      "id": 18596,
+      "before": "draft",
+      "after": "overdue"
+    },
+    {
+      "id": 18617,
+      "before": "draft",
+      "after": "overdue"
+    },
+    {
+      "id": 18631,
+      "before": "draft",
+      "after": "overdue"
+    },
+    {
+      "id": 18650,
+      "before": "invoiced",
+      "after": "overdue"
+    }
+  ],
+  "schedule_states": {
+    "overdue": 26,
+    "paid": 4,
+    "draft": 13
+  },
+  "service_charge_checks": [
+    {
+      "charge": 177,
+      "line": 260,
+      "invoice": 868,
+      "amount": 2000.0,
+      "matching_contracts": [
+        2018
+      ],
+      "stored_contract": false
+    },
+    {
+      "charge": 177,
+      "line": 261,
+      "invoice": 869,
+      "amount": 3000.0,
+      "matching_contracts": [
+        2016
+      ],
+      "stored_contract": false
+    }
+  ],
+  "balanced_posted_moves": 23
+}

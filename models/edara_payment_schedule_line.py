@@ -401,15 +401,32 @@ class EdaraPaymentScheduleLine(models.Model):
         return lines._process_due_invoices()
 
     @api.model
+    def _refresh_overdue_states(self):
+        """Refresh stored states when time passes without a billing-field write.
+
+        Date dependencies do not invalidate themselves at midnight. Reuse the
+        existing computation for past-due candidates so settled/cancelled
+        invoices keep their normal state and no financial records are created.
+        The normal ORM search preserves the caller's company/branch scope.
+        """
+        lines = self.search([
+            ('due_date', '<', fields.Date.context_today(self)),
+            ('state', 'in', ('draft', 'invoiced')),
+        ])
+        lines._compute_state()
+        return len(lines)
+
+    @api.model
     def _cron_send_overdue_reminders(self):
         """Notifications & Reminders Automation (2026-09-22). One internal
         reminder per overdue line, assigned to the Branch Manager, plus a
         tenant-facing chatter notification on the parent contract (no new
-        payment ledger, no accounting side effect - purely observes the
-        already-authoritative computed `state`). Idempotent via "does an open
+        payment ledger, no accounting side effect). Refresh date-dependent
+        stored states before selecting reminders. Idempotent via "does an open
         activity of this type already exist on this line" - once a Branch
         Manager marks it done, a still-overdue line will be reminded again on
         the next run, which is the correct escalation behaviour."""
+        self._refresh_overdue_states()
         activity_type = self.env.ref('property_managment.mail_activity_type_edara_payment_overdue')
         lines = self.search([('state', '=', 'overdue')])
         sent = 0

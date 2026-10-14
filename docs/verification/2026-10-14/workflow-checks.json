@@ -1,0 +1,224 @@
+{
+  "results": [
+    {
+      "name": "valid_existing_fixture",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "create_lease_draft",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "activate_lease_and_unit",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "generate_monthly_schedule",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "active_dashboard_consistency",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_overlapping_active_lease",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "overdue_line",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "rent_invoice_posted_mapping",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "rent_invoice_analytic",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "rent_invoice_idempotent",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "late_fee_posted_mapping",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_duplicate_late_fee",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "rent_receivable_reconciled",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "installment_paid",
+      "status": "PASS",
+      "detail": {
+        "invoice_payment_state": "paid",
+        "payment_state": "reconciled"
+      }
+    },
+    {
+      "name": "deposit_collection_liability",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_duplicate_deposit_collection",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_excessive_deduction",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_excessive_refund",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "partial_deduction_accounting",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "partial_refund_accounting",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "renewal_request_approval",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_duplicate_renewal_approval",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "existing_renewal_wizard",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "terminate_cancels_successor_and_releases_unit",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "terminated_terms_protected",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "terminated_deposit_refund_closes_balance",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_duplicate_final_refund",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "reject_deduction_after_closed",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "maintenance_hierarchy_and_sla",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "maintenance_assigned_timestamp",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "maintenance_draft_bill_and_mapping",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "maintenance_done_timestamp",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "maintenance_no_duplicate_bill",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "maintenance_repeated_completion_blocked",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "vendor_payable_reconciled",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "new_posted_entries_balanced",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "unit_and_active_kpis_restored",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "all_test_business_records_rolled_back",
+      "status": "PASS",
+      "detail": {
+        "before": {
+          "edara.lease.contract": 6,
+          "edara.payment.schedule.line": 43,
+          "edara.deposit": 5,
+          "edara.deposit.transaction": 9,
+          "edara.maintenance.request": 4,
+          "account.move": 23,
+          "account.payment": 11
+        },
+        "after": {
+          "edara.lease.contract": 6,
+          "edara.payment.schedule.line": 43,
+          "edara.deposit": 5,
+          "edara.deposit.transaction": 9,
+          "edara.maintenance.request": 4,
+          "account.move": 23,
+          "account.payment": 11
+        }
+      }
+    }
+  ],
+  "failure": null,
+  "rolled_back_ids": {
+    "contract": 3476,
+    "rent_invoice": 1693,
+    "late_fee_invoice": 1694,
+    "deposit": 742,
+    "maintenance": 1033
+  }
+}

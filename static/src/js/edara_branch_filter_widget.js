@@ -1,18 +1,22 @@
 /** @odoo-module **/
 
-import { Component } from "@odoo/owl";
+import { Component, useProps } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { _t } from "@web/core/l10n/translation";
 
 export class EdaraBranchFilterWidget extends Component {
     static template = "property_managment.EdaraBranchFilterWidget";
-    static props = {
+    props = useProps({
         ...standardFieldProps,
-    };
+    });
 
     get allBranchesLabel() {
         return _t("All Branches");
+    }
+
+    get isReadonly() {
+        return Boolean(this.props?.readonly);
     }
 
     get currentBranchId() {

@@ -1,0 +1,153 @@
+{
+  "rollover-red.log": {
+    "summary": [
+      2,
+      0,
+      2
+    ],
+    "failed_cases": [
+      "TestEdaraOverduePaymentReminders.test_reminder_refreshes_uninvoiced_line_after_day_rollover",
+      "TestEdaraOverduePaymentReminders.test_reminder_refreshes_unpaid_invoice_after_day_rollover"
+    ],
+    "skipped_cases": [],
+    "executed_methods_per_module": {
+      "test_edara_notifications": 2
+    }
+  },
+  "rollover-green.log": {
+    "summary": [
+      2,
+      0,
+      6
+    ],
+    "failed_cases": [
+      "TestEdaraOverduePaymentReminders.test_current_line_not_reminded",
+      "TestEdaraOverduePaymentReminders.test_invoiced_not_yet_due_line_not_reminded"
+    ],
+    "skipped_cases": [],
+    "executed_methods_per_module": {
+      "test_edara_notifications": 6
+    }
+  },
+  "rollover-green-scoped.log": {
+    "summary": [
+      0,
+      1,
+      6
+    ],
+    "failed_cases": [
+      "tearDownClass (odoo.addons.property_managment.tests.test_edara_notifications.TestEdaraOverduePaymentReminders)"
+    ],
+    "skipped_cases": [],
+    "executed_methods_per_module": {
+      "test_edara_notifications": 6
+    }
+  },
+  "focused-safe.log": {
+    "summary": [
+      0,
+      0,
+      6
+    ],
+    "failed_cases": [],
+    "skipped_cases": [],
+    "executed_methods_per_module": {
+      "test_edara_notifications": 6
+    }
+  },
+  "full-suite-safe.log": {
+    "summary": [
+      10,
+      0,
+      845
+    ],
+    "failed_cases": [
+      "TestEdaraSlaTracking.test_response_and_resolution_hours_computed",
+      "TestEdaraLeaseExpiryReminders.test_eligible_lease_within_30_days_receives_reminder",
+      "TestEdaraLeaseExpiryReminders.test_non_active_contract_not_reminded",
+      "TestEdaraLeaseExpiryReminders.test_non_eligible_lease_outside_window_no_reminder",
+      "TestEdaraLeaseExpiryReminders.test_reminder_boundary_31_days_not_yet_eligible",
+      "TestEdaraLeaseExpiryReminders.test_reminder_boundary_exact_30_days_included",
+      "TestEdaraRenewalReminders.test_approved_request_not_reminded",
+      "TestEdaraRenewalReminders.test_submitted_request_gets_reminder",
+      "TestEdaraDashboardMaintenanceCostKpi.test_maintenance_cost_this_month_computed",
+      "TestEdaraDashboardMaintenanceCostKpi.test_maintenance_cost_this_month_excludes_other_months"
+    ],
+    "skipped_cases": [
+      "TestMatFind015DepositWizardJournalResolution.test_wizard_confirm_succeeds_end_to_end_for_edara_only_user : This company does not have exactly one Cash/Bank journal - ambiguous case is covered separately."
+    ],
+    "executed_methods_per_module": {
+      "test_edara_branch": 24,
+      "test_edara_dashboard": 132,
+      "test_edara_deposit": 51,
+      "test_edara_hardening": 5,
+      "test_edara_lease_billing": 23,
+      "test_edara_lease_contract": 47,
+      "test_edara_maintenance_phase2": 48,
+      "test_edara_maintenance_request": 12,
+      "test_edara_maintenance_vendor_bill": 24,
+      "test_edara_mat015_scoped_accounting": 19,
+      "test_edara_multicompany": 2,
+      "test_edara_notifications": 38,
+      "test_edara_payment_schedule": 41,
+      "test_edara_phase1011_fixes": 16,
+      "test_edara_phase1012_hardening": 16,
+      "test_edara_phase1013_occupancy_self_healing": 4,
+      "test_edara_phase10_lease_engine": 51,
+      "test_edara_phase7_hardening": 18,
+      "test_edara_phase8_currency": 10,
+      "test_edara_portal": 45,
+      "test_edara_portal_lifecycle": 28,
+      "test_edara_portal_provisioning": 16,
+      "test_edara_property": 51,
+      "test_edara_renewal_request": 17,
+      "test_edara_reporting_phase2": 33,
+      "test_edara_reports": 5,
+      "test_edara_security_isolation": 15,
+      "test_edara_service_charge": 33,
+      "test_edara_ticket_e": 21
+    }
+  },
+  "full-suite-final.log": {
+    "summary": [
+      0,
+      0,
+      845
+    ],
+    "failed_cases": [],
+    "skipped_cases": [
+      "TestMatFind015DepositWizardJournalResolution.test_wizard_confirm_succeeds_end_to_end_for_edara_only_user : This company does not have exactly one Cash/Bank journal - ambiguous case is covered separately."
+    ],
+    "executed_methods_per_module": {
+      "test_edara_branch": 24,
+      "test_edara_dashboard": 132,
+      "test_edara_deposit": 51,
+      "test_edara_hardening": 5,
+      "test_edara_lease_billing": 23,
+      "test_edara_lease_contract": 47,
+      "test_edara_maintenance_phase2": 48,
+      "test_edara_maintenance_request": 12,
+      "test_edara_maintenance_vendor_bill": 24,
+      "test_edara_mat015_scoped_accounting": 19,
+      "test_edara_multicompany": 2,
+      "test_edara_notifications": 38,
+      "test_edara_payment_schedule": 41,
+      "test_edara_phase1011_fixes": 16,
+      "test_edara_phase1012_hardening": 16,
+      "test_edara_phase1013_occupancy_self_healing": 4,
+      "test_edara_phase10_lease_engine": 51,
+      "test_edara_phase7_hardening": 18,
+      "test_edara_phase8_currency": 10,
+      "test_edara_portal": 45,
+      "test_edara_portal_lifecycle": 28,
+      "test_edara_portal_provisioning": 16,
+      "test_edara_property": 51,
+      "test_edara_renewal_request": 17,
+      "test_edara_reporting_phase2": 33,
+      "test_edara_reports": 5,
+      "test_edara_security_isolation": 15,
+      "test_edara_service_charge": 33,
+      "test_edara_ticket_e": 21
+    }
+  }
+}

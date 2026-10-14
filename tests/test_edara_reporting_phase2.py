@@ -339,7 +339,8 @@ class TestEdaraDashboardMaintenanceCostKpi(TestEdaraReportingPhase2Base):
 
     def test_maintenance_cost_this_month_computed(self):
         self._make_maintenance_with_bill(cost=350)
-        dashboard = self.env['edara.dashboard'].create({})
+        # Scope the assertion to this fixture, independently of posted demo bills.
+        dashboard = self.env['edara.dashboard'].create({'branch_id': self.branch.id})
         self.assertAlmostEqual(dashboard.maintenance_cost_this_month, 350)
 
     def test_maintenance_cost_this_month_excludes_other_months(self):
@@ -359,7 +360,7 @@ class TestEdaraDashboardMaintenanceCostKpi(TestEdaraReportingPhase2Base):
             })],
         })
         old_bill.action_post()
-        dashboard = self.env['edara.dashboard'].create({})
+        dashboard = self.env['edara.dashboard'].create({'branch_id': self.branch.id})
         self.assertEqual(dashboard.maintenance_cost_this_month, 0.0)
 
     def test_maintenance_cost_this_month_gated_for_viewer(self):

@@ -1,0 +1,295 @@
+{
+  "checks": [
+    {
+      "name": "legitimate_get_/my/dashboard",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/leases",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "own_contract_listed",
+      "status": "PASS"
+    },
+    {
+      "name": "foreign_contracts_absent",
+      "status": "PASS"
+    },
+    {
+      "name": "legitimate_get_/my/leases/2017",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/units",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_units_absent",
+      "status": "PASS"
+    },
+    {
+      "name": "legitimate_get_/my/units/2066",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/maintenance",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/maintenance/new",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/billing",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/documents",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "legitimate_get_/my/notifications",
+      "status": "PASS",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_direct_url_/my/leases/2016",
+      "status": "PASS",
+      "detail": {
+        "status": 403,
+        "redirected": false
+      }
+    },
+    {
+      "name": "foreign_direct_url_/my/units/2059",
+      "status": "PASS",
+      "detail": {
+        "status": 403,
+        "redirected": false
+      }
+    },
+    {
+      "name": "foreign_direct_url_/my/maintenance/599",
+      "status": "PASS",
+      "detail": {
+        "status": 403,
+        "redirected": false
+      }
+    },
+    {
+      "name": "foreign_direct_url_/my/invoices/851",
+      "status": "PASS",
+      "detail": {
+        "status": 200,
+        "redirected": true
+      }
+    },
+    {
+      "name": "foreign_direct_url_/my/deposits/455",
+      "status": "PASS",
+      "detail": {
+        "status": 404,
+        "redirected": false
+      }
+    },
+    {
+      "name": "orm_record_rule_edara.lease.contract",
+      "status": "PASS",
+      "detail": {
+        "result": [
+          {
+            "id": 2017
+          }
+        ],
+        "status": 200
+      }
+    },
+    {
+      "name": "orm_record_rule_edara.unit",
+      "status": "PASS",
+      "detail": {
+        "result": [
+          {
+            "id": 2066
+          }
+        ],
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_orm_read_edara.lease.contract",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_orm_read_edara.unit",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_orm_read_edara.deposit",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_orm_read_edara.maintenance.request",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_orm_read_account.move",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.deposit",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.dashboard",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.branch",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.property",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.building",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.service.charge",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "internal_model_denied_edara.recurring.maintenance",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "protected_contract_write_2017",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "protected_contract_write_2016",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "private_invoice_method_not_exposed",
+      "status": "PASS",
+      "detail": {
+        "error": "odoo.exceptions.AccessError",
+        "status": 200
+      }
+    },
+    {
+      "name": "foreign_maintenance_submit_denied",
+      "status": "PASS",
+      "detail": {
+        "status": 422
+      }
+    },
+    {
+      "name": "foreign_renewal_submit_denied",
+      "status": "PASS",
+      "detail": {
+        "status": 403,
+        "url": "http://127.0.0.1:8069/my/leases/2016/renew"
+      }
+    },
+    {
+      "name": "anonymous_requires_authentication",
+      "status": "PASS"
+    },
+    {
+      "name": "no_portal_rendering_exceptions",
+      "status": "PASS",
+      "detail": []
+    }
+  ],
+  "errors": []
+}

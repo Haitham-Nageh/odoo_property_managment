@@ -789,18 +789,18 @@ $edara-line: #E5E7EB;
     }
 }
 
-/* Icons are drawn with FontAwesome glyphs on ::before (no extra markup to translate). */
+/* Use names present in Odoo 20's bundled Material Symbols subset. */
 $edara-flat-icons: (
-    new: "\f055",
-    assigned: "\f007",
-    progress: "\f021",
-    open: "\f01c",
-    done: "\f058",
-    cancelled: "\f05e",
-    breached: "\f071",
-    at_risk: "\f017",
-    vendor: "\f0d1",
-    recurring: "\f073"
+    new: "add_circle",
+    assigned: "person",
+    progress: "refresh",
+    open: "inbox",
+    done: "check_circle",
+    cancelled: "block",
+    breached: "warning",
+    at_risk: "schedule",
+    vendor: "local_shipping",
+    recurring: "calendar_today"
 );
 
 .o_edara_dashboard .o_edara_flat_stat {
@@ -812,9 +812,15 @@ $edara-flat-icons: (
 
     &[class*="o_ic_"]::before {
         flex: none;
-        font-family: FontAwesome;
-        font-size: 18px;
+        font-family: 'Material Symbols Outlined';
+        font-weight: 400;
         font-style: normal;
+        font-feature-settings: 'liga';
+        letter-spacing: normal;
+        text-transform: none;
+        /*rtl:ignore*/
+        direction: ltr;
+        font-size: 18px;
         line-height: 1;
         text-align: center;
         width: 20px;
@@ -1011,9 +1017,16 @@ $edara-flat-icons: (
 /* Maintenance Overview: request-status matrix and SLA & Operations list */
 .o_edara_dashboard .o_edara_maint_section .o_horizontal_separator::before {
     margin-inline-end: 8px;
-    font-family: FontAwesome;
+    font-family: 'Material Symbols Outlined';
+    font-weight: 400;
+    font-style: normal;
+    font-feature-settings: 'liga';
+    letter-spacing: normal;
+    text-transform: none;
+    /*rtl:ignore*/
+    direction: ltr;
     font-size: .95em;
-    content: "\f0ad";
+    content: "build";
     color: $edara-blue;
 }
 
@@ -1095,14 +1108,21 @@ $edara-flat-icons: (
             }
 
             &::after {
-                font-family: FontAwesome;
+                font-family: 'Material Symbols Outlined';
+                font-weight: 400;
+                font-style: normal;
+                font-feature-settings: 'liga';
+                letter-spacing: normal;
+                text-transform: none;
+                /*rtl:ignore*/
+                direction: ltr;
                 font-size: 11px;
-                content: "\f054";
+                content: "chevron_right";
                 color: $text-muted;
             }
 
             &:dir(rtl)::after {
-                content: "\f053";
+                content: "chevron_left";
             }
 
             /* risk emphasis only while the decorated count is above zero (text-* is set by the
